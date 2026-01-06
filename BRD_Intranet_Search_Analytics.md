@@ -54,24 +54,17 @@ The organization requires visibility into how employees interact with the Intran
 
 Given resource constraints and the need for rapid time-to-value, a **tactical solution** will be implemented as Phase 1:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         IMPLEMENTATION APPROACH                              │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│   PHASE 1: Tactical Solution              PHASE 2: Strategic Solution       │
-│   ─────────────────────────               ───────────────────────────       │
-│                                                                              │
-│   • Manual data extraction                • Automated data pipeline          │
-│   • AppInsights as source                 • Real-time data integration       │
-│   • Flat file processing                  • Click-stream integration         │
-│   • PowerBI dashboards                    • GMDP platform integration        │
-│   • Periodic refresh                      • Advanced analytics & ML          │
-│                                                                              │
-│   [Current Focus]                         [Future State]                     │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+#### Implementation Approach Comparison
+
+| Aspect | Phase 1: Tactical Solution | Phase 2: Strategic Solution |
+|--------|---------------------------|----------------------------|
+| **Status** | **Current Focus** | Future State |
+| Data Extraction | Manual | Automated pipeline |
+| Data Source | AppInsights | AppInsights + Click-stream |
+| Processing | Flat file (CSV/Excel) | Data Lake integration |
+| Visualization | PowerBI dashboards | GMDP platform |
+| Refresh | Periodic (weekly) | Real-time |
+| Analytics | Core KPIs | Advanced analytics & ML |
 
 ---
 
@@ -118,28 +111,14 @@ Senior management lacks systematic visibility into Intranet search usage pattern
 
 ### 3.2 Business Questions to Answer
 
-The tactical solution must enable stakeholders to answer:
+The tactical solution must enable stakeholders to answer the following key questions:
 
-```
-┌────────────────────────────────────────────────────────────────────────────┐
-│                      KEY BUSINESS QUESTIONS                                 │
-├────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  USAGE & ADOPTION                    CONTENT & RELEVANCE                   │
-│  ─────────────────                   ────────────────────                  │
-│  • How many searches per day/week?   • What are users searching for?       │
-│  • Which departments search most?    • Which queries return no results?    │
-│  • What devices are used?            • What content is most clicked?       │
-│  • What are peak usage times?        • Are users finding what they need?   │
-│                                                                             │
-│  PERFORMANCE & QUALITY               TRENDS & PATTERNS                     │
-│  ─────────────────────               ────────────────────                  │
-│  • How fast are search results?      • How is usage trending over time?    │
-│  • What is the error rate?           • Are there seasonal patterns?        │
-│  • How often do users refine?        • Which areas show growth/decline?    │
-│                                                                             │
-└────────────────────────────────────────────────────────────────────────────┘
-```
+| Category | Questions |
+|----------|-----------|
+| **Usage & Adoption** | How many searches per day/week? Which departments search most? What devices are used? What are peak usage times? |
+| **Content & Relevance** | What are users searching for? Which queries return no results? What content is most clicked? Are users finding what they need? |
+| **Performance & Quality** | How fast are search results? What is the error rate? How often do users refine queries? |
+| **Trends & Patterns** | How is usage trending over time? Are there seasonal patterns? Which areas show growth/decline? |
 
 ---
 
@@ -168,32 +147,21 @@ The tactical solution must enable stakeholders to answer:
 
 ### 4.3 Scope Boundaries
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           SCOPE BOUNDARIES                                   │
-│                                                                              │
-│    ┌─────────────────────────────────────────────────────────────────┐      │
-│    │                    IN SCOPE (Phase 1)                            │      │
-│    │  ┌─────────────────────────────────────────────────────────┐    │      │
-│    │  │                                                          │    │      │
-│    │  │   AppInsights    →    Flat File    →    PowerBI         │    │      │
-│    │  │   (Manual Export)     (CSV/Excel)      (Dashboards)     │    │      │
-│    │  │                                                          │    │      │
-│    │  └─────────────────────────────────────────────────────────┘    │      │
-│    └─────────────────────────────────────────────────────────────────┘      │
-│                                                                              │
-│    ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┐      │
-│    │                   OUT OF SCOPE (Phase 2)                       │      │
-│    │  ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐   │      │
-│    │                                                                │      │
-│    │  │   Automated      →    Data Lake    →    GMDP/Advanced  │   │      │
-│    │      Pipeline            + Clicks          Analytics          │      │
-│    │  │                                                         │   │      │
-│    │  └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘   │      │
-│    └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┘      │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+#### Phase 1 — In Scope (Tactical Solution)
+
+| Step | Component | Description |
+|------|-----------|-------------|
+| 1 | AppInsights | Manual data export via KQL queries |
+| 2 | Flat File | CSV/Excel intermediate storage |
+| 3 | PowerBI | Dashboard creation and publication |
+
+#### Phase 2 — Out of Scope (Future State)
+
+| Step | Component | Description |
+|------|-----------|-------------|
+| 1 | Automated Pipeline | Scheduled data extraction |
+| 2 | Data Lake + Clicks | Integrated storage with click-stream |
+| 3 | GMDP / Advanced Analytics | Enterprise platform integration |
 
 ---
 
@@ -201,39 +169,14 @@ The tactical solution must enable stakeholders to answer:
 
 ### 5.1 Tactical Solution Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    TACTICAL SOLUTION ARCHITECTURE                            │
-└─────────────────────────────────────────────────────────────────────────────┘
+The tactical solution follows a three-layer architecture:
 
-     DATA SOURCE              DATA PROCESSING           CONSUMPTION
-    ─────────────            ────────────────          ─────────────
-
-┌─────────────────┐      ┌─────────────────────┐     ┌──────────────────┐
-│                 │      │                     │     │                  │
-│   Application   │      │    Data Analyst     │     │     PowerBI      │
-│    Insights     │─────▶│    Workstation      │────▶│     Service      │
-│                 │      │                     │     │                  │
-│  (Raw Telemetry)│      │  • Export data      │     │  • Dashboards    │
-│                 │      │  • Transform/Clean  │     │  • Reports       │
-└─────────────────┘      │  • Create flat file │     │  • Scheduled     │
-                         │                     │     │    refresh       │
-                         └─────────────────────┘     └──────────────────┘
-                                                              │
-                                    ┌─────────────────────────┘
-                                    │
-                                    ▼
-                         ┌──────────────────────┐
-                         │                      │
-                         │   Senior Management  │
-                         │      & Stakeholders  │
-                         │                      │
-                         │   • View dashboards  │
-                         │   • Export reports   │
-                         │   • Decision support │
-                         │                      │
-                         └──────────────────────┘
-```
+| Layer | Component | Technology | Responsibility |
+|-------|-----------|------------|----------------|
+| **Data Source** | Application Insights | Azure AppInsights | Stores raw search telemetry events |
+| **Data Processing** | Analyst Workstation | KQL / Excel / Power Query | Export, transform, and clean data |
+| **Consumption** | PowerBI Service | PowerBI Desktop & Service | Dashboards, reports, scheduled refresh |
+| **End Users** | Senior Management | Web Browser | View dashboards, export reports, decision support |
 
 ### 5.2 Component Description
 
@@ -247,25 +190,13 @@ The tactical solution must enable stakeholders to answer:
 
 ### 5.3 Data Flow
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              DATA FLOW                                       │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-  Step 1              Step 2              Step 3              Step 4
-  ──────              ──────              ──────              ──────
-
-┌─────────┐       ┌───────────┐       ┌───────────┐       ┌───────────┐
-│ Execute │       │  Export   │       │  Process  │       │  Refresh  │
-│  KQL    │──────▶│  Results  │──────▶│  & Clean  │──────▶│  PowerBI  │
-│ Query   │       │  to CSV   │       │   Data    │       │  Dataset  │
-└─────────┘       └───────────┘       └───────────┘       └───────────┘
-     │                  │                   │                   │
-     │                  │                   │                   │
-     ▼                  ▼                   ▼                   ▼
- AppInsights        Raw Data           Flat File           Dashboard
-   Portal           Export            (Processed)           Updated
-```
+| Step | Action | Input | Output | Tool |
+|------|--------|-------|--------|------|
+| 1 | Execute KQL Query | Query parameters | Raw telemetry data | AppInsights Portal |
+| 2 | Export Results | Query results | CSV/Excel file | AppInsights Export |
+| 3 | Process & Clean | Raw export file | Cleaned flat file | Excel / Power Query |
+| 4 | Refresh PowerBI | Flat file | Updated dashboard | PowerBI Desktop |
+| 5 | Publish | Local dashboard | Published report | PowerBI Service |
 
 ---
 
@@ -273,43 +204,16 @@ The tactical solution must enable stakeholders to answer:
 
 ### 6.1 Data Model Overview
 
-The tactical solution will capture and organize data across six logical groupings:
+The tactical solution captures and organizes data across **six logical groupings**, with the Search Event as the central fact:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           DATA MODEL STRUCTURE                               │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-                        ┌─────────────────────────┐
-                        │    SEARCH EVENT         │
-                        │    (Central Fact)       │
-                        └───────────┬─────────────┘
-                                    │
-            ┌───────────────────────┼───────────────────────┐
-            │                       │                       │
-            ▼                       ▼                       ▼
-┌───────────────────┐   ┌───────────────────┐   ┌───────────────────┐
-│  USER & CONTEXT   │   │  QUERY DETAILS    │   │ SESSION METADATA  │
-│                   │   │                   │   │                   │
-│ • User ID         │   │ • Search Terms    │   │ • Timestamp       │
-│ • Department      │   │ • Query Language  │   │ • Session ID      │
-│ • Location        │   │ • Query Length    │   │ • Device Type     │
-│ • Role            │   │ • Query Type      │   │ • Browser/OS      │
-└───────────────────┘   └───────────────────┘   └───────────────────┘
-
-            ┌───────────────────────┼───────────────────────┐
-            │                       │                       │
-            ▼                       ▼                       ▼
-┌───────────────────┐   ┌───────────────────┐   ┌───────────────────┐
-│ RESULTS &         │   │  SEARCH           │   │ FEEDBACK &        │
-│ INTERACTION       │   │  PERFORMANCE      │   │ OUTCOME           │
-│                   │   │                   │   │                   │
-│ • Results Count   │   │ • Search Latency  │   │ • User Feedback   │
-│ • Clicked Results │   │ • Error Type      │   │ • Reformulation   │
-│ • Click Position  │   │ • Suggestions     │   │ • Abandonment     │
-│ • Time to Click   │   │   Shown/Used      │   │                   │
-└───────────────────┘   └───────────────────┘   └───────────────────┘
-```
+| Grouping | Key Fields | Purpose |
+|----------|------------|---------|
+| **User & Context** | User ID, Department, Location, Role | Identify who is searching |
+| **Query Details** | Search Terms, Language, Length, Type | Understand what they search for |
+| **Session Metadata** | Timestamp, Session ID, Device, Browser | Track when and how they search |
+| **Results & Interaction** | Results Count, Clicked Results, Click Position | Measure engagement |
+| **Search Performance** | Latency, Errors, Suggestions | Monitor system health |
+| **Feedback & Outcome** | User Feedback, Reformulation, Abandonment | Assess success |
 
 ### 6.2 Detailed Field Specifications
 
@@ -378,105 +282,35 @@ The tactical solution will capture and organize data across six logical grouping
 
 ### 6.3 Flat File Structure
 
-The exported flat file will contain one row per search event with all fields concatenated:
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         FLAT FILE STRUCTURE                                  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  File Format:     CSV (UTF-8 encoding) or Excel (.xlsx)                     │
-│  Delimiter:       Comma (for CSV)                                            │
-│  Header Row:      Yes (first row contains column names)                      │
-│  Date Format:     ISO 8601 (YYYY-MM-DD HH:MM:SS)                            │
-│  Null Handling:   Empty string for missing values                            │
-│                                                                              │
-│  Naming Convention:                                                          │
-│  search_analytics_YYYYMMDD_YYYYMMDD.csv                                     │
-│  (start date to end date of data range)                                      │
-│                                                                              │
-│  Example: search_analytics_20260101_20260107.csv                            │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+| Property | Specification |
+|----------|---------------|
+| **File Format** | CSV (UTF-8 encoding) or Excel (.xlsx) |
+| **Delimiter** | Comma (for CSV) |
+| **Header Row** | Yes (first row contains column names) |
+| **Date Format** | ISO 8601 (YYYY-MM-DD HH:MM:SS) |
+| **Null Handling** | Empty string for missing values |
+| **Naming Convention** | `search_analytics_YYYYMMDD_YYYYMMDD.csv` |
+| **Example** | `search_analytics_20260101_20260107.csv` |
 
 ### 6.4 Data Groupings for Analysis
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      DATA GROUPINGS & ANALYTICS USE                          │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-  GROUPING                    ANALYSIS PURPOSE
-  ────────                    ────────────────
-
-  User & Context         ──▶  "Who is searching and from where?"
-                              • Department-level adoption metrics
-                              • Geographic usage patterns
-                              • Role-based search behavior
-
-  Query Details          ──▶  "What are they searching for?"
-                              • Top search terms analysis
-                              • Query complexity trends
-                              • Language distribution
-
-  Session & Device       ──▶  "When and how are they searching?"
-                              • Peak usage time identification
-                              • Device preference analysis
-                              • Session duration patterns
-
-  Results & Engagement   ──▶  "What do they do with results?"
-                              • Click-through rate analysis
-                              • Result position effectiveness
-                              • User engagement depth
-
-  Performance & Quality  ──▶  "How well does the search perform?"
-                              • Latency monitoring
-                              • Error rate tracking
-                              • System health indicators
-
-  Feedback & Outcomes    ──▶  "Was the search successful?"
-                              • Success rate measurement
-                              • Abandonment analysis
-                              • User satisfaction indicators
-```
+| Grouping | Key Question | Analysis Purpose |
+|----------|--------------|------------------|
+| **User & Context** | "Who is searching and from where?" | Department-level adoption, geographic patterns, role-based behavior |
+| **Query Details** | "What are they searching for?" | Top search terms, query complexity, language distribution |
+| **Session & Device** | "When and how are they searching?" | Peak usage times, device preferences, session patterns |
+| **Results & Engagement** | "What do they do with results?" | Click-through rates, result position effectiveness, engagement depth |
+| **Performance & Quality** | "How well does the search perform?" | Latency monitoring, error tracking, system health |
+| **Feedback & Outcomes** | "Was the search successful?" | Success rates, abandonment analysis, satisfaction indicators |
 
 ### 6.5 Benefits of This Grouping Approach
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    WHY GROUP DATA THIS WAY?                                  │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-  1. PATTERN IDENTIFICATION
-     ───────────────────────
-     Enables detection of patterns across different dimensions:
-     • Certain teams struggling to find information
-     • Mobile users experiencing more errors than desktop users
-     • Specific locations with higher abandonment rates
-
-  2. IMPROVEMENT OPPORTUNITIES
-     ─────────────────────────
-     Helps spot actionable opportunities for optimization:
-     • Common queries that consistently return poor results
-     • Slow searches occurring at specific times of day
-     • Content gaps where users frequently search but find nothing
-     • High-traffic queries that could benefit from featured results
-
-  3. CROSS-DIMENSIONAL ANALYSIS
-     ──────────────────────────
-     Allows correlation of metrics across groupings:
-     • Performance issues affecting specific departments
-     • Device-specific usability problems
-     • Time-based patterns indicating infrastructure constraints
-
-  4. TARGETED ACTIONS
-     ────────────────
-     Supports prioritization of improvements:
-     • Focus content creation on high-volume zero-result queries
-     • Address performance issues during peak usage windows
-     • Improve search experience for underserved user segments
-```
+| Benefit | Description | Examples |
+|---------|-------------|----------|
+| **Pattern Identification** | Enables detection of patterns across different dimensions | Certain teams struggling to find information; Mobile users experiencing more errors; Specific locations with higher abandonment rates |
+| **Improvement Opportunities** | Helps spot actionable opportunities for optimization | Common queries with poor results; Slow searches at specific times; Content gaps where users find nothing; High-traffic queries needing featured results |
+| **Cross-Dimensional Analysis** | Allows correlation of metrics across groupings | Performance issues affecting specific departments; Device-specific usability problems; Time-based infrastructure constraints |
+| **Targeted Actions** | Supports prioritization of improvements | Focus content on high-volume zero-result queries; Address performance during peak windows; Improve experience for underserved segments |
 
 ---
 
@@ -484,54 +318,25 @@ The exported flat file will contain one row per search event with all fields con
 
 ### 7.1 Data Extraction Process
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      DATA EXTRACTION PROCESS FLOW                            │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   START     │     │   Access    │     │   Execute   │     │   Review    │
-│   Weekly    │────▶│ AppInsights │────▶│    KQL      │────▶│   Query     │
-│   Process   │     │   Portal    │     │   Query     │     │   Results   │
-└─────────────┘     └─────────────┘     └─────────────┘     └──────┬──────┘
-                                                                    │
-                          ┌─────────────────────────────────────────┘
-                          │
-                          ▼
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Upload    │     │   Refresh   │     │   Process   │     │   Export    │
-│   to File   │◀────│   PowerBI   │◀────│    Data     │◀────│   to CSV/   │
-│   Location  │     │   Dataset   │     │   (Clean)   │     │   Excel     │
-└──────┬──────┘     └─────────────┘     └─────────────┘     └─────────────┘
-       │
-       │            ┌─────────────┐
-       └───────────▶│    END      │
-                    │   Process   │
-                    └─────────────┘
-```
+| Step | Activity | Owner | Output |
+|------|----------|-------|--------|
+| 1 | Start weekly process | Data Analyst | Process initiated |
+| 2 | Access AppInsights Portal | Data Analyst | Portal access confirmed |
+| 3 | Execute KQL Query | Data Analyst | Query results displayed |
+| 4 | Review Query Results | Data Analyst | Data validated |
+| 5 | Export to CSV/Excel | Data Analyst | Raw export file |
+| 6 | Process & Clean Data | Data Analyst | Cleaned flat file |
+| 7 | Refresh PowerBI Dataset | Data Analyst | Dataset updated |
+| 8 | Upload to File Location | Data Analyst | File stored |
+| 9 | End Process | Data Analyst | Process complete |
 
 ### 7.2 Weekly Operational Cadence
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      WEEKLY OPERATIONAL CADENCE                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-  MONDAY                TUESDAY               WEDNESDAY - FRIDAY
-  ──────                ───────               ──────────────────
-
-  Data Extraction       Dashboard Update      Stakeholder Access
-  & Processing          & Validation          & Analysis
-
-  ┌─────────────┐      ┌─────────────┐       ┌─────────────┐
-  │ • Run KQL   │      │ • Refresh   │       │ • View      │
-  │   queries   │ ───▶ │   PowerBI   │ ───▶  │   dashboards│
-  │ • Export    │      │ • Validate  │       │ • Generate  │
-  │   data      │      │   metrics   │       │   insights  │
-  │ • Clean &   │      │ • Publish   │       │ • Export    │
-  │   transform │      │   updates   │       │   reports   │
-  └─────────────┘      └─────────────┘       └─────────────┘
-```
+| Day | Activity | Tasks | Owner |
+|-----|----------|-------|-------|
+| **Monday** | Data Extraction & Processing | Run KQL queries; Export data; Clean & transform | Data Analyst |
+| **Tuesday** | Dashboard Update & Validation | Refresh PowerBI; Validate metrics; Publish updates | Data Analyst |
+| **Wednesday–Friday** | Stakeholder Access & Analysis | View dashboards; Generate insights; Export reports | Senior Management |
 
 ---
 
@@ -539,32 +344,11 @@ The exported flat file will contain one row per search event with all fields con
 
 ### 8.1 KPI Framework
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          KPI FRAMEWORK                                       │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-                              SEARCH ANALYTICS KPIs
-                                      │
-           ┌──────────────────────────┼──────────────────────────┐
-           │                          │                          │
-           ▼                          ▼                          ▼
-    ┌─────────────┐           ┌─────────────┐           ┌─────────────┐
-    │   USAGE     │           │  QUALITY    │           │ PERFORMANCE │
-    │   METRICS   │           │  METRICS    │           │   METRICS   │
-    └──────┬──────┘           └──────┬──────┘           └──────┬──────┘
-           │                         │                         │
-    ┌──────┴──────┐           ┌──────┴──────┐           ┌──────┴──────┐
-    │• Search Vol │           │• Zero Result│           │• Avg Latency│
-    │• Unique     │           │  Rate       │           │• P95 Latency│
-    │  Users      │           │• Click-thru │           │• Error Rate │
-    │• Searches   │           │  Rate       │           │• Availability│
-    │  per User   │           │• Abandon    │           │             │
-    │• Dept       │           │  Rate       │           │             │
-    │  Breakdown  │           │• Refinement │           │             │
-    │             │           │  Rate       │           │             │
-    └─────────────┘           └─────────────┘           └─────────────┘
-```
+| Category | KPIs Included |
+|----------|---------------|
+| **Usage Metrics** | Total Search Volume, Unique Users, Searches per User, Department Breakdown |
+| **Quality Metrics** | Zero Result Rate, Click-Through Rate, Abandonment Rate, Query Refinement Rate |
+| **Performance Metrics** | Average Latency, P95 Latency, Error Rate, Availability |
 
 ### 8.2 KPI Definitions
 
@@ -583,50 +367,35 @@ The exported flat file will contain one row per search event with all fields con
 
 ### 8.3 Dashboard Views
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      POWERBI DASHBOARD STRUCTURE                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+#### Page 1: Executive Summary
 
-  PAGE 1: Executive Summary
-  ─────────────────────────
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │  [Total Searches]  [Unique Users]  [CTR]  [Zero Result Rate]       │
-  │       KPI Card         KPI Card      KPI Card     KPI Card          │
-  ├─────────────────────────────────────────────────────────────────────┤
-  │                                                                      │
-  │  [Search Volume Trend - Line Chart]    [Top Search Terms - Bar]    │
-  │                                                                      │
-  ├─────────────────────────────────────────────────────────────────────┤
-  │  [Department Breakdown - Donut]    [Device Distribution - Donut]   │
-  │                                                                      │
-  └─────────────────────────────────────────────────────────────────────┘
+| Section | Visualizations |
+|---------|----------------|
+| KPI Cards (Top Row) | Total Searches, Unique Users, CTR, Zero Result Rate |
+| Charts (Middle) | Search Volume Trend (Line), Top Search Terms (Bar) |
+| Charts (Bottom) | Department Breakdown (Donut), Device Distribution (Donut) |
 
-  PAGE 2: Search Behavior Analysis
-  ────────────────────────────────
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │  [Search by Hour - Heatmap]                                         │
-  ├─────────────────────────────────────────────────────────────────────┤
-  │  [Query Length Distribution]     [Query Type Breakdown]            │
-  ├─────────────────────────────────────────────────────────────────────┤
-  │  [Top Zero-Result Queries - Table]                                  │
-  └─────────────────────────────────────────────────────────────────────┘
+#### Page 2: Search Behavior Analysis
 
-  PAGE 3: Performance Metrics
-  ───────────────────────────
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │  [Avg Latency]   [P95 Latency]   [Error Rate]   [Availability]     │
-  ├─────────────────────────────────────────────────────────────────────┤
-  │  [Latency Trend Over Time]      [Error Distribution by Type]       │
-  └─────────────────────────────────────────────────────────────────────┘
+| Section | Visualizations |
+|---------|----------------|
+| Heatmap | Search Activity by Hour of Day |
+| Charts | Query Length Distribution, Query Type Breakdown |
+| Table | Top Zero-Result Queries (sortable, filterable) |
 
-  PAGE 4: Detailed Data (Drill-through)
-  ─────────────────────────────────────
-  ┌─────────────────────────────────────────────────────────────────────┐
-  │  [Filterable Data Table with all search events]                     │
-  │  [Export functionality enabled]                                     │
-  └─────────────────────────────────────────────────────────────────────┘
-```
+#### Page 3: Performance Metrics
+
+| Section | Visualizations |
+|---------|----------------|
+| KPI Cards | Avg Latency, P95 Latency, Error Rate, Availability |
+| Charts | Latency Trend Over Time, Error Distribution by Type |
+
+#### Page 4: Detailed Data (Drill-through)
+
+| Section | Visualizations |
+|---------|----------------|
+| Data Table | Filterable table with all search events |
+| Actions | Export functionality enabled |
 
 ---
 
@@ -654,7 +423,7 @@ The exported flat file will contain one row per search event with all fields con
 | Consume and analyze insights | I | C | R | C |
 | Maintain data quality | R | A | I | C |
 
-*R = Responsible, A = Accountable, C = Consulted, I = Informed*
+**Legend:** R = Responsible, A = Accountable, C = Consulted, I = Informed
 
 ---
 
@@ -696,24 +465,11 @@ The exported flat file will contain one row per search event with all fields con
 
 ### 11.2 Risk Matrix
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           RISK MATRIX                                        │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-           │
-    HIGH   │              R1
-           │
-  IMPACT   │         R3       R5
-           │
-   MEDIUM  │    R6   R2   R4
-           │
-    LOW    │
-           │
-           └──────────────────────────────
-               LOW    MEDIUM    HIGH
-                   PROBABILITY
-```
+| | **Low Impact** | **Medium Impact** | **High Impact** |
+|---|----------------|-------------------|-----------------|
+| **High Probability** | | R3 | |
+| **Medium Probability** | R6 | R2, R4 | R1 |
+| **Low Probability** | | | R5 |
 
 ---
 
@@ -746,37 +502,14 @@ The tactical solution will be considered complete when:
 
 ### 13.1 Phase Evolution
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         SOLUTION ROADMAP                                     │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-  PHASE 1                   PHASE 2                   PHASE 3
-  Tactical                  Automated                 Advanced
-  (Current)                 Pipeline                  Analytics
-
-  ┌─────────────┐          ┌─────────────┐          ┌─────────────┐
-  │             │          │             │          │             │
-  │  Manual     │          │  Automated  │          │  GMDP       │
-  │  Extract    │────────▶ │  Data       │────────▶ │  Integration│
-  │             │          │  Pipeline   │          │             │
-  │  Flat File  │          │             │          │  ML/AI      │
-  │             │          │  Real-time  │          │  Insights   │
-  │  PowerBI    │          │  Updates    │          │             │
-  │             │          │             │          │  Predictive │
-  └─────────────┘          │  Click      │          │  Analytics  │
-                           │  Integration│          │             │
-                           │             │          └─────────────┘
-                           └─────────────┘
-
-  CAPABILITIES:            CAPABILITIES:            CAPABILITIES:
-
-  • Basic search           • Automated refresh      • Trend prediction
-    analytics              • Click-stream data      • Anomaly detection
-  • Weekly reporting       • Real-time dashboards   • Content recommendations
-  • Manual refresh         • Alerting               • Personalization insights
-  • Core KPIs              • Extended KPIs          • Advanced segmentation
-```
+| Aspect | Phase 1: Tactical (Current) | Phase 2: Automated Pipeline | Phase 3: Advanced Analytics |
+|--------|----------------------------|-----------------------------|-----------------------------|
+| **Data Extraction** | Manual export | Automated scheduled jobs | Real-time streaming |
+| **Data Storage** | Flat files | Data Lake | GMDP integration |
+| **Click Tracking** | Limited/partial | Full click-stream integration | Behavioral analytics |
+| **Refresh Frequency** | Weekly | Daily/hourly | Near real-time |
+| **Analytics** | Core KPIs | Extended KPIs, Alerting | ML/AI, Predictive |
+| **Capabilities** | Basic search analytics, Weekly reporting | Automated refresh, Real-time dashboards | Trend prediction, Anomaly detection, Content recommendations |
 
 ### 13.2 Phase 2 Enhancements (Future)
 
@@ -796,10 +529,10 @@ The tactical solution will be considered complete when:
 
 | Term | Definition |
 |------|------------|
-| **AppInsights** | Azure Application Insights - Microsoft's application performance monitoring service |
-| **KQL** | Kusto Query Language - query language used in Azure Data Explorer and AppInsights |
+| **AppInsights** | Azure Application Insights — Microsoft's application performance monitoring service |
+| **KQL** | Kusto Query Language — query language used in Azure Data Explorer and AppInsights |
 | **GMDP** | Global Marketing Data Platform (enterprise data platform) |
-| **CTR** | Click-Through Rate - percentage of searches resulting in clicks |
+| **CTR** | Click-Through Rate — percentage of searches resulting in clicks |
 | **Zero Result Rate** | Percentage of searches that return no results |
 | **P95 Latency** | 95th percentile response time (95% of requests complete within this time) |
 | **Query Refinement** | When a user modifies their search query immediately after initial search |
