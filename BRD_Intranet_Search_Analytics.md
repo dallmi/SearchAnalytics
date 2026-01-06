@@ -66,6 +66,24 @@ Given resource constraints and the need for rapid time-to-value, a **tactical so
 | Refresh | Periodic (weekly) | Real-time |
 | Analytics | Core KPIs | Extended KPIs with click data |
 
+```
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                        IMPLEMENTATION ROADMAP                              ║
+╠═══════════════════════════════════════════════════════════════════════════╣
+║                                                                            ║
+║   PHASE 1: Tactical                    PHASE 2: Strategic                 ║
+║   ══════════════════                   ═══════════════════                ║
+║   [CURRENT FOCUS]                      [FUTURE STATE]                     ║
+║                                                                            ║
+║   • Manual extraction                  • Automated pipeline               ║
+║   • AppInsights only                   • AppInsights + GMDP               ║
+║   • Flat file processing        ───►   • Data Lake integration            ║
+║   • PowerBI dashboards                 • Extended analytics               ║
+║   • Weekly refresh                     • Real-time updates                ║
+║                                                                            ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+```
+
 ---
 
 ## 2. Business Context
@@ -196,6 +214,32 @@ The tactical solution follows a three-layer architecture:
 | **Consumption** | PowerBI Service | PowerBI Desktop & Service | Dashboards, reports, scheduled refresh |
 | **End Users** | Senior Management | Web Browser | View dashboards, export reports, decision support |
 
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     TACTICAL SOLUTION ARCHITECTURE                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  DATA SOURCE              PROCESSING                 CONSUMPTION
+  ───────────              ──────────                 ───────────
+
+┌───────────────┐      ┌─────────────────┐      ┌─────────────────┐
+│               │      │                 │      │                 │
+│  AppInsights  │ ───► │  Data Analyst   │ ───► │    PowerBI      │
+│               │      │  Workstation    │      │    Service      │
+│  (Telemetry)  │      │                 │      │                 │
+└───────────────┘      │  • KQL Export   │      │  • Dashboards   │
+                       │  • Excel/PQ     │      │  • Reports      │
+                       │  • Flat File    │      │  • Sharing      │
+                       └─────────────────┘      └────────┬────────┘
+                                                         │
+                                                         ▼
+                                                ┌─────────────────┐
+                                                │     Senior      │
+                                                │   Management    │
+                                                │  & Stakeholders │
+                                                └─────────────────┘
+```
+
 ### 5.2 Component Description
 
 | Component | Technology | Purpose |
@@ -216,6 +260,25 @@ The tactical solution follows a three-layer architecture:
 | 4 | Refresh PowerBI | Flat file | Updated dashboard | PowerBI Desktop |
 | 5 | Publish | Local dashboard | Published report | PowerBI Service |
 
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              DATA FLOW                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  Step 1           Step 2           Step 3           Step 4           Step 5
+  ──────           ──────           ──────           ──────           ──────
+
+┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐     ┌─────────┐
+│ Execute │     │ Export  │     │ Process │     │ Refresh │     │ Publish │
+│   KQL   │ ──► │   to    │ ──► │ & Clean │ ──► │ PowerBI │ ──► │   to    │
+│  Query  │     │   CSV   │     │  Data   │     │ Dataset │     │ Service │
+└─────────┘     └─────────┘     └─────────┘     └─────────┘     └─────────┘
+     │               │               │               │               │
+     ▼               ▼               ▼               ▼               ▼
+ AppInsights     Raw Data      Flat File       Dashboard        Live
+   Portal         Export       (Cleaned)        Updated        Report
+```
+
 ---
 
 ## 6. Data Requirements
@@ -233,7 +296,43 @@ The tactical solution captures and organizes data across logical groupings. **Ph
 | **Search Performance** | Latency, Errors, Suggestions | Monitor system health | Phase 1 |
 | **Query Outcome** | User Feedback, Query Reformulation | Assess search quality | Phase 1 |
 | **Click & Interaction** | Clicked Results, Click Position, Time on Result | Measure engagement depth | **Phase 2 (GMDP)** |
-| **Abandonment** | Session abandoned without click | Assess search success | **Phase 2 (GMDP)** |
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           DATA MODEL STRUCTURE                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                           ┌─────────────────────┐
+                           │    SEARCH EVENT     │
+                           │   (Central Fact)    │
+                           └──────────┬──────────┘
+                                      │
+          ┌───────────────────────────┼───────────────────────────┐
+          │                           │                           │
+          ▼                           ▼                           ▼
+┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
+│ USER & CONTEXT  │       │  QUERY DETAILS  │       │SESSION METADATA │
+│   [Phase 1]     │       │    [Phase 1]    │       │    [Phase 1]    │
+├─────────────────┤       ├─────────────────┤       ├─────────────────┤
+│ • User ID       │       │ • Search Terms  │       │ • Timestamp     │
+│ • Department    │       │ • Language      │       │ • Session ID    │
+│ • Location      │       │ • Query Length  │       │ • Device Type   │
+│ • Role          │       │ • Query Type    │       │ • Browser/OS    │
+└─────────────────┘       └─────────────────┘       └─────────────────┘
+
+          ┌───────────────────────────┼───────────────────────────┐
+          │                           │                           │
+          ▼                           ▼                           ▼
+┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
+│  RESULTS &      │       │    SEARCH       │       │   CLICK &       │
+│  PERFORMANCE    │       │    OUTCOME      │       │   INTERACTION   │
+│   [Phase 1]     │       │    [Phase 1]    │       │  [Phase 2/GMDP] │
+├─────────────────┤       ├─────────────────┤       ├─────────────────┤
+│ • Results Count │       │ • Feedback      │       │ • Click Position│
+│ • Latency       │       │ • Reformulation │       │ • Time on Result│
+│ • Errors        │       │                 │       │ • Abandonment   │
+└─────────────────┘       └─────────────────┘       └─────────────────┘
+```
 
 ### 6.2 Detailed Field Specifications
 
@@ -370,11 +469,64 @@ The tactical solution captures and organizes data across logical groupings. **Ph
 | **Tuesday** | Dashboard Update & Validation | Refresh PowerBI; Validate metrics; Publish updates | Data Analyst |
 | **Wednesday–Friday** | Stakeholder Access & Analysis | View dashboards; Generate insights; Export reports | Senior Management |
 
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      WEEKLY OPERATIONAL CADENCE                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    MONDAY                  TUESDAY                 WED - FRI
+    ══════                  ═══════                 ═════════
+
+┌───────────────┐      ┌───────────────┐      ┌───────────────┐
+│   DATA        │      │   DASHBOARD   │      │  STAKEHOLDER  │
+│   EXTRACTION  │ ───► │   UPDATE      │ ───► │   ACCESS      │
+│   & PROCESS   │      │   & VALIDATE  │      │   & ANALYSIS  │
+├───────────────┤      ├───────────────┤      ├───────────────┤
+│ • Run KQL     │      │ • Refresh PBI │      │ • View reports│
+│ • Export data │      │ • Validate    │      │ • Insights    │
+│ • Clean/Trans │      │ • Publish     │      │ • Export      │
+└───────────────┘      └───────────────┘      └───────────────┘
+    Data Analyst           Data Analyst          Senior Mgmt
+```
+
 ---
 
 ## 8. Key Performance Indicators
 
 ### 8.1 KPI Framework — Phase 1 (Tactical)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           KPI FRAMEWORK OVERVIEW                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  PHASE 1 — AVAILABLE (AppInsights)          PHASE 2 — DEFERRED (GMDP)
+  ════════════════════════════════           ══════════════════════════
+
+  ┌─────────────────────────────┐            ┌─────────────────────────────┐
+  │      USAGE METRICS          │            │   ENGAGEMENT METRICS        │
+  │  ─────────────────────      │            │   ────────────────────      │
+  │  • Total Search Volume      │            │  • Click-Through Rate       │
+  │  • Unique Users             │            │  • Abandonment Rate         │
+  │  • Searches per User        │            │  • Time to First Click      │
+  │  • Department Breakdown     │            │                             │
+  └─────────────────────────────┘            └─────────────────────────────┘
+
+  ┌─────────────────────────────┐            ┌─────────────────────────────┐
+  │    QUERY QUALITY METRICS    │            │  CONTENT EFFECTIVENESS      │
+  │  ─────────────────────────  │            │  ──────────────────────     │
+  │  • Zero Result Rate         │            │  • Result Position Perf.    │
+  │  • Query Refinement Rate    │            │  • Time on Result           │
+  └─────────────────────────────┘            └─────────────────────────────┘
+
+  ┌─────────────────────────────┐
+  │   PERFORMANCE METRICS       │
+  │   ───────────────────       │
+  │  • Average Latency          │
+  │  • P95 Latency              │
+  │  • Error Rate               │
+  └─────────────────────────────┘
+```
 
 **Available in Phase 1** (AppInsights data only):
 
@@ -414,6 +566,28 @@ The tactical solution captures and organizes data across logical groupings. **Ph
 | **Time to First Click** | Average time until user clicks a result | `AVG(time_to_click)` | < 5s | GMDP |
 
 ### 8.4 Dashboard Views — Phase 1
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        POWERBI DASHBOARD STRUCTURE                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+  PAGE 1                    PAGE 2                    PAGE 3                PAGE 4
+  ══════                    ══════                    ══════                ══════
+  Executive                 Search                    Performance           Detailed
+  Summary                   Behavior                  Metrics               Data
+
+  ┌──────────┐             ┌──────────┐             ┌──────────┐          ┌──────────┐
+  │ KPI Cards│             │ Heatmap  │             │ KPI Cards│          │ Data     │
+  │ ──────── │             │ (Hour)   │             │ (Latency)│          │ Table    │
+  ├──────────┤             ├──────────┤             ├──────────┤          │          │
+  │ Volume   │             │ Query    │             │ Latency  │          │ Filter & │
+  │ Trend    │             │ Length   │             │ Trend    │          │ Export   │
+  ├──────────┤             ├──────────┤             ├──────────┤          │          │
+  │ Dept &   │             │ Zero-    │             │ Error    │          │          │
+  │ Device   │             │ Result   │             │ Distrib. │          │          │
+  └──────────┘             └──────────┘             └──────────┘          └──────────┘
+```
 
 #### Page 1: Executive Summary
 
@@ -535,6 +709,47 @@ The tactical solution will be considered complete when:
 ## 13. Future State Roadmap
 
 ### 13.1 Phase Evolution
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           PHASE EVOLUTION ROADMAP                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+       PHASE 1: TACTICAL                           PHASE 2: STRATEGIC
+       ═════════════════                           ══════════════════
+       [CURRENT STATE]                             [FUTURE STATE]
+
+  ┌─────────────────────────┐                 ┌─────────────────────────┐
+  │                         │                 │                         │
+  │   ┌───────────────┐     │                 │   ┌───────────────┐     │
+  │   │  AppInsights  │     │                 │   │  AppInsights  │     │
+  │   └───────┬───────┘     │                 │   └───────┬───────┘     │
+  │           │             │                 │           │             │
+  │           ▼             │                 │           ▼             │
+  │   ┌───────────────┐     │    ═══════►    │   ┌───────────────┐     │
+  │   │ Manual Export │     │    Automate    │   │   Automated   │     │
+  │   │ (KQL/Portal)  │     │                │   │   Pipeline    │     │
+  │   └───────┬───────┘     │                 │   └───────┬───────┘     │
+  │           │             │                 │           │             │
+  │           ▼             │                 │           ▼             │
+  │   ┌───────────────┐     │                 │   ┌───────────────┐     │
+  │   │   Flat File   │     │                 │   │   Data Lake   │◄────┼─────┐
+  │   │  (CSV/Excel)  │     │                 │   │  Integration  │     │     │
+  │   └───────┬───────┘     │                 │   └───────┬───────┘     │     │
+  │           │             │                 │           │             │  ┌──┴──┐
+  │           ▼             │                 │           ▼             │  │GMDP │
+  │   ┌───────────────┐     │                 │   ┌───────────────┐     │  │Click│
+  │   │    PowerBI    │     │                 │   │    PowerBI    │     │  │Data │
+  │   │  (Weekly)     │     │                 │   │ (Real-time)   │     │  └─────┘
+  │   └───────────────┘     │                 │   └───────────────┘     │
+  │                         │                 │                         │
+  │   KPIs Available:       │                 │   KPIs Available:       │
+  │   • Search Volume       │                 │   • All Phase 1 KPIs    │
+  │   • Zero Result Rate    │                 │   • Click-Through Rate  │
+  │   • Latency/Errors      │                 │   • Abandonment Rate    │
+  │                         │                 │   • Content Engagement  │
+  └─────────────────────────┘                 └─────────────────────────┘
+```
 
 | Aspect | Phase 1: Tactical (Current) | Phase 2: Automated Pipeline + GMDP |
 |--------|----------------------------|-----------------------------------|
