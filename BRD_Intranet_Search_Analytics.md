@@ -64,7 +64,7 @@ Given resource constraints and the need for rapid time-to-value, a **tactical so
 | Processing | Flat file (CSV/Excel) | Data Lake integration |
 | Visualization | PowerBI dashboards | GMDP platform |
 | Refresh | Periodic (weekly) | Real-time |
-| Analytics | Core KPIs | Advanced analytics & ML |
+| Analytics | Core KPIs | Extended KPIs with click data |
 
 ---
 
@@ -159,7 +159,6 @@ The tactical solution enables stakeholders to answer questions **based on AppIns
 | Click-through data & engagement metrics | Click data resides in GMDP, not AppInsights | **GMDP** | Phase 2 |
 | GMDP platform integration | Resource and timeline constraints | GMDP | Phase 2 |
 | Real-time data streaming | Requires automated pipeline infrastructure | — | Phase 2 |
-| Predictive analytics / ML | Requires mature data foundation | — | Phase 2+ |
 | Automated alerting | Requires pipeline automation | — | Phase 2 |
 
 **Note:** Click-through rate (CTR), content engagement, and result effectiveness metrics require integration with GMDP where click-stream data is stored. These metrics are explicitly deferred to Phase 2.
@@ -180,7 +179,7 @@ The tactical solution enables stakeholders to answer questions **based on AppIns
 |------|-----------|-------------|
 | 1 | Automated Pipeline | Scheduled data extraction |
 | 2 | Data Lake + Clicks | Integrated storage with click-stream |
-| 3 | GMDP / Advanced Analytics | Enterprise platform integration |
+| 3 | GMDP Integration | Click data and enterprise platform integration |
 
 ---
 
@@ -551,14 +550,14 @@ The tactical solution will be considered complete when:
 
 ### 13.1 Phase Evolution
 
-| Aspect | Phase 1: Tactical (Current) | Phase 2: Automated Pipeline | Phase 3: Advanced Analytics |
-|--------|----------------------------|-----------------------------|-----------------------------|
-| **Data Extraction** | Manual export | Automated scheduled jobs | Real-time streaming |
-| **Data Storage** | Flat files | Data Lake | GMDP integration |
-| **Click Tracking** | Limited/partial | Full click-stream integration | Behavioral analytics |
-| **Refresh Frequency** | Weekly | Daily/hourly | Near real-time |
-| **Analytics** | Core KPIs | Extended KPIs, Alerting | ML/AI, Predictive |
-| **Capabilities** | Basic search analytics, Weekly reporting | Automated refresh, Real-time dashboards | Trend prediction, Anomaly detection, Content recommendations |
+| Aspect | Phase 1: Tactical (Current) | Phase 2: Automated Pipeline + GMDP |
+|--------|----------------------------|-----------------------------------|
+| **Data Extraction** | Manual export | Automated scheduled jobs |
+| **Data Storage** | Flat files | Data Lake + GMDP integration |
+| **Click Tracking** | Not available | Full click-stream integration |
+| **Refresh Frequency** | Weekly | Daily/hourly |
+| **Analytics** | Core KPIs (AppInsights only) | Extended KPIs incl. CTR, engagement |
+| **Capabilities** | Search volume, Zero-result analysis, Performance monitoring | + Click-through analysis, Abandonment tracking, Alerting |
 
 ### 13.2 Phase 2 Enhancements (Future)
 
