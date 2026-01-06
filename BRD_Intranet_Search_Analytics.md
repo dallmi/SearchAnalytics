@@ -459,20 +459,6 @@ The tactical solution captures and organizes data across logical groupings. **Ph
 | Search Platform Team | Technical Owner | System performance, improvements | Data source management |
 | Data Analyst | Implementer | Data extraction, dashboard creation | Active contributor |
 
-### 9.2 RACI Matrix
-
-| Activity | Data Analyst | IT Leadership | Senior Mgmt | Platform Team |
-|----------|--------------|---------------|-------------|---------------|
-| Define requirements | R | A | C | C |
-| Extract data from AppInsights | R | I | I | C |
-| Process and clean data | R | I | I | I |
-| Create PowerBI dashboards | R | A | C | I |
-| Publish dashboards | R | A | I | I |
-| Consume and analyze insights | I | C | R | C |
-| Maintain data quality | R | A | I | C |
-
-**Legend:** R = Responsible, A = Accountable, C = Consulted, I = Informed
-
 ---
 
 ## 10. Assumptions & Constraints
