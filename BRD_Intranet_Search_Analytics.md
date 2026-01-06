@@ -102,23 +102,40 @@ Senior management lacks systematic visibility into Intranet search usage pattern
 
 ### 3.1 Primary Objectives
 
-| # | Objective | Success Measure |
-|---|-----------|-----------------|
-| O1 | Establish baseline search analytics capability | Dashboard operational and accessible to stakeholders |
-| O2 | Provide visibility into search behavior patterns | Weekly/monthly reports delivered to senior management |
-| O3 | Enable identification of top search queries | Top 100 queries identified and categorized |
-| O4 | Track search performance metrics | Latency, error rates, and zero-result rates monitored |
+| # | Objective | Success Measure | Data Source |
+|---|-----------|-----------------|-------------|
+| O1 | Establish baseline search analytics capability | Dashboard operational and accessible to stakeholders | AppInsights |
+| O2 | Provide visibility into search query patterns | Top 100 queries identified and categorized | AppInsights |
+| O3 | Track search performance metrics | Latency, error rates, and zero-result rates monitored | AppInsights |
+| O4 | Monitor adoption across departments and devices | Usage breakdown by department, location, device available | AppInsights |
 
-### 3.2 Business Questions to Answer
+### 3.2 Tactical Solution Limitations
 
-The tactical solution must enable stakeholders to answer the following key questions:
+**Important:** Click-through data (which results users click, engagement with content) resides in **GMDP** and is **out of scope** for the tactical solution. This means:
 
-| Category | Questions |
-|----------|-----------|
-| **Usage & Adoption** | How many searches per day/week? Which departments search most? What devices are used? What are peak usage times? |
-| **Content & Relevance** | What are users searching for? Which queries return no results? What content is most clicked? Are users finding what they need? |
-| **Performance & Quality** | How fast are search results? What is the error rate? How often do users refine queries? |
-| **Trends & Patterns** | How is usage trending over time? Are there seasonal patterns? Which areas show growth/decline? |
+| Metric Type | Phase 1 (Tactical) | Phase 2 (With GMDP) |
+|-------------|-------------------|---------------------|
+| Search volume & frequency | Available | Available |
+| Query terms & patterns | Available | Available |
+| Zero-result queries | Available | Available |
+| Search latency & errors | Available | Available |
+| User/department/device info | Available | Available |
+| **Click-through rate** | **Not Available** | Available |
+| **Content engagement** | **Not Available** | Available |
+| **Result position effectiveness** | **Not Available** | Available |
+
+### 3.3 Business Questions to Answer
+
+The tactical solution enables stakeholders to answer questions **based on AppInsights data only**:
+
+| Category | Answerable in Phase 1 | Deferred to Phase 2 (Requires GMDP) |
+|----------|----------------------|-------------------------------------|
+| **Usage & Adoption** | How many searches per day/week? Which departments search most? What devices are used? What are peak usage times? | — |
+| **Query Analysis** | What are users searching for? Which queries return no results? How complex are queries? What languages are used? | — |
+| **Performance** | How fast are search results? What is the error rate? Are there performance issues at specific times? | — |
+| **Trends** | How is search volume trending? Are there seasonal patterns? Which departments show growth/decline? | — |
+| **Content & Relevance** | — | What content is most clicked? Are users finding what they need? Which results perform best? |
+| **User Success** | — | Do users engage with results? What is the click-through rate? How long do users spend on results? |
 
 ---
 
@@ -137,13 +154,15 @@ The tactical solution must enable stakeholders to answer the following key quest
 
 ### 4.2 Out of Scope — Tactical Solution
 
-| Item | Rationale | Future Phase |
-|------|-----------|--------------|
-| Real-time data streaming | Requires automated pipeline infrastructure | Phase 2 |
-| Click-through tracking integration | Requires additional instrumentation | Phase 2 |
-| GMDP platform integration | Resource and timeline constraints | Phase 2 |
-| Predictive analytics / ML | Requires mature data foundation | Phase 2+ |
-| Automated alerting | Requires pipeline automation | Phase 2 |
+| Item | Rationale | Data Location | Future Phase |
+|------|-----------|---------------|--------------|
+| Click-through data & engagement metrics | Click data resides in GMDP, not AppInsights | **GMDP** | Phase 2 |
+| GMDP platform integration | Resource and timeline constraints | GMDP | Phase 2 |
+| Real-time data streaming | Requires automated pipeline infrastructure | — | Phase 2 |
+| Predictive analytics / ML | Requires mature data foundation | — | Phase 2+ |
+| Automated alerting | Requires pipeline automation | — | Phase 2 |
+
+**Note:** Click-through rate (CTR), content engagement, and result effectiveness metrics require integration with GMDP where click-stream data is stored. These metrics are explicitly deferred to Phase 2.
 
 ### 4.3 Scope Boundaries
 
@@ -204,16 +223,18 @@ The tactical solution follows a three-layer architecture:
 
 ### 6.1 Data Model Overview
 
-The tactical solution captures and organizes data across **six logical groupings**, with the Search Event as the central fact:
+The tactical solution captures and organizes data across logical groupings. **Phase 1** uses AppInsights data only; **Phase 2** will add GMDP click data:
 
-| Grouping | Key Fields | Purpose |
-|----------|------------|---------|
-| **User & Context** | User ID, Department, Location, Role | Identify who is searching |
-| **Query Details** | Search Terms, Language, Length, Type | Understand what they search for |
-| **Session Metadata** | Timestamp, Session ID, Device, Browser | Track when and how they search |
-| **Results & Interaction** | Results Count, Clicked Results, Click Position | Measure engagement |
-| **Search Performance** | Latency, Errors, Suggestions | Monitor system health |
-| **Feedback & Outcome** | User Feedback, Reformulation, Abandonment | Assess success |
+| Grouping | Key Fields | Purpose | Phase |
+|----------|------------|---------|-------|
+| **User & Context** | User ID, Department, Location, Role | Identify who is searching | Phase 1 |
+| **Query Details** | Search Terms, Language, Length, Type | Understand what they search for | Phase 1 |
+| **Session Metadata** | Timestamp, Session ID, Device, Browser | Track when and how they search | Phase 1 |
+| **Results Count** | Number of results returned | Measure result availability | Phase 1 |
+| **Search Performance** | Latency, Errors, Suggestions | Monitor system health | Phase 1 |
+| **Query Outcome** | User Feedback, Query Reformulation | Assess search quality | Phase 1 |
+| **Click & Interaction** | Clicked Results, Click Position, Time on Result | Measure engagement depth | **Phase 2 (GMDP)** |
+| **Abandonment** | Session abandoned without click | Assess search success | **Phase 2 (GMDP)** |
 
 ### 6.2 Detailed Field Specifications
 
@@ -246,39 +267,43 @@ The tactical solution captures and organizes data across **six logical groupings
 | `browser` | String | Browser name and version | `Chrome 120`, `Edge 119` | Optional |
 | `operating_system` | String | Operating system | `Windows 11`, `macOS` | Optional |
 
-#### 6.2.4 Results & Interaction
+#### 6.2.4 Results (Phase 1 — AppInsights)
 
-| Field Name | Data Type | Description | Example | Priority |
-|------------|-----------|-------------|---------|----------|
-| `results_count` | Integer | Number of results returned | `42` | Required |
-| `clicked_result_id` | String | Document/page ID of clicked result | `DOC_12345` | Optional* |
-| `clicked_result_title` | String | Title of clicked result | `Expense Policy 2026` | Optional* |
-| `clicked_result_url` | String | URL of clicked result | `/policies/expense` | Optional* |
-| `click_position` | Integer | Position of clicked result (1-based) | `2` | Optional* |
-| `time_to_first_click` | Integer | Milliseconds until first click | `3500` | Optional* |
-| `time_on_result` | Integer | Seconds spent on clicked page | `45` | Optional* |
-| `post_click_action` | String | Action after click | `download`, `share`, `none` | Optional* |
+| Field Name | Data Type | Description | Example | Priority | Source |
+|------------|-----------|-------------|---------|----------|--------|
+| `results_count` | Integer | Number of results returned | `42` | Required | AppInsights |
 
-*Note: Click-related fields depend on instrumentation availability. Full click tracking is planned for Phase 2.*
+#### 6.2.5 Click & Interaction Data (Phase 2 — GMDP)
 
-#### 6.2.5 Search Performance
+**Note:** The following fields reside in **GMDP** and are **not available** in Phase 1. They are documented here for Phase 2 planning purposes.
 
-| Field Name | Data Type | Description | Example | Priority |
-|------------|-----------|-------------|---------|----------|
-| `search_latency_ms` | Integer | Time to return results (ms) | `450` | Required |
-| `error_type` | String | Type of error if occurred | `timeout`, `no_results`, `null` | Required |
-| `has_error` | Boolean | Whether an error occurred | `false` | Required |
-| `suggestions_shown` | Boolean | Were query suggestions displayed | `true` | Optional |
-| `suggestion_selected` | Boolean | Did user select a suggestion | `false` | Optional |
+| Field Name | Data Type | Description | Example | Source |
+|------------|-----------|-------------|---------|--------|
+| `clicked_result_id` | String | Document/page ID of clicked result | `DOC_12345` | GMDP |
+| `clicked_result_title` | String | Title of clicked result | `Expense Policy 2026` | GMDP |
+| `clicked_result_url` | String | URL of clicked result | `/policies/expense` | GMDP |
+| `click_position` | Integer | Position of clicked result (1-based) | `2` | GMDP |
+| `time_to_first_click` | Integer | Milliseconds until first click | `3500` | GMDP |
+| `time_on_result` | Integer | Seconds spent on clicked page | `45` | GMDP |
+| `post_click_action` | String | Action after click | `download`, `share`, `none` | GMDP |
 
-#### 6.2.6 Feedback & Outcome
+#### 6.2.6 Search Performance (Phase 1 — AppInsights)
 
-| Field Name | Data Type | Description | Example | Priority |
-|------------|-----------|-------------|---------|----------|
-| `user_feedback` | String | Explicit feedback if provided | `thumbs_up`, `thumbs_down`, `null` | Optional |
-| `feedback_rating` | Integer | Numeric rating (1-5) if provided | `4` | Optional |
-| `query_reformulated` | Boolean | Did user search again immediately | `true` | Required |
-| `session_abandoned` | Boolean | Did user leave without clicking | `false` | Required |
+| Field Name | Data Type | Description | Example | Priority | Source |
+|------------|-----------|-------------|---------|----------|--------|
+| `search_latency_ms` | Integer | Time to return results (ms) | `450` | Required | AppInsights |
+| `error_type` | String | Type of error if occurred | `timeout`, `no_results`, `null` | Required | AppInsights |
+| `has_error` | Boolean | Whether an error occurred | `false` | Required | AppInsights |
+| `suggestions_shown` | Boolean | Were query suggestions displayed | `true` | Optional | AppInsights |
+| `suggestion_selected` | Boolean | Did user select a suggestion | `false` | Optional | AppInsights |
+
+#### 6.2.7 Feedback & Outcome (Phase 1 — AppInsights)
+
+| Field Name | Data Type | Description | Example | Priority | Source |
+|------------|-----------|-------------|---------|----------|--------|
+| `user_feedback` | String | Explicit feedback if provided | `thumbs_up`, `thumbs_down`, `null` | Optional | AppInsights |
+| `feedback_rating` | Integer | Numeric rating (1-5) if provided | `4` | Optional | AppInsights |
+| `query_reformulated` | Boolean | Did user search again immediately | `true` | Required | AppInsights |
 
 ### 6.3 Flat File Structure
 
@@ -294,23 +319,31 @@ The tactical solution captures and organizes data across **six logical groupings
 
 ### 6.4 Data Groupings for Analysis
 
+#### Phase 1 — Available Analysis (AppInsights)
+
 | Grouping | Key Question | Analysis Purpose |
 |----------|--------------|------------------|
 | **User & Context** | "Who is searching and from where?" | Department-level adoption, geographic patterns, role-based behavior |
 | **Query Details** | "What are they searching for?" | Top search terms, query complexity, language distribution |
 | **Session & Device** | "When and how are they searching?" | Peak usage times, device preferences, session patterns |
-| **Results & Engagement** | "What do they do with results?" | Click-through rates, result position effectiveness, engagement depth |
 | **Performance & Quality** | "How well does the search perform?" | Latency monitoring, error tracking, system health |
-| **Feedback & Outcomes** | "Was the search successful?" | Success rates, abandonment analysis, satisfaction indicators |
+| **Zero Results & Refinement** | "Are users finding results?" | Zero-result rate, query refinement patterns |
+
+#### Phase 2 — Deferred Analysis (Requires GMDP)
+
+| Grouping | Key Question | Analysis Purpose |
+|----------|--------------|------------------|
+| **Results & Engagement** | "What do they do with results?" | Click-through rates, result position effectiveness, engagement depth |
+| **User Success** | "Was the search successful?" | Abandonment analysis, content satisfaction |
 
 ### 6.5 Benefits of This Grouping Approach
 
-| Benefit | Description | Examples |
-|---------|-------------|----------|
-| **Pattern Identification** | Enables detection of patterns across different dimensions | Certain teams struggling to find information; Mobile users experiencing more errors; Specific locations with higher abandonment rates |
-| **Improvement Opportunities** | Helps spot actionable opportunities for optimization | Common queries with poor results; Slow searches at specific times; Content gaps where users find nothing; High-traffic queries needing featured results |
-| **Cross-Dimensional Analysis** | Allows correlation of metrics across groupings | Performance issues affecting specific departments; Device-specific usability problems; Time-based infrastructure constraints |
-| **Targeted Actions** | Supports prioritization of improvements | Focus content on high-volume zero-result queries; Address performance during peak windows; Improve experience for underserved segments |
+| Benefit | Description | Phase 1 Examples | Phase 2 Examples |
+|---------|-------------|------------------|------------------|
+| **Pattern Identification** | Enables detection of patterns across dimensions | Teams with high zero-result rates; Mobile users experiencing more errors | Abandonment rates by department |
+| **Improvement Opportunities** | Helps spot actionable optimization opportunities | Common queries returning no results; Slow searches at specific times | Low CTR queries needing better results |
+| **Cross-Dimensional Analysis** | Allows correlation of metrics across groupings | Performance issues by department; Device-specific error patterns | Click behavior by device type |
+| **Targeted Actions** | Supports prioritization of improvements | Focus content on zero-result queries; Address peak-time performance | Optimize result ranking for low-CTR queries |
 
 ---
 
@@ -342,36 +375,52 @@ The tactical solution captures and organizes data across **six logical groupings
 
 ## 8. Key Performance Indicators
 
-### 8.1 KPI Framework
+### 8.1 KPI Framework — Phase 1 (Tactical)
+
+**Available in Phase 1** (AppInsights data only):
 
 | Category | KPIs Included |
 |----------|---------------|
 | **Usage Metrics** | Total Search Volume, Unique Users, Searches per User, Department Breakdown |
-| **Quality Metrics** | Zero Result Rate, Click-Through Rate, Abandonment Rate, Query Refinement Rate |
-| **Performance Metrics** | Average Latency, P95 Latency, Error Rate, Availability |
+| **Query Quality Metrics** | Zero Result Rate, Query Refinement Rate |
+| **Performance Metrics** | Average Latency, P95 Latency, Error Rate |
 
-### 8.2 KPI Definitions
+**Deferred to Phase 2** (Requires GMDP click data):
 
-| KPI | Definition | Formula | Target |
-|-----|------------|---------|--------|
-| **Total Search Volume** | Total number of searches executed | `COUNT(search_events)` | Baseline TBD |
-| **Unique Users** | Distinct users performing searches | `COUNT(DISTINCT user_id)` | Baseline TBD |
-| **Searches per User** | Average searches per unique user | `Total Searches / Unique Users` | Baseline TBD |
-| **Zero Result Rate** | Percentage of searches with no results | `Searches with 0 results / Total Searches` | < 5% |
-| **Click-Through Rate** | Percentage of searches with at least one click | `Searches with clicks / Total Searches` | > 60% |
-| **Abandonment Rate** | Percentage of searches without interaction | `Abandoned searches / Total Searches` | < 25% |
-| **Query Refinement Rate** | Percentage of queries followed by immediate re-search | `Refined queries / Total Searches` | < 20% |
-| **Average Latency** | Mean time to return results | `AVG(search_latency_ms)` | < 500ms |
-| **P95 Latency** | 95th percentile response time | `PERCENTILE(search_latency_ms, 0.95)` | < 2000ms |
-| **Error Rate** | Percentage of searches resulting in errors | `Error searches / Total Searches` | < 1% |
+| Category | KPIs Deferred | Reason |
+|----------|---------------|--------|
+| **Engagement Metrics** | Click-Through Rate, Abandonment Rate | Click data in GMDP |
+| **Content Effectiveness** | Result Position Performance, Time on Result | Click data in GMDP |
 
-### 8.3 Dashboard Views
+### 8.2 KPI Definitions — Phase 1 (Available)
+
+| KPI | Definition | Formula | Target | Source |
+|-----|------------|---------|--------|--------|
+| **Total Search Volume** | Total number of searches executed | `COUNT(search_events)` | Baseline TBD | AppInsights |
+| **Unique Users** | Distinct users performing searches | `COUNT(DISTINCT user_id)` | Baseline TBD | AppInsights |
+| **Searches per User** | Average searches per unique user | `Total Searches / Unique Users` | Baseline TBD | AppInsights |
+| **Zero Result Rate** | Percentage of searches with no results | `Searches with 0 results / Total Searches` | < 5% | AppInsights |
+| **Query Refinement Rate** | Percentage of queries followed by immediate re-search | `Refined queries / Total Searches` | < 20% | AppInsights |
+| **Average Latency** | Mean time to return results | `AVG(search_latency_ms)` | < 500ms | AppInsights |
+| **P95 Latency** | 95th percentile response time | `PERCENTILE(search_latency_ms, 0.95)` | < 2000ms | AppInsights |
+| **Error Rate** | Percentage of searches resulting in errors | `Error searches / Total Searches` | < 1% | AppInsights |
+
+### 8.3 KPI Definitions — Phase 2 (Deferred)
+
+| KPI | Definition | Formula | Target | Source |
+|-----|------------|---------|--------|--------|
+| **Click-Through Rate** | Percentage of searches with at least one click | `Searches with clicks / Total Searches` | > 60% | GMDP |
+| **Abandonment Rate** | Percentage of searches without any click | `Searches without clicks / Total Searches` | < 25% | GMDP |
+| **Avg Click Position** | Average position of clicked results | `AVG(click_position)` | < 3 | GMDP |
+| **Time to First Click** | Average time until user clicks a result | `AVG(time_to_click)` | < 5s | GMDP |
+
+### 8.4 Dashboard Views — Phase 1
 
 #### Page 1: Executive Summary
 
 | Section | Visualizations |
 |---------|----------------|
-| KPI Cards (Top Row) | Total Searches, Unique Users, CTR, Zero Result Rate |
+| KPI Cards (Top Row) | Total Searches, Unique Users, Zero Result Rate, Error Rate |
 | Charts (Middle) | Search Volume Trend (Line), Top Search Terms (Bar) |
 | Charts (Bottom) | Department Breakdown (Donut), Device Distribution (Donut) |
 
@@ -380,14 +429,14 @@ The tactical solution captures and organizes data across **six logical groupings
 | Section | Visualizations |
 |---------|----------------|
 | Heatmap | Search Activity by Hour of Day |
-| Charts | Query Length Distribution, Query Type Breakdown |
+| Charts | Query Length Distribution, Query Refinement Rate Trend |
 | Table | Top Zero-Result Queries (sortable, filterable) |
 
 #### Page 3: Performance Metrics
 
 | Section | Visualizations |
 |---------|----------------|
-| KPI Cards | Avg Latency, P95 Latency, Error Rate, Availability |
+| KPI Cards | Avg Latency, P95 Latency, Error Rate, Query Refinement Rate |
 | Charts | Latency Trend Over Time, Error Distribution by Type |
 
 #### Page 4: Detailed Data (Drill-through)
