@@ -798,7 +798,7 @@ The tactical solution will be considered complete when:
 |------|------------|
 | **AppInsights** | Azure Application Insights - Microsoft's application performance monitoring service |
 | **KQL** | Kusto Query Language - query language used in Azure Data Explorer and AppInsights |
-| **GMDP** | Global Master Data Platform (enterprise data platform) |
+| **GMDP** | Global Marketing Data Platform (enterprise data platform) |
 | **CTR** | Click-Through Rate - percentage of searches resulting in clicks |
 | **Zero Result Rate** | Percentage of searches that return no results |
 | **P95 Latency** | 95th percentile response time (95% of requests complete within this time) |
