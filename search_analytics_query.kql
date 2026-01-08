@@ -31,6 +31,8 @@ let SearchData =
     | where name startswith "Search"
     // STEP 2: Parse customDimensions as dynamic JSON
     | extend cd = todynamic(customDimensions)
+    // Serialize the row set (required for row_number)
+    | serialize
     // Create a unique row identifier to preserve row integrity during expansion
     | extend rowId = row_number()
     // STEP 3: Handle nested CustomProps JSON
