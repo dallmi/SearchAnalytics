@@ -16,124 +16,44 @@
 // Output: All keys become columns dynamically. CustomProps keys are prefixed
 //         with "CP_" to distinguish them from top-level keys.
 //
-// Future-proof: Any new keys added to customDimensions or CustomProps will
-//               automatically appear as new columns without query changes.
+// HOW TO USE: Copy from "let TimeRange" to "order by timestamp desc" (lines 24-45)
 // ============================================================================
-// CONFIGURATION: Adjust TimeRange and CustomPropsPrefix as needed
-// ============================================================================
+
+
+// === COPY FROM HERE ===
 let TimeRange = 24h;
 let CustomPropsPrefix = "CP_";
-// MAIN QUERY
-let SearchData =
-    customEvents
-    // STEP 1: Filter to relevant events
+let SearchData = customEvents
     | where timestamp >= ago(TimeRange)
     | where name startswith "Search"
-    // STEP 2: Parse customDimensions as dynamic JSON
     | extend cd = todynamic(customDimensions)
-    // Serialize the row set (required for row_number)
     | serialize
-    // Create a unique row identifier to preserve row integrity during expansion
     | extend rowId = row_number()
-    // STEP 3: Handle nested CustomProps JSON
-    // Extract CustomProps as a string, then parse it as JSON
     | extend CustomPropsRaw = tostring(cd.CustomProps)
-    | extend CP = iff(
-        isnotempty(CustomPropsRaw) and CustomPropsRaw startswith "{",
-        todynamic(CustomPropsRaw),
-        dynamic({})
-    )
-    // STEP 4: Remove CustomProps from main bag (we'll add it back flattened)
+    | extend CP = iff(isnotempty(CustomPropsRaw) and CustomPropsRaw startswith "{", todynamic(CustomPropsRaw), dynamic({}))
     | extend mainBag = bag_remove_keys(cd, dynamic(["CustomProps"]))
-    // STEP 5: Dynamically extract and prefix all CustomProps keys
-    // Get all keys from CustomProps dynamically (no hardcoding!)
     | extend cpKeys = bag_keys(CP)
-    // Expand each key and create prefixed key-value pairs
     | mv-expand cpKey = cpKeys to typeof(string)
     | extend cpBag = pack(strcat(CustomPropsPrefix, cpKey), tostring(CP[cpKey]))
-    // STEP 6: Reaggregate by row, merging all CustomProps into a single bag
-    | summarize
-        take_any(timestamp),
-        take_any(name),
-        take_any(mainBag),
-        cpMerged = make_bag(cpBag)
-        by rowId
-    // STEP 7: Merge main bag with prefixed CustomProps bag
-    // coalesce handles cases where CustomProps is empty/null
+    | summarize take_any(timestamp), take_any(name), take_any(mainBag), cpMerged = make_bag(cpBag) by rowId
     | extend finalBag = bag_merge(mainBag, coalesce(cpMerged, dynamic({})));
-// STEP 8: Unpack the final bag into dynamic columns
-// bag_unpack() automatically creates a column for each unique key
 SearchData
 | evaluate bag_unpack(finalBag)
-// Clean up intermediate columns
 | project-away rowId, mainBag, cpMerged, finalBag
-// Reorder to show timestamp and event name first
 | project-reorder timestamp, name
-// Sort by most recent first
 | order by timestamp desc
+// === COPY TO HERE ===
 
 
 // ============================================================================
-// ALTERNATIVE QUERIES (commented out - copy/paste to use separately)
+// ALTERNATIVE QUERIES (copy/paste separately)
 // ============================================================================
 
-// ----------------------------------------------------------------------------
-// QUERY A: Row-based output (keys as rows instead of columns)
-// Useful for exploration or when you have too many unique keys
-// ----------------------------------------------------------------------------
-// customEvents
-// | where timestamp >= ago(24h)
-// | where name startswith "Search"
-// | extend cd = todynamic(customDimensions)
-// | extend rowId = row_number()
-// | extend CP = todynamic(tostring(cd.CustomProps))
-// | extend mainBag = bag_remove_keys(cd, dynamic(["CustomProps"]))
-// | mv-expand kind=array mainKV = mainBag
-// | extend PropertyKey = tostring(mainKV[0]), PropertyValue = tostring(mainKV[1])
-// | project timestamp, name, rowId, PropertyKey, PropertyValue, Source = "main"
-// | union (
-//     customEvents
-//     | where timestamp >= ago(24h)
-//     | where name startswith "Search"
-//     | extend cd = todynamic(customDimensions)
-//     | extend rowId = row_number()
-//     | extend CP = todynamic(tostring(cd.CustomProps))
-//     | mv-expand kind=array cpKV = CP
-//     | extend PropertyKey = strcat("CP_", tostring(cpKV[0])), PropertyValue = tostring(cpKV[1])
-//     | project timestamp, name, rowId, PropertyKey, PropertyValue, Source = "CustomProps"
-// )
-// | order by timestamp desc, rowId, Source, PropertyKey
+// --- QUERY A: Row-based output (keys as rows instead of columns) ---
+// customEvents | where timestamp >= ago(24h) | where name startswith "Search" | extend cd = todynamic(customDimensions) | serialize | extend rowId = row_number() | extend CP = todynamic(tostring(cd.CustomProps)) | extend mainBag = bag_remove_keys(cd, dynamic(["CustomProps"])) | mv-expand kind=array mainKV = mainBag | extend PropertyKey = tostring(mainKV[0]), PropertyValue = tostring(mainKV[1]) | project timestamp, name, rowId, PropertyKey, PropertyValue, Source = "main"
 
-// ----------------------------------------------------------------------------
-// QUERY B: Key discovery - find all unique keys in your data
-// ----------------------------------------------------------------------------
-// customEvents
-// | where timestamp >= ago(24h)
-// | where name startswith "Search"
-// | extend cd = todynamic(customDimensions)
-// | extend CP = todynamic(tostring(cd.CustomProps))
-// | extend mainKeys = bag_keys(bag_remove_keys(cd, dynamic(["CustomProps"])))
-// | mv-expand mainKey = mainKeys to typeof(string)
-// | summarize MainKeyCount = count(), SampleValue = take_any(tostring(cd[mainKey])) by Key = mainKey, Source = "customDimensions"
-// | union (
-//     customEvents
-//     | where timestamp >= ago(24h)
-//     | where name startswith "Search"
-//     | extend CP = todynamic(tostring(todynamic(customDimensions).CustomProps))
-//     | mv-expand cpKey = bag_keys(CP) to typeof(string)
-//     | summarize MainKeyCount = count(), SampleValue = take_any(tostring(CP[cpKey])) by Key = cpKey, Source = "CustomProps"
-// )
-// | order by Source, MainKeyCount desc
+// --- QUERY B: Key discovery - find all unique keys ---
+// customEvents | where timestamp >= ago(24h) | where name startswith "Search" | extend cd = todynamic(customDimensions) | extend CP = todynamic(tostring(cd.CustomProps)) | extend mainKeys = bag_keys(bag_remove_keys(cd, dynamic(["CustomProps"]))) | mv-expand mainKey = mainKeys to typeof(string) | summarize KeyCount = count(), SampleValue = take_any(tostring(cd[mainKey])) by Key = mainKey | order by KeyCount desc
 
-// ----------------------------------------------------------------------------
-// QUERY C: Simplified version (no CustomProps prefix)
-// ----------------------------------------------------------------------------
-// customEvents
-// | where timestamp >= ago(24h)
-// | where name startswith "Search"
-// | extend cd = todynamic(customDimensions)
-// | extend CP = todynamic(tostring(cd.CustomProps))
-// | extend flatBag = bag_merge(bag_remove_keys(cd, dynamic(["CustomProps"])), coalesce(CP, dynamic({})))
-// | evaluate bag_unpack(flatBag)
-// | project-reorder timestamp, name
-// | order by timestamp desc
+// --- QUERY C: Simplified version (no CP_ prefix) ---
+// customEvents | where timestamp >= ago(24h) | where name startswith "Search" | extend cd = todynamic(customDimensions) | extend CP = todynamic(tostring(cd.CustomProps)) | extend flatBag = bag_merge(bag_remove_keys(cd, dynamic(["CustomProps"])), coalesce(CP, dynamic({}))) | evaluate bag_unpack(flatBag) | project-reorder timestamp, name | order by timestamp desc
