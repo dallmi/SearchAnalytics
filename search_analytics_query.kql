@@ -21,7 +21,8 @@
 
 
 // === COPY FROM HERE ===
-let TimeRange = 24h;
+set truncationmaxrecords = 500000;
+let TimeRange = 90d;
 let CustomPropsPrefix = "CP_";
 let SearchData = customEvents
     | where timestamp >= ago(TimeRange)
