@@ -35,12 +35,12 @@ let SearchData = customEvents
     | extend cpKeys = bag_keys(CP)
     | mv-expand cpKey = cpKeys to typeof(string)
     | extend cpBag = pack(strcat(CustomPropsPrefix, cpKey), tostring(CP[cpKey]))
-    | summarize take_any(timestamp), take_any(name), take_any(mainBag), cpMerged = make_bag(cpBag) by rowId
+    | summarize take_any(timestamp), take_any(name), take_any(client_CountryOrRegion), take_any(mainBag), cpMerged = make_bag(cpBag) by rowId
     | extend finalBag = bag_merge(mainBag, coalesce(cpMerged, dynamic({})));
 SearchData
 | evaluate bag_unpack(finalBag)
 | project-away rowId, mainBag, cpMerged
-| project-reorder timestamp, name
+| project-reorder timestamp, name, client_CountryOrRegion
 | order by timestamp desc
 // === COPY TO HERE ===
 
