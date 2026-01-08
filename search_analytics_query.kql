@@ -34,8 +34,9 @@ let SearchData = customEvents
     | extend CP = iff(isnotempty(CustomPropsRaw) and CustomPropsRaw startswith "{", todynamic(CustomPropsRaw), dynamic({}))
     | extend mainBag = bag_remove_keys(cd, dynamic(["CustomProps"]))
     | extend cpKeys = bag_keys(CP)
+    | extend cpKeys = iff(array_length(cpKeys) == 0, dynamic(["__no_cp__"]), cpKeys)
     | mv-expand cpKey = cpKeys to typeof(string)
-    | extend cpBag = pack(strcat(CustomPropsPrefix, cpKey), tostring(CP[cpKey]))
+    | extend cpBag = iff(cpKey == "__no_cp__", dynamic({}), pack(strcat(CustomPropsPrefix, cpKey), tostring(CP[cpKey])))
     | summarize take_any(timestamp), take_any(name), take_any(client_CountryOrRegion), take_any(mainBag), cpMerged = make_bag(cpBag) by rowId
     | extend finalBag = bag_merge(mainBag, coalesce(cpMerged, dynamic({})));
 SearchData
