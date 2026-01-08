@@ -39,7 +39,7 @@ let SearchData = customEvents
     | extend finalBag = bag_merge(mainBag, coalesce(cpMerged, dynamic({})));
 SearchData
 | evaluate bag_unpack(finalBag)
-| project-away rowId, mainBag, cpMerged, finalBag
+| project-away rowId, mainBag, cpMerged
 | project-reorder timestamp, name
 | order by timestamp desc
 // === COPY TO HERE ===
