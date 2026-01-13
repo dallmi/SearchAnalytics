@@ -23,8 +23,7 @@ SearchAnalytics/
 ├── output/                         # Parquet files for Power BI
 │   ├── searches_raw.parquet
 │   ├── searches_daily.parquet
-│   ├── searches_journeys.parquet
-│   └── searches_journeys_timed.parquet
+│   └── searches_journeys.parquet
 └── process_search_analytics.py
 ```
 
@@ -174,22 +173,22 @@ Four Parquet files are generated for Power BI:
   - Click breakdowns by category (`clicks_general`, `clicks_all`, `clicks_news`, `clicks_goto`, `clicks_people`)
 
 #### 3. `searches_journeys.parquet`
-- **Content**: Session-level summary data
-- **Columns include**:
-  - Session timing (`session_start`, `duration_seconds`)
-  - Event counts (`search_count`, `result_count`, `click_count`)
-  - `journey_outcome` (`Success`, `No Results`, `Abandoned`, `Unknown`)
-  - `had_reformulation` (user modified search query)
-  - `session_complexity` (`Single Event`, `Simple`, `Medium`, `Complex`)
-
-#### 4. `searches_journeys_timed.parquet`
-- **Content**: Session data with detailed timing metrics
-- **Timing columns**:
+- **Content**: Session-level data with timing metrics (consolidated)
+- **Event counts**:
+  - `search_count`, `result_count`, `click_count`, `unique_queries`
+  - `null_result_count`, `avg_total_results`, `max_total_results`
+- **Timing metrics**:
   - `sec_search_to_result` - Time from search to results displayed
   - `sec_result_to_click` - Time from results to user click
   - `avg_sec_between_events` - Average time between events
   - `total_duration_sec` - Total session duration
 - **Time buckets**: Pre-categorized performance tiers
+  - `search_to_result_bucket`, `result_to_click_bucket`, `session_duration_bucket`
+- **Classifications**:
+  - `journey_outcome` (`Success`, `No Results`, `Abandoned`, `Unknown`)
+  - `had_reformulation` (user modified search query)
+  - `session_complexity` (`Single Event`, `Simple`, `Medium`, `Complex`)
+- **Click breakdown**: `general_clicks`, `all_tab_clicks`, `news_clicks`, etc.
 
 ---
 
@@ -230,8 +229,7 @@ Four Parquet files are generated for Power BI:
 │  STEP 4: Export Parquet Files                                    │
 │  ├── searches_raw.parquet       (event-level)                   │
 │  ├── searches_daily.parquet     (daily aggregates)              │
-│  ├── searches_journeys.parquet  (session summaries)             │
-│  └── searches_journeys_timed.parquet (timing metrics)           │
+│  └── searches_journeys.parquet  (session data with timing)      │
 └─────────────────────────────────────────────────────────────────┘
                             │
                             ▼

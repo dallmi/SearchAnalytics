@@ -22,8 +22,7 @@ Output:
     - data/searchanalytics.db              (DuckDB database)
     - output/searches_raw.parquet          (all event-level data)
     - output/searches_daily.parquet        (aggregated by day)
-    - output/searches_journeys.parquet     (session-level journey data)
-    - output/searches_journeys_timed.parquet (journeys with timing)
+    - output/searches_journeys.parquet     (session-level data with timing)
 
 Primary Key: timestamp + user_id + session_id + name
     On conflict, the latest file's data takes precedence.
@@ -409,106 +408,39 @@ def export_parquet_files(con, output_dir):
     daily_count = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{daily_file}')").df()['n'][0]
     log(f"  searches_daily.parquet ({daily_count} days)")
 
-    # Session journeys
+    # Session journeys (consolidated - includes timing metrics)
     journeys_file = output_dir / 'searches_journeys.parquet'
     if journeys_file.exists():
         journeys_file.unlink()
     con.execute(f"""
         COPY (
-            WITH session_events AS (
-                SELECT
-                    session_key,
-                    session_date,
-                    MIN(timestamp) as session_start,
-                    DATEDIFF('second', MIN(timestamp), MAX(timestamp)) as duration_seconds,
-                    COUNT(*) as total_events,
-                    COUNT(CASE WHEN name IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED') THEN 1 END) as search_count,
-                    COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_count,
-                    COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_count,
-                    COUNT(DISTINCT search_term_normalized) as unique_queries,
-                    AVG(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN CAST(CP_totalResultCount AS FLOAT) END) as avg_total_results,
-                    MAX(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN CAST(CP_totalResultCount AS INTEGER) END) as max_total_results,
-                    SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END) as null_result_searches,
-                    COUNT(CASE WHEN click_category = 'General' THEN 1 END) as general_clicks,
-                    COUNT(CASE WHEN click_category = 'All' THEN 1 END) as all_tab_clicks,
-                    COUNT(CASE WHEN click_category = 'News' THEN 1 END) as news_clicks,
-                    COUNT(CASE WHEN click_category = 'GoTo' THEN 1 END) as goto_clicks,
-                    COUNT(CASE WHEN click_category = 'People' THEN 1 END) as people_clicks,
-                    ROUND(AVG(search_term_length), 1) as avg_search_term_length,
-                    ROUND(AVG(search_term_word_count), 1) as avg_search_term_words,
-                    MIN(event_hour) as first_event_hour,
-                    MAX(event_hour) as last_event_hour,
-                    MAX(CASE WHEN is_first_search_of_day = true THEN 1 ELSE 0 END) as includes_first_search_of_day
-                FROM searches
-                GROUP BY session_key, session_date
-            )
-            SELECT
-                session_date,
-                session_start,
-                duration_seconds,
-                total_events,
-                search_count,
-                result_count,
-                click_count,
-                unique_queries,
-                ROUND(avg_total_results, 1) as avg_total_results,
-                max_total_results,
-                null_result_searches,
-                general_clicks,
-                all_tab_clicks,
-                news_clicks,
-                goto_clicks,
-                people_clicks,
-                avg_search_term_length,
-                avg_search_term_words,
-                first_event_hour,
-                last_event_hour,
-                CASE WHEN includes_first_search_of_day = 1 THEN true ELSE false END as includes_first_search_of_day,
-                CASE
-                    WHEN click_count > 0 THEN 'Success'
-                    WHEN null_result_searches > 0 AND click_count = 0 THEN 'No Results'
-                    WHEN result_count > 0 AND click_count = 0 THEN 'Abandoned'
-                    ELSE 'Unknown'
-                END as journey_outcome,
-                CASE WHEN unique_queries > 1 THEN true ELSE false END as had_reformulation,
-                CASE
-                    WHEN total_events = 1 THEN 'Single Event'
-                    WHEN total_events <= 3 THEN 'Simple'
-                    WHEN total_events <= 10 THEN 'Medium'
-                    ELSE 'Complex'
-                END as session_complexity
-            FROM session_events
-            ORDER BY session_date, session_start
-        ) TO '{journeys_file}' (FORMAT PARQUET)
-    """)
-    journeys_count = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{journeys_file}')").df()['n'][0]
-    log(f"  searches_journeys.parquet ({journeys_count:,} sessions)")
-
-    # Session journeys with timing
-    journeys_timed_file = output_dir / 'searches_journeys_timed.parquet'
-    if journeys_timed_file.exists():
-        journeys_timed_file.unlink()
-    con.execute(f"""
-        COPY (
-            WITH session_timings AS (
+            WITH session_data AS (
                 SELECT
                     session_key,
                     session_date,
                     MIN(timestamp) as session_start,
                     COUNT(*) as total_events,
+                    -- Timing metrics
                     MIN(CASE WHEN name = 'SEARCH_RESULT_COUNT' AND prev_event IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED') THEN ms_since_prev_event END) as ms_search_to_result,
                     MIN(CASE WHEN click_category IS NOT NULL AND prev_event = 'SEARCH_RESULT_COUNT' THEN ms_since_prev_event END) as ms_result_to_click,
                     AVG(ms_since_prev_event) as avg_ms_between_events,
                     DATEDIFF('millisecond', MIN(timestamp), MAX(timestamp)) as total_duration_ms,
+                    -- Event counts
                     COUNT(CASE WHEN name IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED') THEN 1 END) as search_count,
                     COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_count,
                     COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_count,
                     COUNT(DISTINCT search_term_normalized) as unique_queries,
                     SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END) as null_result_count,
+                    -- Result metrics
+                    AVG(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN CAST(CP_totalResultCount AS FLOAT) END) as avg_total_results,
+                    MAX(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN CAST(CP_totalResultCount AS INTEGER) END) as max_total_results,
+                    -- Search term metrics
                     ROUND(AVG(search_term_length), 1) as avg_search_term_length,
                     ROUND(AVG(search_term_word_count), 1) as avg_search_term_words,
+                    -- Time of day
                     MIN(event_hour) as first_event_hour,
                     MAX(event_hour) as last_event_hour,
+                    -- Click breakdown
                     COUNT(CASE WHEN click_category = 'General' THEN 1 END) as general_clicks,
                     COUNT(CASE WHEN click_category = 'All' THEN 1 END) as all_tab_clicks,
                     COUNT(CASE WHEN click_category = 'News' THEN 1 END) as news_clicks,
@@ -527,20 +459,27 @@ def export_parquet_files(con, output_dir):
                 click_count,
                 unique_queries,
                 null_result_count,
+                ROUND(avg_total_results, 1) as avg_total_results,
+                max_total_results,
+                -- Timing in seconds
                 ROUND(ms_search_to_result / 1000.0, 2) as sec_search_to_result,
                 ROUND(ms_result_to_click / 1000.0, 2) as sec_result_to_click,
                 ROUND(avg_ms_between_events / 1000.0, 2) as avg_sec_between_events,
                 ROUND(total_duration_ms / 1000.0, 2) as total_duration_sec,
+                -- Search term metrics
                 avg_search_term_length,
                 avg_search_term_words,
+                -- Time of day
                 first_event_hour,
                 last_event_hour,
+                -- Click breakdown
                 general_clicks,
                 all_tab_clicks,
                 news_clicks,
                 goto_clicks,
                 people_clicks,
                 CASE WHEN includes_first_search_of_day = 1 THEN true ELSE false END as includes_first_search_of_day,
+                -- Time buckets
                 CASE
                     WHEN ms_search_to_result IS NULL THEN 'No Result'
                     WHEN ms_search_to_result < 500 THEN '< 0.5s'
@@ -566,19 +505,26 @@ def export_parquet_files(con, output_dir):
                     WHEN total_duration_ms < 300000 THEN '3-5 min'
                     ELSE '> 5 min (extended)'
                 END as session_duration_bucket,
+                -- Classifications
                 CASE
                     WHEN click_count > 0 THEN 'Success'
                     WHEN null_result_count > 0 AND click_count = 0 THEN 'No Results'
                     WHEN result_count > 0 AND click_count = 0 THEN 'Abandoned'
                     ELSE 'Unknown'
                 END as journey_outcome,
-                CASE WHEN unique_queries > 1 THEN true ELSE false END as had_reformulation
-            FROM session_timings
+                CASE WHEN unique_queries > 1 THEN true ELSE false END as had_reformulation,
+                CASE
+                    WHEN total_events = 1 THEN 'Single Event'
+                    WHEN total_events <= 3 THEN 'Simple'
+                    WHEN total_events <= 10 THEN 'Medium'
+                    ELSE 'Complex'
+                END as session_complexity
+            FROM session_data
             ORDER BY session_date, session_start
-        ) TO '{journeys_timed_file}' (FORMAT PARQUET)
+        ) TO '{journeys_file}' (FORMAT PARQUET)
     """)
-    journeys_timed_count = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{journeys_timed_file}')").df()['n'][0]
-    log(f"  searches_journeys_timed.parquet ({journeys_timed_count:,} sessions)")
+    journeys_count = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{journeys_file}')").df()['n'][0]
+    log(f"  searches_journeys.parquet ({journeys_count:,} sessions)")
 
 
 def print_summary(con):
