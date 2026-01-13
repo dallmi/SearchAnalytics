@@ -12,10 +12,11 @@ Usage:
     python process_search_analytics.py --full-refresh     # Delete DB and reprocess all files
 
 Input folder: input/
-    Place your KQL export files here with date suffixes, e.g.:
-    - search_export_2025-01-13.xlsx
-    - search_export_2025-W02.xlsx
-    - search_export_20250113.csv
+    Place your KQL export files here with date suffix _YYYY_MM_DD, e.g.:
+    - search_export_2025_01_13.xlsx
+    - search_export_2025_01_13.csv
+
+    The file with the most recent date in the filename will be processed.
 
 Output:
     - data/searchanalytics.db              (DuckDB database)
@@ -44,10 +45,27 @@ def log(message):
     print(f"[{timestamp}] {message}")
 
 
+def extract_date_from_filename(filepath):
+    """
+    Extract date from filename with format _YYYY_MM_DD.
+    Returns a date object or None if not found.
+    """
+    filename = Path(filepath).stem
+    # Match _YYYY_MM_DD pattern
+    match = re.search(r'_(\d{4})_(\d{2})_(\d{2})$', filename)
+    if match:
+        try:
+            year, month, day = int(match.group(1)), int(match.group(2)), int(match.group(3))
+            return datetime(year, month, day).date()
+        except ValueError:
+            return None
+    return None
+
+
 def find_latest_input_file(input_dir):
     """
-    Find the latest input file in the input directory.
-    Supports .xlsx, .xls, .csv files with date suffixes.
+    Find the latest input file in the input directory based on date in filename.
+    Expects format: filename_YYYY_MM_DD.xlsx or filename_YYYY_MM_DD.csv
     """
     patterns = ['*.xlsx', '*.xls', '*.csv']
     all_files = []
@@ -58,24 +76,53 @@ def find_latest_input_file(input_dir):
     if not all_files:
         return None
 
-    # Sort by modification time (most recent first)
-    all_files.sort(key=os.path.getmtime, reverse=True)
+    # Parse dates from filenames and sort
+    files_with_dates = []
+    for f in all_files:
+        file_date = extract_date_from_filename(f)
+        if file_date:
+            files_with_dates.append((Path(f), file_date))
 
-    return Path(all_files[0])
+    if not files_with_dates:
+        # No files with valid date suffix found, fall back to modification time
+        log("  Warning: No files with _YYYY_MM_DD suffix found, using modification time")
+        all_files.sort(key=os.path.getmtime, reverse=True)
+        return Path(all_files[0])
+
+    # Sort by date (most recent first)
+    files_with_dates.sort(key=lambda x: x[1], reverse=True)
+
+    return files_with_dates[0][0]
 
 
 def get_all_input_files(input_dir):
-    """Get all input files sorted by modification time (oldest first for processing order)."""
+    """Get all input files sorted by date in filename (oldest first for processing order)."""
     patterns = ['*.xlsx', '*.xls', '*.csv']
     all_files = []
 
     for pattern in patterns:
         all_files.extend(glob.glob(str(input_dir / pattern)))
 
-    # Sort by modification time (oldest first)
-    all_files.sort(key=os.path.getmtime)
+    # Parse dates from filenames and sort
+    files_with_dates = []
+    files_without_dates = []
 
-    return [Path(f) for f in all_files]
+    for f in all_files:
+        file_date = extract_date_from_filename(f)
+        if file_date:
+            files_with_dates.append((Path(f), file_date))
+        else:
+            files_without_dates.append(Path(f))
+
+    # Sort by date (oldest first for chronological processing)
+    files_with_dates.sort(key=lambda x: x[1])
+
+    # Return dated files first (in order), then undated files by modification time
+    result = [f for f, _ in files_with_dates]
+    files_without_dates.sort(key=os.path.getmtime)
+    result.extend(files_without_dates)
+
+    return result
 
 
 def load_file_to_temp_table(con, input_path, temp_table='temp_import'):
@@ -624,9 +671,10 @@ def process_search_analytics(input_file=None, full_refresh=False):
             log(f"ERROR: No input files found in {input_dir}")
             log("Place your KQL export files (xlsx/csv) in the input/ folder")
             log("Supported formats: .xlsx, .xls, .csv")
-            log("\nExample filenames:")
-            log("  search_export_2025-01-13.xlsx")
-            log("  search_export_2025-W02.csv")
+            log("\nFilename format: filename_YYYY_MM_DD.xlsx")
+            log("Example filenames:")
+            log("  search_export_2025_01_13.xlsx")
+            log("  search_export_2025_01_13.csv")
             sys.exit(1)
         files_to_process = [latest_file]
         log(f"Auto-detected latest file: {latest_file.name}")
