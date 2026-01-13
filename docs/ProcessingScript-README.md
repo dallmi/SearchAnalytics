@@ -159,13 +159,19 @@ Four Parquet files are generated for Power BI:
 - **Size**: Largest file (contains all rows)
 
 #### 2. `searches_daily.parquet`
-- **Content**: Aggregated metrics by day
+- **Content**: Aggregated metrics by day for trend analysis
 - **Columns include**:
-  - `total_events`, `unique_sessions`, `unique_queries`
-  - `search_starts`, `result_events`, `click_events`
-  - `null_results`, `null_rate_pct`
+  - `total_events`, `unique_sessions`, `unique_users`, `unique_queries`
+  - `search_starts`, `result_events`, `click_events`, `null_results`
+  - **Rate metrics**:
+    - `click_through_rate_pct` - Clicks / Searches × 100
+    - `null_rate_pct` - Null results / Results shown × 100
+    - `abandonment_rate_pct` - (Results without click) / Results × 100
+  - **Session metrics**:
+    - `avg_searches_per_session` - Average searches per session
   - `avg_search_term_length`, `avg_search_term_words`
-  - Click breakdowns by category
+  - `first_searches_of_day`
+  - Click breakdowns by category (`clicks_general`, `clicks_all`, `clicks_news`, `clicks_goto`, `clicks_people`)
 
 #### 3. `searches_journeys.parquet`
 - **Content**: Session-level summary data
