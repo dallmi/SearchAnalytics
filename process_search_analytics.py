@@ -375,16 +375,27 @@ def export_parquet_files(con, output_dir):
                 session_date as date,
                 COUNT(*) as total_events,
                 COUNT(DISTINCT session_key) as unique_sessions,
+                COUNT(DISTINCT user_id) as unique_users,
                 COUNT(DISTINCT search_term_normalized) as unique_queries,
                 COUNT(CASE WHEN name IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED') THEN 1 END) as search_starts,
                 COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_events,
                 COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_events,
                 SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END) as null_results,
+                -- Rate metrics
+                ROUND(100.0 * COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END)
+                    / NULLIF(COUNT(CASE WHEN name IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED') THEN 1 END), 0), 2) as click_through_rate_pct,
                 ROUND(100.0 * SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END)
                     / NULLIF(COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END), 0), 2) as null_rate_pct,
+                ROUND(100.0 * (COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' AND is_null_result = false THEN 1 END) - COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END))
+                    / NULLIF(COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' AND is_null_result = false THEN 1 END), 0), 2) as abandonment_rate_pct,
+                -- Session metrics
+                ROUND(1.0 * COUNT(CASE WHEN name IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED') THEN 1 END)
+                    / NULLIF(COUNT(DISTINCT session_key), 0), 2) as avg_searches_per_session,
+                -- Search term metrics
                 ROUND(AVG(search_term_length), 1) as avg_search_term_length,
                 ROUND(AVG(search_term_word_count), 1) as avg_search_term_words,
                 COUNT(CASE WHEN is_first_search_of_day = true THEN 1 END) as first_searches_of_day,
+                -- Click category breakdown
                 COUNT(CASE WHEN click_category = 'General' THEN 1 END) as clicks_general,
                 COUNT(CASE WHEN click_category = 'All' THEN 1 END) as clicks_all,
                 COUNT(CASE WHEN click_category = 'News' THEN 1 END) as clicks_news,
