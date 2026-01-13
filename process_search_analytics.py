@@ -3,28 +3,35 @@
 Search Analytics Weekly Processing Script
 
 This script processes weekly search analytics data extracted via KQL.
-It creates a DuckDB database with all calculated columns and exports
+It creates/updates a DuckDB database with all calculated columns and exports
 Parquet files for Power BI consumption.
 
 Usage:
-    python process_search_analytics.py <input_file>
-    python process_search_analytics.py data/search_export.csv
-    python process_search_analytics.py data/search_export.xlsx
+    python process_search_analytics.py                    # Auto-detect latest file in input/
+    python process_search_analytics.py input/export.xlsx  # Process specific file
+    python process_search_analytics.py --full-refresh     # Delete DB and reprocess all files
 
-Input:
-    CSV or Excel file exported from KQL query
+Input folder: input/
+    Place your KQL export files here with date suffixes, e.g.:
+    - search_export_2025-01-13.xlsx
+    - search_export_2025-W02.xlsx
+    - search_export_20250113.csv
 
 Output:
-    - data/searchanalytics.db          (DuckDB database)
-    - output/searches_raw.parquet      (all event-level data)
-    - output/searches_daily.parquet    (aggregated by day)
-    - output/searches_journeys.parquet (session-level journey data)
+    - data/searchanalytics.db              (DuckDB database)
+    - output/searches_raw.parquet          (all event-level data)
+    - output/searches_daily.parquet        (aggregated by day)
+    - output/searches_journeys.parquet     (session-level journey data)
     - output/searches_journeys_timed.parquet (journeys with timing)
+
+Primary Key: timestamp + user_id + session_id + name
+    On conflict, the latest file's data takes precedence.
 """
 
 import sys
 import os
 import re
+import glob
 import duckdb
 import pandas as pd
 from pathlib import Path
@@ -37,91 +44,70 @@ def log(message):
     print(f"[{timestamp}] {message}")
 
 
-def process_search_analytics(input_file):
+def find_latest_input_file(input_dir):
     """
-    Process search analytics data and create DuckDB + Parquet outputs.
-
-    Args:
-        input_file: Path to CSV or Excel file with search data
+    Find the latest input file in the input directory.
+    Supports .xlsx, .xls, .csv files with date suffixes.
     """
-    input_path = Path(input_file)
+    patterns = ['*.xlsx', '*.xls', '*.csv']
+    all_files = []
 
-    if not input_path.exists():
-        log(f"ERROR: Input file not found: {input_file}")
-        sys.exit(1)
+    for pattern in patterns:
+        all_files.extend(glob.glob(str(input_dir / pattern)))
 
-    log(f"Starting processing: {input_path.name}")
+    if not all_files:
+        return None
 
-    # Determine output paths
-    data_dir = input_path.parent
-    output_dir = data_dir.parent / 'output'
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # Sort by modification time (most recent first)
+    all_files.sort(key=os.path.getmtime, reverse=True)
 
-    db_path = data_dir / 'searchanalytics.db'
+    return Path(all_files[0])
 
-    # Delete old database to start fresh
-    if db_path.exists():
-        db_path.unlink()
-        log(f"Removed old database: {db_path.name}")
 
-    # Connect to DuckDB
-    con = duckdb.connect(str(db_path))
+def get_all_input_files(input_dir):
+    """Get all input files sorted by modification time (oldest first for processing order)."""
+    patterns = ['*.xlsx', '*.xls', '*.csv']
+    all_files = []
 
-    def query(sql):
-        return con.execute(sql).df()
+    for pattern in patterns:
+        all_files.extend(glob.glob(str(input_dir / pattern)))
 
-    def execute(sql):
-        con.execute(sql)
+    # Sort by modification time (oldest first)
+    all_files.sort(key=os.path.getmtime)
 
-    # =========================================================================
-    # STEP 1: Import data
-    # =========================================================================
-    log("Step 1: Importing data...")
+    return [Path(f) for f in all_files]
+
+
+def load_file_to_temp_table(con, input_path, temp_table='temp_import'):
+    """Load a CSV or Excel file into a temporary table."""
+    con.execute(f"DROP TABLE IF EXISTS {temp_table}")
 
     if input_path.suffix.lower() in ['.xlsx', '.xls']:
-        # Excel file
-        execute(f"""
-            CREATE TABLE searches AS
+        con.execute(f"""
+            CREATE TABLE {temp_table} AS
             SELECT * FROM st_read('{input_path}')
         """)
     else:
-        # CSV file
-        execute(f"""
-            CREATE TABLE searches AS
+        con.execute(f"""
+            CREATE TABLE {temp_table} AS
             SELECT * FROM read_csv('{input_path}', auto_detect=true)
         """)
 
-    row_count = query("SELECT COUNT(*) as n FROM searches")['n'][0]
-    log(f"  Imported {row_count:,} rows")
-
-    # =========================================================================
-    # STEP 2: Normalize column names
-    # =========================================================================
-    log("Step 2: Normalizing column names...")
-
-    schema = query("DESCRIBE searches")
+    # Normalize column names
+    schema = con.execute(f"DESCRIBE {temp_table}").df()
     col_names = schema['column_name'].tolist()
 
-    rename_map = {
-        'user_Id': 'user_id',
-        'session_Id': 'session_id'
-    }
-
+    rename_map = {'user_Id': 'user_id', 'session_Id': 'session_id'}
     for old_name, new_name in rename_map.items():
         if old_name in col_names:
-            execute(f"ALTER TABLE searches RENAME COLUMN {old_name} TO {new_name}")
-            log(f"  Renamed: {old_name} → {new_name}")
+            con.execute(f"ALTER TABLE {temp_table} RENAME COLUMN {old_name} TO {new_name}")
 
-    # =========================================================================
-    # STEP 3: Convert German date formats
-    # =========================================================================
-    log("Step 3: Checking for German date formats...")
-
-    schema = query("DESCRIBE searches")
+    # Convert German date formats
+    schema = con.execute(f"DESCRIBE {temp_table}").df()
     varchar_cols = schema[schema['column_type'] == 'VARCHAR']['column_name'].tolist()
 
     for col in varchar_cols:
-        sample = query(f"SELECT {col} FROM searches WHERE {col} IS NOT NULL LIMIT 1")
+        sample = con.execute(f"SELECT {col} FROM {temp_table} WHERE {col} IS NOT NULL LIMIT 1").df()
         if len(sample) > 0:
             val = str(sample.iloc[0, 0])
             if re.match(r'^\d{2}\.\d{2}\.\d{4}', val):
@@ -131,209 +117,212 @@ def process_search_analytics(input_file):
                     else:
                         fmt = '%d.%m.%Y'
 
-                    execute(f"ALTER TABLE searches ADD COLUMN {col}_temp TIMESTAMP")
-                    execute(f"UPDATE searches SET {col}_temp = strptime({col}, '{fmt}')")
-                    execute(f"ALTER TABLE searches DROP COLUMN {col}")
-                    execute(f"ALTER TABLE searches RENAME COLUMN {col}_temp TO {col}")
-                    log(f"  Converted: {col}")
-                except Exception as e:
-                    log(f"  Warning: Could not convert {col}: {e}")
+                    con.execute(f"ALTER TABLE {temp_table} ADD COLUMN {col}_temp TIMESTAMP")
+                    con.execute(f"UPDATE {temp_table} SET {col}_temp = strptime({col}, '{fmt}')")
+                    con.execute(f"ALTER TABLE {temp_table} DROP COLUMN {col}")
+                    con.execute(f"ALTER TABLE {temp_table} RENAME COLUMN {col}_temp TO {col}")
+                except Exception:
+                    pass
 
-    # =========================================================================
-    # STEP 4: Create session key
-    # =========================================================================
-    log("Step 4: Creating session key...")
+    row_count = con.execute(f"SELECT COUNT(*) as n FROM {temp_table}").df()['n'][0]
+    return row_count
 
-    schema = query("DESCRIBE searches")
+
+def create_base_table(con):
+    """Create the base searches table with proper schema."""
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS searches_raw (
+            -- Original columns will be added dynamically
+            -- This is just a placeholder
+            _placeholder INTEGER
+        )
+    """)
+
+
+def upsert_data(con, temp_table='temp_import'):
+    """
+    Upsert data from temp table into main searches_raw table.
+    Primary key: timestamp + user_id + session_id + name
+    """
+    # Check if searches_raw exists and has data
+    tables = con.execute("SHOW TABLES").df()
+    table_exists = 'searches_raw' in tables['name'].values if len(tables) > 0 else False
+
+    if not table_exists:
+        # First time: just rename temp table
+        con.execute(f"ALTER TABLE {temp_table} RENAME TO searches_raw")
+        log("  Created new searches_raw table")
+        return
+
+    # Get row count before
+    before_count = con.execute("SELECT COUNT(*) as n FROM searches_raw").df()['n'][0]
+
+    # Delete existing rows that match the PK from new data
+    con.execute(f"""
+        DELETE FROM searches_raw
+        WHERE EXISTS (
+            SELECT 1 FROM {temp_table} t
+            WHERE searches_raw.timestamp = t.timestamp
+              AND searches_raw.user_id = t.user_id
+              AND searches_raw.session_id = t.session_id
+              AND searches_raw.name = t.name
+        )
+    """)
+
+    deleted_count = before_count - con.execute("SELECT COUNT(*) as n FROM searches_raw").df()['n'][0]
+
+    # Insert all rows from temp table
+    con.execute(f"""
+        INSERT INTO searches_raw
+        SELECT * FROM {temp_table}
+    """)
+
+    after_count = con.execute("SELECT COUNT(*) as n FROM searches_raw").df()['n'][0]
+    new_rows = after_count - before_count + deleted_count
+
+    if deleted_count > 0:
+        log(f"  Updated {deleted_count:,} existing rows, added {new_rows - deleted_count:,} new rows")
+    else:
+        log(f"  Added {new_rows:,} new rows")
+
+    # Clean up temp table
+    con.execute(f"DROP TABLE IF EXISTS {temp_table}")
+
+
+def add_calculated_columns(con):
+    """Add all calculated columns to searches_raw and create final searches table."""
+    log("Adding calculated columns...")
+
+    # Drop existing searches table
+    con.execute("DROP TABLE IF EXISTS searches")
+
+    # Get column list
+    schema = con.execute("DESCRIBE searches_raw").df()
     col_names = schema['column_name'].tolist()
 
     has_user_id = 'user_id' in col_names
     has_session_id = 'session_id' in col_names
     has_timestamp = 'timestamp' in col_names
 
-    if has_user_id and has_session_id and has_timestamp:
-        execute("ALTER TABLE searches ADD COLUMN session_date DATE;")
-        execute("UPDATE searches SET session_date = DATE_TRUNC('day', timestamp)::DATE;")
-        execute("ALTER TABLE searches ADD COLUMN session_key VARCHAR;")
-        execute("""
-            UPDATE searches SET session_key =
-                COALESCE(CAST(session_date AS VARCHAR), '') || '_' ||
+    # Build the main query with all calculated columns
+    con.execute("""
+        CREATE TABLE searches AS
+        SELECT
+            r.*,
+            -- Session columns
+            DATE_TRUNC('day', timestamp)::DATE as session_date,
+            COALESCE(CAST(DATE_TRUNC('day', timestamp)::DATE AS VARCHAR), '') || '_' ||
                 COALESCE(user_id, '') || '_' ||
-                COALESCE(session_id, '');
-        """)
-        log("  Created: session_date, session_key")
-    else:
-        log(f"  Warning: Missing columns for session key")
+                COALESCE(session_id, '') as session_key,
+            -- Time interval columns (calculated via window functions below)
+            NULL::INTEGER as event_order,
+            NULL::VARCHAR as prev_event,
+            NULL::TIMESTAMP as prev_timestamp,
+            NULL::BIGINT as ms_since_prev_event,
+            NULL::DOUBLE as sec_since_prev_event,
+            NULL::VARCHAR as time_since_prev_bucket,
+            -- Search term columns
+            LOWER(TRIM(COALESCE(CP_searchQuery, searchQuery, query))) as search_term_normalized,
+            LENGTH(LOWER(TRIM(COALESCE(CP_searchQuery, searchQuery, query)))) as search_term_length,
+            CASE
+                WHEN LOWER(TRIM(COALESCE(CP_searchQuery, searchQuery, query))) IS NULL
+                     OR LOWER(TRIM(COALESCE(CP_searchQuery, searchQuery, query))) = '' THEN 0
+                ELSE LENGTH(LOWER(TRIM(COALESCE(CP_searchQuery, searchQuery, query)))) -
+                     LENGTH(REPLACE(LOWER(TRIM(COALESCE(CP_searchQuery, searchQuery, query))), ' ', '')) + 1
+            END as search_term_word_count,
+            -- Time extraction
+            EXTRACT(HOUR FROM timestamp)::INTEGER as event_hour,
+            DAYNAME(timestamp) as event_weekday,
+            ISODOW(timestamp) as event_weekday_num,
+            -- Flags
+            CASE
+                WHEN name = 'SEARCH_RESULT_COUNT' AND CAST(CP_totalResultCount AS INTEGER) = 0 THEN true
+                WHEN name = 'SEARCH_RESULT_COUNT' AND CAST(CP_totalResultCount AS INTEGER) > 0 THEN false
+                ELSE NULL
+            END as is_null_result,
+            CASE
+                WHEN name = 'SEARCH_TAB_CLICK' THEN 'General'
+                WHEN name = 'SEARCH_ALL_TAB_PAGE_CLICK' THEN 'All'
+                WHEN name = 'SEARCH_NEWS_TAB_PAGE_CLICK' THEN 'News'
+                WHEN name = 'SEARCH_GOTO_TAB_PAGE_CLICK' THEN 'GoTo'
+                WHEN name LIKE '%PEOPLE%' OR name LIKE '%people%' THEN 'People'
+                ELSE NULL
+            END as click_category
+        FROM searches_raw r
+    """)
 
-    # =========================================================================
-    # STEP 5: Calculate time intervals
-    # =========================================================================
-    log("Step 5: Calculating event time intervals...")
-
-    schema = query("DESCRIBE searches")
-    col_names = schema['column_name'].tolist()
-
-    if 'session_key' in col_names and 'timestamp' in col_names:
-        execute("ALTER TABLE searches ADD COLUMN event_order INTEGER;")
-        execute("ALTER TABLE searches ADD COLUMN prev_event VARCHAR;")
-        execute("ALTER TABLE searches ADD COLUMN prev_timestamp TIMESTAMP;")
-        execute("ALTER TABLE searches ADD COLUMN ms_since_prev_event BIGINT;")
-        execute("ALTER TABLE searches ADD COLUMN sec_since_prev_event DOUBLE;")
-
-        execute("""
-            CREATE OR REPLACE TABLE searches AS
-            SELECT
-                s.*,
-                ROW_NUMBER() OVER (PARTITION BY session_key ORDER BY timestamp) as event_order_new,
-                LAG(name) OVER (PARTITION BY session_key ORDER BY timestamp) as prev_event_new,
-                LAG(timestamp) OVER (PARTITION BY session_key ORDER BY timestamp) as prev_timestamp_new,
+    # Now update the window function columns
+    con.execute("""
+        CREATE OR REPLACE TABLE searches AS
+        SELECT
+            s.* EXCLUDE (event_order, prev_event, prev_timestamp, ms_since_prev_event, sec_since_prev_event, time_since_prev_bucket),
+            ROW_NUMBER() OVER (PARTITION BY session_key ORDER BY timestamp) as event_order,
+            LAG(name) OVER (PARTITION BY session_key ORDER BY timestamp) as prev_event,
+            LAG(timestamp) OVER (PARTITION BY session_key ORDER BY timestamp) as prev_timestamp,
+            DATEDIFF('millisecond',
+                LAG(timestamp) OVER (PARTITION BY session_key ORDER BY timestamp),
+                timestamp
+            ) as ms_since_prev_event,
+            ROUND(
                 DATEDIFF('millisecond',
                     LAG(timestamp) OVER (PARTITION BY session_key ORDER BY timestamp),
                     timestamp
-                ) as ms_since_prev_event_new,
-                ROUND(
-                    DATEDIFF('millisecond',
-                        LAG(timestamp) OVER (PARTITION BY session_key ORDER BY timestamp),
-                        timestamp
-                    ) / 1000.0,
-                3) as sec_since_prev_event_new
-            FROM searches s
-        """)
-
-        execute("ALTER TABLE searches DROP COLUMN event_order;")
-        execute("ALTER TABLE searches DROP COLUMN prev_event;")
-        execute("ALTER TABLE searches DROP COLUMN prev_timestamp;")
-        execute("ALTER TABLE searches DROP COLUMN ms_since_prev_event;")
-        execute("ALTER TABLE searches DROP COLUMN sec_since_prev_event;")
-        execute("ALTER TABLE searches RENAME COLUMN event_order_new TO event_order;")
-        execute("ALTER TABLE searches RENAME COLUMN prev_event_new TO prev_event;")
-        execute("ALTER TABLE searches RENAME COLUMN prev_timestamp_new TO prev_timestamp;")
-        execute("ALTER TABLE searches RENAME COLUMN ms_since_prev_event_new TO ms_since_prev_event;")
-        execute("ALTER TABLE searches RENAME COLUMN sec_since_prev_event_new TO sec_since_prev_event;")
-
-        execute("ALTER TABLE searches ADD COLUMN time_since_prev_bucket VARCHAR;")
-        execute("""
-            UPDATE searches SET time_since_prev_bucket = CASE
-                WHEN ms_since_prev_event IS NULL THEN 'First Event'
-                WHEN ms_since_prev_event < 500 THEN '< 0.5s'
-                WHEN ms_since_prev_event < 1000 THEN '0.5-1s'
-                WHEN ms_since_prev_event < 2000 THEN '1-2s'
-                WHEN ms_since_prev_event < 5000 THEN '2-5s'
-                WHEN ms_since_prev_event < 10000 THEN '5-10s'
-                WHEN ms_since_prev_event < 30000 THEN '10-30s'
-                WHEN ms_since_prev_event < 60000 THEN '30-60s'
+                ) / 1000.0,
+            3) as sec_since_prev_event,
+            CASE
+                WHEN LAG(timestamp) OVER (PARTITION BY session_key ORDER BY timestamp) IS NULL THEN 'First Event'
+                WHEN DATEDIFF('millisecond', LAG(timestamp) OVER (PARTITION BY session_key ORDER BY timestamp), timestamp) < 500 THEN '< 0.5s'
+                WHEN DATEDIFF('millisecond', LAG(timestamp) OVER (PARTITION BY session_key ORDER BY timestamp), timestamp) < 1000 THEN '0.5-1s'
+                WHEN DATEDIFF('millisecond', LAG(timestamp) OVER (PARTITION BY session_key ORDER BY timestamp), timestamp) < 2000 THEN '1-2s'
+                WHEN DATEDIFF('millisecond', LAG(timestamp) OVER (PARTITION BY session_key ORDER BY timestamp), timestamp) < 5000 THEN '2-5s'
+                WHEN DATEDIFF('millisecond', LAG(timestamp) OVER (PARTITION BY session_key ORDER BY timestamp), timestamp) < 10000 THEN '5-10s'
+                WHEN DATEDIFF('millisecond', LAG(timestamp) OVER (PARTITION BY session_key ORDER BY timestamp), timestamp) < 30000 THEN '10-30s'
+                WHEN DATEDIFF('millisecond', LAG(timestamp) OVER (PARTITION BY session_key ORDER BY timestamp), timestamp) < 60000 THEN '30-60s'
                 ELSE '> 60s'
-            END;
-        """)
-        log("  Created: event_order, prev_event, prev_timestamp, ms_since_prev_event, sec_since_prev_event, time_since_prev_bucket")
-
-    # =========================================================================
-    # STEP 6: Add calculated analytics columns
-    # =========================================================================
-    log("Step 6: Adding calculated analytics columns...")
-
-    schema = query("DESCRIBE searches")
-    col_names = schema['column_name'].tolist()
-
-    # Search term normalization
-    execute("ALTER TABLE searches ADD COLUMN search_term_normalized VARCHAR;")
-    execute("""
-        UPDATE searches SET search_term_normalized =
-            LOWER(TRIM(COALESCE(CP_searchQuery, searchQuery, query)));
+            END as time_since_prev_bucket
+        FROM searches s
     """)
-    log("  Created: search_term_normalized")
 
-    # Search term length and word count
-    execute("ALTER TABLE searches ADD COLUMN search_term_length INTEGER;")
-    execute("ALTER TABLE searches ADD COLUMN search_term_word_count INTEGER;")
-    execute("""
-        UPDATE searches SET
-            search_term_length = LENGTH(search_term_normalized),
-            search_term_word_count = CASE
-                WHEN search_term_normalized IS NULL OR search_term_normalized = '' THEN 0
-                ELSE LENGTH(search_term_normalized) - LENGTH(REPLACE(search_term_normalized, ' ', '')) + 1
-            END;
+    # Add is_first_search_of_day
+    con.execute("""
+        CREATE OR REPLACE TABLE searches AS
+        SELECT
+            s.*,
+            CASE
+                WHEN name IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED') AND
+                     ROW_NUMBER() OVER (PARTITION BY user_id, session_date ORDER BY timestamp) = 1
+                THEN true
+                WHEN name IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED')
+                THEN false
+                ELSE NULL
+            END as is_first_search_of_day
+        FROM searches s
     """)
-    log("  Created: search_term_length, search_term_word_count")
 
-    # Hour and weekday
-    if 'timestamp' in col_names:
-        execute("ALTER TABLE searches ADD COLUMN event_hour INTEGER;")
-        execute("ALTER TABLE searches ADD COLUMN event_weekday VARCHAR;")
-        execute("ALTER TABLE searches ADD COLUMN event_weekday_num INTEGER;")
-        execute("""
-            UPDATE searches SET
-                event_hour = EXTRACT(HOUR FROM timestamp)::INTEGER,
-                event_weekday = DAYNAME(timestamp),
-                event_weekday_num = ISODOW(timestamp);
-        """)
-        log("  Created: event_hour, event_weekday, event_weekday_num")
+    row_count = con.execute("SELECT COUNT(*) as n FROM searches").df()['n'][0]
+    log(f"  Calculated columns added for {row_count:,} rows")
 
-    # Null result flag
-    execute("ALTER TABLE searches ADD COLUMN is_null_result BOOLEAN;")
-    execute("""
-        UPDATE searches SET is_null_result = CASE
-            WHEN name = 'SEARCH_RESULT_COUNT' AND CAST(CP_totalResultCount AS INTEGER) = 0 THEN true
-            WHEN name = 'SEARCH_RESULT_COUNT' AND CAST(CP_totalResultCount AS INTEGER) > 0 THEN false
-            ELSE NULL
-        END;
-    """)
-    log("  Created: is_null_result")
 
-    # Click category
-    execute("ALTER TABLE searches ADD COLUMN click_category VARCHAR;")
-    execute("""
-        UPDATE searches SET click_category = CASE
-            WHEN name = 'SEARCH_TAB_CLICK' THEN 'General'
-            WHEN name = 'SEARCH_ALL_TAB_PAGE_CLICK' THEN 'All'
-            WHEN name = 'SEARCH_NEWS_TAB_PAGE_CLICK' THEN 'News'
-            WHEN name = 'SEARCH_GOTO_TAB_PAGE_CLICK' THEN 'GoTo'
-            WHEN name LIKE '%PEOPLE%' OR name LIKE '%people%' THEN 'People'
-            ELSE NULL
-        END;
-    """)
-    log("  Created: click_category")
+def export_parquet_files(con, output_dir):
+    """Export all Parquet files for Power BI."""
+    log("Exporting Parquet files...")
 
-    # First search of day
-    if 'user_id' in col_names and 'session_date' in col_names and 'timestamp' in col_names:
-        execute("""
-            CREATE OR REPLACE TABLE searches AS
-            SELECT
-                s.*,
-                CASE
-                    WHEN name IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED') AND
-                         ROW_NUMBER() OVER (
-                             PARTITION BY user_id, session_date
-                             ORDER BY timestamp
-                         ) = 1
-                    THEN true
-                    WHEN name IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED')
-                    THEN false
-                    ELSE NULL
-                END as is_first_search_of_day
-            FROM searches s
-        """)
-        log("  Created: is_first_search_of_day")
-
-    # =========================================================================
-    # STEP 7: Export Parquet files
-    # =========================================================================
-    log("Step 7: Exporting Parquet files...")
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     # Raw data export
     raw_file = output_dir / 'searches_raw.parquet'
     if raw_file.exists():
         raw_file.unlink()
-    execute(f"COPY searches TO '{raw_file}' (FORMAT PARQUET)")
-    raw_count = query(f"SELECT COUNT(*) as n FROM read_parquet('{raw_file}')")['n'][0]
+    con.execute(f"COPY searches TO '{raw_file}' (FORMAT PARQUET)")
+    raw_count = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{raw_file}')").df()['n'][0]
     raw_size = os.path.getsize(raw_file) / (1024 * 1024)
-    log(f"  Exported: searches_raw.parquet ({raw_count:,} rows, {raw_size:.1f} MB)")
+    log(f"  searches_raw.parquet ({raw_count:,} rows, {raw_size:.1f} MB)")
 
     # Daily aggregation
     daily_file = output_dir / 'searches_daily.parquet'
     if daily_file.exists():
         daily_file.unlink()
-    execute(f"""
+    con.execute(f"""
         COPY (
             SELECT
                 session_date as date,
@@ -359,21 +348,20 @@ def process_search_analytics(input_file):
             ORDER BY 1
         ) TO '{daily_file}' (FORMAT PARQUET)
     """)
-    daily_count = query(f"SELECT COUNT(*) as n FROM read_parquet('{daily_file}')")['n'][0]
-    log(f"  Exported: searches_daily.parquet ({daily_count} days)")
+    daily_count = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{daily_file}')").df()['n'][0]
+    log(f"  searches_daily.parquet ({daily_count} days)")
 
     # Session journeys
     journeys_file = output_dir / 'searches_journeys.parquet'
     if journeys_file.exists():
         journeys_file.unlink()
-    execute(f"""
+    con.execute(f"""
         COPY (
             WITH session_events AS (
                 SELECT
                     session_key,
                     session_date,
                     MIN(timestamp) as session_start,
-                    MAX(timestamp) as session_end,
                     DATEDIFF('second', MIN(timestamp), MAX(timestamp)) as duration_seconds,
                     COUNT(*) as total_events,
                     COUNT(CASE WHEN name IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED') THEN 1 END) as search_count,
@@ -435,30 +423,23 @@ def process_search_analytics(input_file):
             ORDER BY session_date, session_start
         ) TO '{journeys_file}' (FORMAT PARQUET)
     """)
-    journeys_count = query(f"SELECT COUNT(*) as n FROM read_parquet('{journeys_file}')")['n'][0]
-    log(f"  Exported: searches_journeys.parquet ({journeys_count:,} sessions)")
+    journeys_count = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{journeys_file}')").df()['n'][0]
+    log(f"  searches_journeys.parquet ({journeys_count:,} sessions)")
 
     # Session journeys with timing
     journeys_timed_file = output_dir / 'searches_journeys_timed.parquet'
     if journeys_timed_file.exists():
         journeys_timed_file.unlink()
-    execute(f"""
+    con.execute(f"""
         COPY (
             WITH session_timings AS (
                 SELECT
                     session_key,
                     session_date,
                     MIN(timestamp) as session_start,
-                    MAX(timestamp) as session_end,
                     COUNT(*) as total_events,
-                    MIN(CASE
-                        WHEN name = 'SEARCH_RESULT_COUNT' AND prev_event IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED')
-                        THEN ms_since_prev_event
-                    END) as ms_search_to_result,
-                    MIN(CASE
-                        WHEN click_category IS NOT NULL AND prev_event = 'SEARCH_RESULT_COUNT'
-                        THEN ms_since_prev_event
-                    END) as ms_result_to_click,
+                    MIN(CASE WHEN name = 'SEARCH_RESULT_COUNT' AND prev_event IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED') THEN ms_since_prev_event END) as ms_search_to_result,
+                    MIN(CASE WHEN click_category IS NOT NULL AND prev_event = 'SEARCH_RESULT_COUNT' THEN ms_since_prev_event END) as ms_result_to_click,
                     AVG(ms_since_prev_event) as avg_ms_between_events,
                     DATEDIFF('millisecond', MIN(timestamp), MAX(timestamp)) as total_duration_ms,
                     COUNT(CASE WHEN name IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED') THEN 1 END) as search_count,
@@ -538,35 +519,33 @@ def process_search_analytics(input_file):
             ORDER BY session_date, session_start
         ) TO '{journeys_timed_file}' (FORMAT PARQUET)
     """)
-    journeys_timed_count = query(f"SELECT COUNT(*) as n FROM read_parquet('{journeys_timed_file}')")['n'][0]
-    log(f"  Exported: searches_journeys_timed.parquet ({journeys_timed_count:,} sessions)")
+    journeys_timed_count = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{journeys_timed_file}')").df()['n'][0]
+    log(f"  searches_journeys_timed.parquet ({journeys_timed_count:,} sessions)")
 
-    # =========================================================================
-    # STEP 8: Summary
-    # =========================================================================
-    log("="*60)
-    log("PROCESSING COMPLETE")
-    log("="*60)
 
-    # Show column summary
-    schema = query("DESCRIBE searches")
-    log(f"\nDuckDB database: {db_path}")
-    log(f"Total columns: {len(schema)}")
-    log(f"Total rows: {row_count:,}")
+def print_summary(con):
+    """Print processing summary."""
+    row_count = con.execute("SELECT COUNT(*) as n FROM searches").df()['n'][0]
 
-    # Show date range
-    date_range = query("""
+    # Date range
+    date_range = con.execute("""
         SELECT
             MIN(session_date) as first_date,
             MAX(session_date) as last_date,
             COUNT(DISTINCT session_date) as days
         FROM searches
-    """)
-    if len(date_range) > 0:
-        log(f"\nDate range: {date_range['first_date'][0]} to {date_range['last_date'][0]} ({date_range['days'][0]} days)")
+    """).df()
 
-    # Show journey outcomes
-    outcomes = query("""
+    log("="*60)
+    log("SUMMARY")
+    log("="*60)
+    log(f"Total rows: {row_count:,}")
+
+    if len(date_range) > 0 and date_range['first_date'][0] is not None:
+        log(f"Date range: {date_range['first_date'][0]} to {date_range['last_date'][0]} ({date_range['days'][0]} days)")
+
+    # Journey outcomes
+    outcomes = con.execute("""
         WITH session_summary AS (
             SELECT
                 session_key,
@@ -588,17 +567,95 @@ def process_search_analytics(input_file):
         FROM session_summary
         GROUP BY 1
         ORDER BY 2 DESC
-    """)
+    """).df()
 
     log("\nJourney Outcomes:")
     for _, row in outcomes.iterrows():
         log(f"  {row['outcome']:12} {row['sessions']:>8,} ({row['pct']}%)")
 
-    log(f"\nParquet files exported to: {output_dir}")
-    log("  - searches_raw.parquet (all event-level data)")
-    log("  - searches_daily.parquet (aggregated by day)")
-    log("  - searches_journeys.parquet (session-level)")
-    log("  - searches_journeys_timed.parquet (with timing intervals)")
+
+def process_search_analytics(input_file=None, full_refresh=False):
+    """
+    Main processing function.
+
+    Args:
+        input_file: Specific file to process, or None to auto-detect
+        full_refresh: If True, delete DB and reprocess all files
+    """
+    # Determine paths
+    script_dir = Path(__file__).parent
+    input_dir = script_dir / 'input'
+    data_dir = script_dir / 'data'
+    output_dir = script_dir / 'output'
+    db_path = data_dir / 'searchanalytics.db'
+
+    # Create directories
+    input_dir.mkdir(parents=True, exist_ok=True)
+    data_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    log("="*60)
+    log("SEARCH ANALYTICS PROCESSING")
+    log("="*60)
+
+    # Handle full refresh
+    if full_refresh:
+        if db_path.exists():
+            db_path.unlink()
+            log("Full refresh: deleted existing database")
+
+        # Process all files
+        files_to_process = get_all_input_files(input_dir)
+        if not files_to_process:
+            log(f"ERROR: No input files found in {input_dir}")
+            log("Place your KQL export files (xlsx/csv) in the input/ folder")
+            sys.exit(1)
+        log(f"Full refresh: processing {len(files_to_process)} files")
+    elif input_file:
+        # Process specific file
+        files_to_process = [Path(input_file)]
+        if not files_to_process[0].exists():
+            log(f"ERROR: File not found: {input_file}")
+            sys.exit(1)
+    else:
+        # Auto-detect latest file
+        latest_file = find_latest_input_file(input_dir)
+        if not latest_file:
+            log(f"ERROR: No input files found in {input_dir}")
+            log("Place your KQL export files (xlsx/csv) in the input/ folder")
+            log("Supported formats: .xlsx, .xls, .csv")
+            log("\nExample filenames:")
+            log("  search_export_2025-01-13.xlsx")
+            log("  search_export_2025-W02.csv")
+            sys.exit(1)
+        files_to_process = [latest_file]
+        log(f"Auto-detected latest file: {latest_file.name}")
+
+    # Connect to DuckDB
+    con = duckdb.connect(str(db_path))
+
+    # Process each file
+    for input_path in files_to_process:
+        log(f"\nProcessing: {input_path.name}")
+
+        # Load file into temp table
+        row_count = load_file_to_temp_table(con, input_path)
+        log(f"  Loaded {row_count:,} rows")
+
+        # Upsert into main table
+        upsert_data(con)
+
+    # Add calculated columns
+    add_calculated_columns(con)
+
+    # Export Parquet files
+    export_parquet_files(con, output_dir)
+
+    # Print summary
+    print_summary(con)
+
+    log(f"\nDatabase: {db_path}")
+    log(f"Parquet files: {output_dir}")
 
     # Close connection
     con.close()
@@ -606,10 +663,19 @@ def process_search_analytics(input_file):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print(__doc__)
-        print("\nError: Please provide input file path")
-        print("Example: python process_search_analytics.py data/search_export.csv")
-        sys.exit(1)
+    # Parse arguments
+    full_refresh = '--full-refresh' in sys.argv
 
-    process_search_analytics(sys.argv[1])
+    # Get input file if specified
+    input_file = None
+    for arg in sys.argv[1:]:
+        if not arg.startswith('--'):
+            input_file = arg
+            break
+
+    if len(sys.argv) == 1:
+        # No arguments - show help and auto-detect
+        print(__doc__)
+        print("\nNo arguments provided - auto-detecting latest file in input/\n")
+
+    process_search_analytics(input_file=input_file, full_refresh=full_refresh)
