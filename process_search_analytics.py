@@ -375,7 +375,7 @@ def export_parquet_files(con, output_dir):
                 COUNT(*) as total_events,
                 COUNT(DISTINCT session_key) as unique_sessions,
                 COUNT(DISTINCT user_id) as unique_users,
-                COUNT(DISTINCT search_term_normalized) as unique_queries,
+                COUNT(DISTINCT search_term_normalized) as unique_search_terms,
                 COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END) as search_starts,
                 COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_events,
                 COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_events,
@@ -429,7 +429,7 @@ def export_parquet_files(con, output_dir):
                     COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END) as search_count_in_session,
                     COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_count,
                     COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_count,
-                    COUNT(DISTINCT search_term_normalized) as unique_queries,
+                    COUNT(DISTINCT search_term_normalized) as unique_search_terms,
                     SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END) as null_result_count,
                     -- Result metrics
                     AVG(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN CAST(CP_totalResultCount AS FLOAT) END) as avg_total_results,
@@ -457,7 +457,7 @@ def export_parquet_files(con, output_dir):
                 search_count_in_session,
                 result_count,
                 click_count,
-                unique_queries,
+                unique_search_terms,
                 null_result_count,
                 ROUND(avg_total_results, 1) as avg_total_results,
                 max_total_results,
@@ -512,7 +512,7 @@ def export_parquet_files(con, output_dir):
                     WHEN result_count > 0 AND click_count = 0 THEN 'Abandoned'
                     ELSE 'Unknown'
                 END as journey_outcome,
-                CASE WHEN unique_queries > 1 THEN true ELSE false END as had_reformulation,
+                CASE WHEN unique_search_terms > 1 THEN true ELSE false END as had_reformulation,
                 CASE
                     WHEN total_events = 1 THEN 'Single Event'
                     WHEN total_events <= 3 THEN 'Simple'

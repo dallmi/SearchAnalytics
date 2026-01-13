@@ -160,7 +160,7 @@ Four Parquet files are generated for Power BI:
 #### 2. `searches_daily.parquet`
 - **Content**: Aggregated metrics by day for trend analysis
 - **Columns include**:
-  - `total_events`, `unique_sessions`, `unique_users`, `unique_queries`
+  - `total_events`, `unique_sessions`, `unique_users`, `unique_search_terms`
   - `search_starts`, `result_events`, `click_events`, `null_results`
   - **Rate metrics**:
     - `click_through_rate_pct` - Clicks / Searches × 100
@@ -175,7 +175,7 @@ Four Parquet files are generated for Power BI:
 #### 3. `searches_journeys.parquet`
 - **Content**: Session-level data with timing metrics (consolidated)
 - **Event counts**:
-  - `search_count_in_session`, `result_count`, `click_count`, `unique_queries`
+  - `search_count_in_session`, `result_count`, `click_count`, `unique_search_terms`
   - `null_result_count`, `avg_total_results`, `max_total_results`
 - **Timing metrics**:
   - `sec_search_to_result` - Time from search to results displayed
