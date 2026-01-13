@@ -309,6 +309,30 @@ If Power BI can't read the Parquet files:
 
 ---
 
+## Event Types and Counting Logic
+
+### Search Events
+The telemetry captures two search initiation events that can overlap:
+- `SEARCH_TRIGGERED` - User initiates a search (presses enter, clicks button)
+- `SEARCH_STARTED` - System begins processing the search
+
+**Important:** To avoid double-counting, search counts use only `SEARCH_STARTED` events. This applies to:
+- `search_starts` in daily parquet
+- `search_count` in journeys parquet
+- Click-through rate calculations
+- Average searches per session
+
+### Other Event Types
+| Event | Description |
+|-------|-------------|
+| `SEARCH_RESULT_COUNT` | Results are displayed to user |
+| `SEARCH_TAB_CLICK` | Click on general result |
+| `SEARCH_ALL_TAB_PAGE_CLICK` | Click on "All" tab result |
+| `SEARCH_NEWS_TAB_PAGE_CLICK` | Click on news result |
+| `SEARCH_GOTO_TAB_PAGE_CLICK` | Click on "Go To" result |
+
+---
+
 ## Technical Details
 
 ### DuckDB Functions Used

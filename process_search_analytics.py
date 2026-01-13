@@ -335,10 +335,10 @@ def add_calculated_columns(con):
         SELECT
             s.*,
             CASE
-                WHEN name IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED') AND
+                WHEN name = 'SEARCH_STARTED' AND
                      ROW_NUMBER() OVER (PARTITION BY user_id, session_date ORDER BY timestamp) = 1
                 THEN true
-                WHEN name IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED')
+                WHEN name = 'SEARCH_STARTED'
                 THEN false
                 ELSE NULL
             END as is_first_search_of_day
@@ -376,19 +376,19 @@ def export_parquet_files(con, output_dir):
                 COUNT(DISTINCT session_key) as unique_sessions,
                 COUNT(DISTINCT user_id) as unique_users,
                 COUNT(DISTINCT search_term_normalized) as unique_queries,
-                COUNT(CASE WHEN name IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED') THEN 1 END) as search_starts,
+                COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END) as search_starts,
                 COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_events,
                 COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_events,
                 SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END) as null_results,
                 -- Rate metrics
                 ROUND(100.0 * COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END)
-                    / NULLIF(COUNT(CASE WHEN name IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED') THEN 1 END), 0), 2) as click_through_rate_pct,
+                    / NULLIF(COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END), 0), 2) as click_through_rate_pct,
                 ROUND(100.0 * SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END)
                     / NULLIF(COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END), 0), 2) as null_rate_pct,
                 ROUND(100.0 * (COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' AND is_null_result = false THEN 1 END) - COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END))
                     / NULLIF(COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' AND is_null_result = false THEN 1 END), 0), 2) as abandonment_rate_pct,
                 -- Session metrics
-                ROUND(1.0 * COUNT(CASE WHEN name IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED') THEN 1 END)
+                ROUND(1.0 * COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END)
                     / NULLIF(COUNT(DISTINCT session_key), 0), 2) as avg_searches_per_session,
                 -- Search term metrics
                 ROUND(AVG(search_term_length), 1) as avg_search_term_length,
@@ -421,12 +421,12 @@ def export_parquet_files(con, output_dir):
                     MIN(timestamp) as session_start,
                     COUNT(*) as total_events,
                     -- Timing metrics
-                    MIN(CASE WHEN name = 'SEARCH_RESULT_COUNT' AND prev_event IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED') THEN ms_since_prev_event END) as ms_search_to_result,
+                    MIN(CASE WHEN name = 'SEARCH_RESULT_COUNT' AND prev_event = 'SEARCH_STARTED' THEN ms_since_prev_event END) as ms_search_to_result,
                     MIN(CASE WHEN click_category IS NOT NULL AND prev_event = 'SEARCH_RESULT_COUNT' THEN ms_since_prev_event END) as ms_result_to_click,
                     AVG(ms_since_prev_event) as avg_ms_between_events,
                     DATEDIFF('millisecond', MIN(timestamp), MAX(timestamp)) as total_duration_ms,
                     -- Event counts
-                    COUNT(CASE WHEN name IN ('SEARCH_TRIGGERED', 'SEARCH_STARTED') THEN 1 END) as search_count,
+                    COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END) as search_count,
                     COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_count,
                     COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_count,
                     COUNT(DISTINCT search_term_normalized) as unique_queries,
