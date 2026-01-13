@@ -426,7 +426,7 @@ def export_parquet_files(con, output_dir):
                     AVG(ms_since_prev_event) as avg_ms_between_events,
                     DATEDIFF('millisecond', MIN(timestamp), MAX(timestamp)) as total_duration_ms,
                     -- Event counts
-                    COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END) as search_count,
+                    COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END) as search_count_in_session,
                     COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_count,
                     COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_count,
                     COUNT(DISTINCT search_term_normalized) as unique_queries,
@@ -454,7 +454,7 @@ def export_parquet_files(con, output_dir):
                 session_date,
                 session_start,
                 total_events,
-                search_count,
+                search_count_in_session,
                 result_count,
                 click_count,
                 unique_queries,

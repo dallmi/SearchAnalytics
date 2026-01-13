@@ -175,7 +175,7 @@ Four Parquet files are generated for Power BI:
 #### 3. `searches_journeys.parquet`
 - **Content**: Session-level data with timing metrics (consolidated)
 - **Event counts**:
-  - `search_count`, `result_count`, `click_count`, `unique_queries`
+  - `search_count_in_session`, `result_count`, `click_count`, `unique_queries`
   - `null_result_count`, `avg_total_results`, `max_total_results`
 - **Timing metrics**:
   - `sec_search_to_result` - Time from search to results displayed
@@ -318,7 +318,7 @@ The telemetry captures two search initiation events that can overlap:
 
 **Important:** To avoid double-counting, search counts use only `SEARCH_STARTED` events. This applies to:
 - `search_starts` in daily parquet
-- `search_count` in journeys parquet
+- `search_count_in_session` in journeys parquet
 - Click-through rate calculations
 - Average searches per session
 
