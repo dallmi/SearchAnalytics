@@ -607,6 +607,8 @@ def export_parquet_files(con, output_dir):
                     is_null_result,
                     click_category,
                     search_term_normalized,
+                    prev_event,
+                    ms_since_prev_event,
                     -- Forward-fill search term to clicks and result events
                     LAST_VALUE(search_term_normalized IGNORE NULLS) OVER (
                         PARTITION BY session_key
@@ -634,7 +636,21 @@ def export_parquet_files(con, output_dir):
                 COUNT(CASE WHEN click_category = 'All' THEN 1 END) as clicks_all,
                 COUNT(CASE WHEN click_category = 'News' THEN 1 END) as clicks_news,
                 COUNT(CASE WHEN click_category = 'GoTo' THEN 1 END) as clicks_goto,
-                COUNT(CASE WHEN click_category = 'People' THEN 1 END) as clicks_people
+                COUNT(CASE WHEN click_category = 'People' THEN 1 END) as clicks_people,
+                -- Timing metrics (result to click time for this term)
+                ROUND(AVG(CASE
+                    WHEN click_category IS NOT NULL AND prev_event = 'SEARCH_RESULT_COUNT'
+                    THEN ms_since_prev_event / 1000.0
+                END), 2) as avg_sec_to_click,
+                COUNT(CASE
+                    WHEN click_category IS NOT NULL AND prev_event = 'SEARCH_RESULT_COUNT'
+                    THEN 1
+                END) as clicks_with_timing,
+                SUM(CASE
+                    WHEN click_category IS NOT NULL AND prev_event = 'SEARCH_RESULT_COUNT'
+                    THEN ms_since_prev_event / 1000.0
+                    ELSE 0
+                END) as sum_sec_to_click
             FROM search_terms_with_context
             WHERE active_search_term IS NOT NULL
               AND active_search_term != ''
