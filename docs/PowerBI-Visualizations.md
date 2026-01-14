@@ -31,9 +31,10 @@ The daily parquet file contains pre-calculated rate and average columns for conv
 
 | Column | Type | Problem |
 |--------|------|---------|
-| `click_through_rate_pct` | Ratio | Cannot average percentages |
+| `click_rate_pct` | Ratio | Cannot average percentages |
 | `null_rate_pct` | Ratio | Cannot average percentages |
-| `abandonment_rate_pct` | Ratio | Cannot average percentages |
+| `session_success_rate_pct` | Ratio | Cannot average percentages |
+| `session_abandonment_rate_pct` | Ratio | Cannot average percentages |
 | `avg_searches_per_session` | Average | Cannot average averages |
 | `avg_search_term_length` | Average | Cannot average averages |
 | `avg_search_term_words` | Average | Cannot average averages |
@@ -45,8 +46,8 @@ Instead of using the pre-calculated columns, create DAX measures that recalculat
 #### Rate Metrics - DAX Formulas
 
 ```dax
-// Click-Through Rate (correct across any date range)
-CTR % =
+// Click Rate (clicks per search - can exceed 100% if users click multiple results)
+Click Rate % =
 DIVIDE(
     SUM(searches_daily[click_events]),
     SUM(searches_daily[search_starts]),
@@ -61,14 +62,29 @@ DIVIDE(
     0
 ) * 100
 
-// Abandonment Rate
-Abandonment Rate % =
+// Session Success Rate (sessions with at least one click / sessions with results)
+// Always 0-100% - recommended for KPIs
+Session Success Rate % =
 DIVIDE(
-    SUM(searches_daily[clickable_results]) - SUM(searches_daily[click_events]),
-    SUM(searches_daily[clickable_results]),
+    SUM(searches_daily[sessions_with_clicks]),
+    SUM(searches_daily[sessions_with_results]),
+    0
+) * 100
+
+// Session Abandonment Rate (sessions with results but no clicks / sessions with results)
+// Always 0-100% - recommended for KPIs
+Session Abandonment Rate % =
+DIVIDE(
+    SUM(searches_daily[sessions_abandoned]),
+    SUM(searches_daily[sessions_with_results]),
     0
 ) * 100
 ```
+
+**Note on Click Rate vs Session Success Rate:**
+- `Click Rate %` counts events and can exceed 100% (users clicking multiple results per search)
+- `Session Success Rate %` is session-based and always 0-100% (did the session have any clicks?)
+- Use **Session Success/Abandonment rates** for executive KPIs
 
 #### Average Metrics - DAX Formulas
 
@@ -102,9 +118,10 @@ DIVIDE(
 
 | Metric to Calculate | Numerator Column | Denominator Column |
 |---------------------|------------------|-------------------|
-| CTR % | `click_events` | `search_starts` |
+| Click Rate % | `click_events` | `search_starts` |
 | Null Rate % | `null_results` | `result_events` |
-| Abandonment Rate % | `clickable_results - click_events` | `clickable_results` |
+| Session Success Rate % | `sessions_with_clicks` | `sessions_with_results` |
+| Session Abandonment Rate % | `sessions_abandoned` | `sessions_with_results` |
 | Avg Searches/Session | `search_starts` | `unique_sessions` |
 | Avg Search Term Length | `sum_search_term_length` | `search_term_count` |
 | Avg Search Term Words | `sum_search_term_words` | `search_term_count` |
@@ -136,18 +153,26 @@ DIVIDE(
 |------|---------|-------------|
 | **Total Searches** | `SUM(search_starts)` | Total search queries |
 | **Unique Users** | `SUM(unique_users)` | Distinct users who searched |
-| **Click-Through Rate** | See DAX below | Percentage of searches that led to clicks |
+| **Session Success Rate** | See DAX below | Percentage of sessions with results that had clicks |
 | **Null Result Rate** | See DAX below | Percentage of searches with zero results |
-| **Abandonment Rate** | See DAX below | Percentage of results shown but not clicked |
+| **Session Abandonment Rate** | See DAX below | Percentage of sessions with results but no clicks |
 
 #### DAX Measures for Correct Aggregation
 
 ```dax
-// Click-Through Rate (recalculated for correct aggregation)
-CTR % =
+// Session Success Rate (always 0-100%)
+Session Success Rate % =
 DIVIDE(
-    SUM(searches_daily[click_events]),
-    SUM(searches_daily[search_starts]),
+    SUM(searches_daily[sessions_with_clicks]),
+    SUM(searches_daily[sessions_with_results]),
+    0
+) * 100
+
+// Session Abandonment Rate (always 0-100%)
+Session Abandonment Rate % =
+DIVIDE(
+    SUM(searches_daily[sessions_abandoned]),
+    SUM(searches_daily[sessions_with_results]),
     0
 ) * 100
 
@@ -159,11 +184,11 @@ DIVIDE(
     0
 ) * 100
 
-// Abandonment Rate
-Abandonment Rate % =
+// Click Rate (can exceed 100% - multiple clicks per search)
+Click Rate % =
 DIVIDE(
-    SUM(searches_daily[clickable_results]) - SUM(searches_daily[click_events]),
-    SUM(searches_daily[clickable_results]),
+    SUM(searches_daily[click_events]),
+    SUM(searches_daily[search_starts]),
     0
 ) * 100
 
@@ -196,9 +221,9 @@ DIVIDE(
 - **Type**: Line Chart (multiple series)
 - **X-Axis**: `date`
 - **Lines**:
-  - `CTR %` (DAX measure)
+  - `Session Success Rate %` (DAX measure)
   - `Null Rate %` (DAX measure)
-  - `Abandonment Rate %` (DAX measure)
+  - `Session Abandonment Rate %` (DAX measure)
 
 ### Row 3: Click Distribution
 
@@ -213,8 +238,8 @@ DIVIDE(
 
 #### Chart 4: Daily Activity Table
 - **Type**: Table
-- **Columns**: `date`, `search_starts`, `unique_users`, `CTR %`, `Null Rate %`
-- **Conditional Formatting**: Highlight low CTR or high null rates
+- **Columns**: `date`, `search_starts`, `unique_users`, `Session Success Rate %`, `Null Rate %`
+- **Conditional Formatting**: Highlight low success rates or high null rates
 
 ---
 
@@ -338,8 +363,8 @@ Set up Power BI alerts for:
 | Alert | Threshold | Meaning |
 |-------|-----------|---------|
 | Null Rate Spike | > 15% | Content gap or search issues |
-| CTR Drop | < 20% | Results not matching user intent |
-| Abandonment Spike | > 70% | Results showing but not useful |
+| Session Success Drop | < 30% | Results not matching user intent |
+| Session Abandonment Spike | > 70% | Results showing but not useful |
 | Slow Results | > 10% in "> 5s" bucket | System performance issue |
 
 ---
@@ -348,10 +373,10 @@ Set up Power BI alerts for:
 
 | Metric Type | Good | Warning | Bad |
 |-------------|------|---------|-----|
-| CTR % | > 30% (Green) | 15-30% (Yellow) | < 15% (Red) |
+| Session Success Rate % | > 40% (Green) | 25-40% (Yellow) | < 25% (Red) |
 | Null Rate % | < 5% (Green) | 5-15% (Yellow) | > 15% (Red) |
-| Abandonment % | < 50% (Green) | 50-70% (Yellow) | > 70% (Red) |
-| Success Rate | > 40% (Green) | 25-40% (Yellow) | < 25% (Red) |
+| Session Abandonment % | < 50% (Green) | 50-70% (Yellow) | > 70% (Red) |
+| Click Rate % | > 30% (Green) | 15-30% (Yellow) | < 15% (Red) |
 
 ---
 
@@ -369,22 +394,22 @@ Set up Power BI alerts for:
 ## Sample Report Layout
 
 ```
-+------------------------------------------------------------------+
-|  [Total Searches]  [Unique Users]  [CTR %]  [Null %]  [Abandon%] |
-+------------------------------------------------------------------+
-|                                          |                        |
-|     Search Volume Over Time              |   Click Category       |
-|     (Line Chart)                         |   Distribution         |
-|                                          |   (Donut)              |
-+------------------------------------------+------------------------+
-|                                          |                        |
-|     Quality Metrics Over Time            |   Journey Outcomes     |
-|     (Multi-line: CTR, Null, Abandon)     |   (Donut)              |
-|                                          |                        |
-+------------------------------------------+------------------------+
-|                                                                   |
-|     Daily Details Table                                           |
-|     (Date, Searches, Users, CTR%, Null%, etc.)                   |
-|                                                                   |
-+------------------------------------------------------------------+
++------------------------------------------------------------------------+
+|  [Total Searches]  [Unique Users]  [Success %]  [Null %]  [Abandon %]  |
++------------------------------------------------------------------------+
+|                                          |                              |
+|     Search Volume Over Time              |   Click Category             |
+|     (Line Chart)                         |   Distribution               |
+|                                          |   (Donut)                    |
++------------------------------------------+------------------------------+
+|                                          |                              |
+|     Quality Metrics Over Time            |   Journey Outcomes           |
+|     (Multi-line: Success, Null, Abandon) |   (Donut)                    |
+|                                          |                              |
++------------------------------------------+------------------------------+
+|                                                                         |
+|     Daily Details Table                                                 |
+|     (Date, Searches, Users, Success%, Null%, etc.)                     |
+|                                                                         |
++------------------------------------------------------------------------+
 ```

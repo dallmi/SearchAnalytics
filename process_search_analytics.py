@@ -375,41 +375,69 @@ def export_parquet_files(con, output_dir):
         daily_file.unlink()
     con.execute(f"""
         COPY (
+            WITH session_stats AS (
+                -- Pre-calculate session-level flags for accurate daily aggregation
+                SELECT
+                    session_key,
+                    session_date,
+                    MAX(CASE WHEN is_clickable_result = true THEN 1 ELSE 0 END) as had_results,
+                    MAX(CASE WHEN click_category IS NOT NULL THEN 1 ELSE 0 END) as had_clicks
+                FROM searches
+                GROUP BY session_key, session_date
+            ),
+            daily_session_metrics AS (
+                SELECT
+                    session_date,
+                    COUNT(*) as total_sessions,
+                    SUM(had_results) as sessions_with_results,
+                    SUM(had_clicks) as sessions_with_clicks,
+                    SUM(CASE WHEN had_results = 1 AND had_clicks = 0 THEN 1 ELSE 0 END) as sessions_abandoned
+                FROM session_stats
+                GROUP BY session_date
+            )
             SELECT
-                session_date as date,
+                s.session_date as date,
                 COUNT(*) as total_events,
-                COUNT(DISTINCT session_key) as unique_sessions,
-                COUNT(DISTINCT user_id) as unique_users,
-                COUNT(DISTINCT search_term_normalized) as unique_search_terms,
-                COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END) as search_starts,
-                COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_events,
-                COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_events,
-                SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END) as null_results,
-                SUM(CASE WHEN is_clickable_result = true THEN 1 ELSE 0 END) as clickable_results,
-                -- Rate metrics
-                ROUND(100.0 * COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END)
-                    / NULLIF(COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END), 0), 2) as click_through_rate_pct,
-                ROUND(100.0 * SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END)
-                    / NULLIF(COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END), 0), 2) as null_rate_pct,
-                ROUND(100.0 * (SUM(CASE WHEN is_clickable_result = true THEN 1 ELSE 0 END) - COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END))
-                    / NULLIF(SUM(CASE WHEN is_clickable_result = true THEN 1 ELSE 0 END), 0), 2) as abandonment_rate_pct,
+                COUNT(DISTINCT s.session_key) as unique_sessions,
+                COUNT(DISTINCT s.user_id) as unique_users,
+                COUNT(DISTINCT s.search_term_normalized) as unique_search_terms,
+                COUNT(CASE WHEN s.name = 'SEARCH_STARTED' THEN 1 END) as search_starts,
+                COUNT(CASE WHEN s.name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_events,
+                COUNT(CASE WHEN s.click_category IS NOT NULL THEN 1 END) as click_events,
+                SUM(CASE WHEN s.is_null_result = true THEN 1 ELSE 0 END) as null_results,
+                SUM(CASE WHEN s.is_clickable_result = true THEN 1 ELSE 0 END) as result_events_with_results,
+                -- Session-based metrics for accurate rate calculations
+                MAX(d.sessions_with_results) as sessions_with_results,
+                MAX(d.sessions_with_clicks) as sessions_with_clicks,
+                MAX(d.sessions_abandoned) as sessions_abandoned,
+                -- Rate metrics (event-based, can exceed 100% due to multiple clicks per search)
+                ROUND(100.0 * COUNT(CASE WHEN s.click_category IS NOT NULL THEN 1 END)
+                    / NULLIF(COUNT(CASE WHEN s.name = 'SEARCH_STARTED' THEN 1 END), 0), 2) as click_rate_pct,
+                ROUND(100.0 * SUM(CASE WHEN s.is_null_result = true THEN 1 ELSE 0 END)
+                    / NULLIF(COUNT(CASE WHEN s.name = 'SEARCH_RESULT_COUNT' THEN 1 END), 0), 2) as null_rate_pct,
+                -- Session-based rates (always 0-100%)
+                ROUND(100.0 * MAX(d.sessions_with_clicks)
+                    / NULLIF(MAX(d.sessions_with_results), 0), 2) as session_success_rate_pct,
+                ROUND(100.0 * MAX(d.sessions_abandoned)
+                    / NULLIF(MAX(d.sessions_with_results), 0), 2) as session_abandonment_rate_pct,
                 -- Session metrics
-                ROUND(1.0 * COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END)
-                    / NULLIF(COUNT(DISTINCT session_key), 0), 2) as avg_searches_per_session,
+                ROUND(1.0 * COUNT(CASE WHEN s.name = 'SEARCH_STARTED' THEN 1 END)
+                    / NULLIF(COUNT(DISTINCT s.session_key), 0), 2) as avg_searches_per_session,
                 -- Search term metrics (includes SUM columns for weighted DAX calculations)
-                ROUND(AVG(search_term_length), 1) as avg_search_term_length,
-                ROUND(AVG(search_term_word_count), 1) as avg_search_term_words,
-                SUM(search_term_length) as sum_search_term_length,
-                SUM(search_term_word_count) as sum_search_term_words,
-                COUNT(CASE WHEN search_term_length IS NOT NULL THEN 1 END) as search_term_count,
-                COUNT(CASE WHEN is_first_search_of_day = true THEN 1 END) as first_searches_of_day,
+                ROUND(AVG(s.search_term_length), 1) as avg_search_term_length,
+                ROUND(AVG(s.search_term_word_count), 1) as avg_search_term_words,
+                SUM(s.search_term_length) as sum_search_term_length,
+                SUM(s.search_term_word_count) as sum_search_term_words,
+                COUNT(CASE WHEN s.search_term_length IS NOT NULL THEN 1 END) as search_term_count,
+                COUNT(CASE WHEN s.is_first_search_of_day = true THEN 1 END) as first_searches_of_day,
                 -- Click category breakdown
-                COUNT(CASE WHEN click_category = 'General' THEN 1 END) as clicks_general,
-                COUNT(CASE WHEN click_category = 'All' THEN 1 END) as clicks_all,
-                COUNT(CASE WHEN click_category = 'News' THEN 1 END) as clicks_news,
-                COUNT(CASE WHEN click_category = 'GoTo' THEN 1 END) as clicks_goto,
-                COUNT(CASE WHEN click_category = 'People' THEN 1 END) as clicks_people
-            FROM searches
+                COUNT(CASE WHEN s.click_category = 'General' THEN 1 END) as clicks_general,
+                COUNT(CASE WHEN s.click_category = 'All' THEN 1 END) as clicks_all,
+                COUNT(CASE WHEN s.click_category = 'News' THEN 1 END) as clicks_news,
+                COUNT(CASE WHEN s.click_category = 'GoTo' THEN 1 END) as clicks_goto,
+                COUNT(CASE WHEN s.click_category = 'People' THEN 1 END) as clicks_people
+            FROM searches s
+            JOIN daily_session_metrics d ON s.session_date = d.session_date
             GROUP BY 1
             ORDER BY 1
         ) TO '{daily_file}' (FORMAT PARQUET)
