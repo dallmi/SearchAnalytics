@@ -390,9 +390,12 @@ def export_parquet_files(con, output_dir):
                 -- Session metrics
                 ROUND(1.0 * COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END)
                     / NULLIF(COUNT(DISTINCT session_key), 0), 2) as avg_searches_per_session,
-                -- Search term metrics
+                -- Search term metrics (includes SUM columns for weighted DAX calculations)
                 ROUND(AVG(search_term_length), 1) as avg_search_term_length,
                 ROUND(AVG(search_term_word_count), 1) as avg_search_term_words,
+                SUM(search_term_length) as sum_search_term_length,
+                SUM(search_term_word_count) as sum_search_term_words,
+                COUNT(CASE WHEN search_term_length IS NOT NULL THEN 1 END) as search_term_count,
                 COUNT(CASE WHEN is_first_search_of_day = true THEN 1 END) as first_searches_of_day,
                 -- Click category breakdown
                 COUNT(CASE WHEN click_category = 'General' THEN 1 END) as clicks_general,
@@ -423,7 +426,6 @@ def export_parquet_files(con, output_dir):
                     -- Timing metrics
                     MIN(CASE WHEN name = 'SEARCH_RESULT_COUNT' AND prev_event = 'SEARCH_STARTED' THEN ms_since_prev_event END) as ms_search_to_result,
                     MIN(CASE WHEN click_category IS NOT NULL AND prev_event = 'SEARCH_RESULT_COUNT' THEN ms_since_prev_event END) as ms_result_to_click,
-                    AVG(ms_since_prev_event) as avg_ms_between_events,
                     DATEDIFF('millisecond', MIN(timestamp), MAX(timestamp)) as total_duration_ms,
                     -- Event counts
                     COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END) as search_count_in_session,
@@ -432,11 +434,7 @@ def export_parquet_files(con, output_dir):
                     COUNT(DISTINCT search_term_normalized) as unique_search_terms,
                     SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END) as null_result_count,
                     -- Result metrics
-                    AVG(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN CAST(CP_totalResultCount AS FLOAT) END) as avg_total_results,
                     MAX(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN CAST(CP_totalResultCount AS INTEGER) END) as max_total_results,
-                    -- Search term metrics
-                    ROUND(AVG(search_term_length), 1) as avg_search_term_length,
-                    ROUND(AVG(search_term_word_count), 1) as avg_search_term_words,
                     -- Time of day
                     MIN(event_hour) as first_event_hour,
                     MAX(event_hour) as last_event_hour,
@@ -459,16 +457,11 @@ def export_parquet_files(con, output_dir):
                 click_count,
                 unique_search_terms,
                 null_result_count,
-                ROUND(avg_total_results, 1) as avg_total_results,
                 max_total_results,
                 -- Timing in seconds
                 ROUND(ms_search_to_result / 1000.0, 2) as sec_search_to_result,
                 ROUND(ms_result_to_click / 1000.0, 2) as sec_result_to_click,
-                ROUND(avg_ms_between_events / 1000.0, 2) as avg_sec_between_events,
                 ROUND(total_duration_ms / 1000.0, 2) as total_duration_sec,
-                -- Search term metrics
-                avg_search_term_length,
-                avg_search_term_words,
                 -- Time of day
                 first_event_hour,
                 last_event_hour,

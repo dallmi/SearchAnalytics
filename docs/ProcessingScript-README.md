@@ -168,7 +168,10 @@ Four Parquet files are generated for Power BI:
     - `abandonment_rate_pct` - (Results without click) / Results × 100
   - **Session metrics**:
     - `avg_searches_per_session` - Average searches per session
-  - `avg_search_term_length`, `avg_search_term_words`
+  - **Search term metrics** (includes SUM columns for weighted DAX calculations):
+    - `avg_search_term_length`, `avg_search_term_words` - Daily averages
+    - `sum_search_term_length`, `sum_search_term_words` - Daily sums for weighted avg in Power BI
+    - `search_term_count` - Count of search terms (denominator for weighted avg)
   - `first_searches_of_day`
   - Click breakdowns by category (`clicks_general`, `clicks_all`, `clicks_news`, `clicks_goto`, `clicks_people`)
 
@@ -176,11 +179,10 @@ Four Parquet files are generated for Power BI:
 - **Content**: Session-level data with timing metrics (consolidated)
 - **Event counts**:
   - `search_count_in_session`, `result_count`, `click_count`, `unique_search_terms`
-  - `null_result_count`, `avg_total_results`, `max_total_results`
+  - `null_result_count`, `max_total_results`
 - **Timing metrics**:
   - `sec_search_to_result` - Time from search to results displayed
   - `sec_result_to_click` - Time from results to user click
-  - `avg_sec_between_events` - Average time between events
   - `total_duration_sec` - Total session duration
 - **Time buckets**: Pre-categorized performance tiers
   - `search_to_result_bucket`, `result_to_click_bucket`, `session_duration_bucket`
