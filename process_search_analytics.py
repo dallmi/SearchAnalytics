@@ -535,7 +535,7 @@ def export_parquet_files(con, output_dir):
                 -- Classifications
                 CASE
                     WHEN click_count > 0 THEN 'Success'
-                    WHEN null_result_count > 0 AND click_count = 0 THEN 'No Results'
+                    WHEN result_count > 0 AND null_result_count = result_count AND click_count = 0 THEN 'No Results'
                     WHEN result_count > 0 AND click_count = 0 THEN 'Abandoned'
                     ELSE 'Unknown'
                 END as journey_outcome,
@@ -589,7 +589,7 @@ def print_summary(con):
         SELECT
             CASE
                 WHEN clicks > 0 THEN 'Success'
-                WHEN null_results > 0 AND clicks = 0 THEN 'No Results'
+                WHEN results > 0 AND null_results = results AND clicks = 0 THEN 'No Results'
                 WHEN results > 0 AND clicks = 0 THEN 'Abandoned'
                 ELSE 'Unknown'
             END as outcome,
