@@ -390,7 +390,7 @@ def export_parquet_files(con, output_dir):
                     session_date,
                     COUNT(*) as total_sessions,
                     SUM(had_results) as sessions_with_results,
-                    SUM(had_clicks) as sessions_with_clicks,
+                    SUM(CASE WHEN had_results = 1 AND had_clicks = 1 THEN 1 ELSE 0 END) as sessions_with_clicks,
                     SUM(CASE WHEN had_results = 1 AND had_clicks = 0 THEN 1 ELSE 0 END) as sessions_abandoned
                 FROM session_stats
                 GROUP BY session_date
