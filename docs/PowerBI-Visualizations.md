@@ -9,9 +9,10 @@ This guide provides recommended visualizations for analyzing Intranet search beh
 ### Connecting to Parquet Files
 1. **Get Data** > **Parquet**
 2. Navigate to `output/` folder
-3. Load both files:
-   - `searches_daily.parquet` - Daily aggregated metrics
-   - `searches_journeys.parquet` - Session-level data
+3. Load all three files:
+   - `searches_daily.parquet` - Daily aggregated metrics (1 row per day)
+   - `searches_journeys.parquet` - Session-level data (1 row per search session)
+   - `searches_terms.parquet` - Search term analytics (1 row per term per day)
 
 ---
 
