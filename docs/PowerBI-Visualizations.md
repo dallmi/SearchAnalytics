@@ -490,6 +490,9 @@ The `searches_terms.parquet` file contains **one row per search term per day**. 
 | `clicks_news` | Integer | News tab clicks |
 | `clicks_goto` | Integer | GoTo clicks |
 | `clicks_people` | Integer | People clicks |
+| `avg_sec_to_click` | Float | Average seconds from result to click |
+| `clicks_with_timing` | Integer | Clicks with timing data (for weighting) |
+| `sum_sec_to_click` | Float | Sum of seconds to click (for weighted avg) |
 
 ### DAX Measures for Search Terms
 
@@ -523,6 +526,15 @@ DIVIDE(
 
 // Unique Terms Count
 Unique Terms = DISTINCTCOUNT(searches_terms[search_term])
+
+// Weighted Average Time to Click (seconds)
+// Uses SUM columns for proper aggregation across dates/terms
+Avg Time to Click (sec) =
+DIVIDE(
+    SUM(searches_terms[sum_sec_to_click]),
+    SUM(searches_terms[clicks_with_timing]),
+    BLANK()
+)
 ```
 
 ### Row 1: Top Search Terms
