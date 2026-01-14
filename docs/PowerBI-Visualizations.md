@@ -126,6 +126,35 @@ DIVIDE(
 | Avg Search Term Length | `sum_search_term_length` | `search_term_count` |
 | Avg Search Term Words | `sum_search_term_words` | `search_term_count` |
 
+### User Cohort Columns (Daily File)
+
+The daily file includes columns for analyzing new vs returning users:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `new_users` | Integer | Users whose first search session was on this date |
+| `returning_users` | Integer | Users who had searched before this date |
+
+**DAX Measures for User Cohorts:**
+
+```dax
+// New User Percentage (daily)
+New User % =
+DIVIDE(
+    SUM(searches_daily[new_users]),
+    SUM(searches_daily[unique_users]),
+    0
+) * 100
+
+// Returning User Percentage (daily)
+Returning User % =
+DIVIDE(
+    SUM(searches_daily[returning_users]),
+    SUM(searches_daily[unique_users]),
+    0
+) * 100
+```
+
 ### When to Use Pre-Calculated vs DAX Measures
 
 | Scenario | Use Pre-Calculated Column | Use DAX Measure |
@@ -291,6 +320,12 @@ The `searches_journeys.parquet` file contains **one row per session**. Each row 
 | `session_duration_sort` | Integer | Sort order for session_duration_bucket |
 | `journey_outcome_sort` | Integer | Sort order for journey_outcome |
 | `session_complexity_sort` | Integer | Sort order for session_complexity |
+| `had_null_result` | Boolean | Did session have any null result? |
+| `recovered_from_null` | Boolean | Had null result but still clicked (recovered) |
+| `user_session_number` | Integer | Which session is this for the user (1, 2, 3...) |
+| `is_users_first_session` | Boolean | Is this the user's first session in dataset? |
+| `distinct_click_categories` | Integer | Number of different click types in session |
+| `had_tab_switch` | Boolean | Did user click on multiple tabs/categories? |
 
 ### DAX Measures for Journeys
 
@@ -362,6 +397,42 @@ AVERAGE(searches_journeys[total_duration_sec])
 // Average Searches per Session (from journeys)
 Avg Searches per Session (Journeys) =
 AVERAGE(searches_journeys[search_count_in_session])
+
+// Null Result Recovery Rate - sessions that had null result but still succeeded
+Null Recovery Rate % =
+DIVIDE(
+    CALCULATE(COUNTROWS(searches_journeys), searches_journeys[recovered_from_null] = TRUE()),
+    CALCULATE(COUNTROWS(searches_journeys), searches_journeys[had_null_result] = TRUE()),
+    0
+) * 100
+
+// First-time User Success Rate
+First-Time User Success Rate % =
+DIVIDE(
+    CALCULATE(COUNTROWS(searches_journeys),
+        searches_journeys[is_users_first_session] = TRUE(),
+        searches_journeys[journey_outcome] = "Success"),
+    CALCULATE(COUNTROWS(searches_journeys), searches_journeys[is_users_first_session] = TRUE()),
+    0
+) * 100
+
+// Returning User Success Rate
+Returning User Success Rate % =
+DIVIDE(
+    CALCULATE(COUNTROWS(searches_journeys),
+        searches_journeys[is_users_first_session] = FALSE(),
+        searches_journeys[journey_outcome] = "Success"),
+    CALCULATE(COUNTROWS(searches_journeys), searches_journeys[is_users_first_session] = FALSE()),
+    0
+) * 100
+
+// Tab Switch Rate
+Tab Switch Rate % =
+DIVIDE(
+    CALCULATE(COUNTROWS(searches_journeys), searches_journeys[had_tab_switch] = TRUE()),
+    COUNTROWS(searches_journeys),
+    0
+) * 100
 ```
 
 ### Setting Up Sort Order for Columns
@@ -517,6 +588,8 @@ The `searches_terms.parquet` file contains **one row per search term per day**. 
 | `searches_afternoon` | Integer | Searches 12:00-18:00 |
 | `searches_evening` | Integer | Searches 18:00-24:00 |
 | `searches_night` | Integer | Searches 0:00-6:00 |
+| `first_seen_date` | Date | First date this term appeared in dataset |
+| `is_new_term` | Boolean | Is this the first day this term was searched? |
 
 ### DAX Measures for Search Terms
 
@@ -568,6 +641,21 @@ SWITCH(
     searches_terms[word_count] <= 3, "2-3 words",
     "4+ words"
 )
+
+// New Terms Count (terms first seen on selected date range)
+New Terms Count =
+CALCULATE(
+    DISTINCTCOUNT(searches_terms[search_term]),
+    searches_terms[is_new_term] = TRUE()
+)
+
+// New Term Rate (what % of today's terms are new)
+New Term Rate % =
+DIVIDE(
+    CALCULATE(COUNTROWS(searches_terms), searches_terms[is_new_term] = TRUE()),
+    COUNTROWS(searches_terms),
+    0
+) * 100
 ```
 
 ### Query Length vs Success Analysis
@@ -672,6 +760,93 @@ SWITCH(
 
 ---
 
+## Page 5: Advanced Analytics
+
+This page focuses on deeper behavioral insights: user cohorts, recovery patterns, and emerging trends.
+
+### Row 1: User Cohort Analysis
+
+#### Chart 1: New vs Returning Users Trend
+- **Type**: Stacked Area Chart
+- **Setup**:
+  1. Drag `date` to **X-axis**
+  2. Add `new_users` and `returning_users` to **Values**
+- **Insight**: Track user acquisition and retention patterns
+
+#### Chart 2: First-Time vs Returning User Success Comparison
+- **Type**: Clustered Bar Chart
+- **Setup**:
+  1. Create a bar for `First-Time User Success Rate %` measure
+  2. Create a bar for `Returning User Success Rate %` measure
+- **Alternative**: Use a KPI card comparison
+- **Insight**: Do experienced users perform better? If so, there may be a learning curve for the search interface.
+
+### Row 2: Null Result Recovery Analysis
+
+#### Chart 3: Null Recovery Rate KPI
+- **Type**: KPI Card
+- **Setup**: Use the `Null Recovery Rate %` measure
+- **Target**: > 50% is good (users recovered despite initial failure)
+- **Insight**: Measures resilience - can users succeed even when initial search fails?
+
+#### Chart 4: Recovery Funnel
+- **Type**: Funnel Chart
+- **Setup**:
+  1. Stage 1: Sessions with null results (`had_null_result = TRUE`)
+  2. Stage 2: Recovered sessions (`recovered_from_null = TRUE`)
+- **DAX for filtering**:
+```dax
+Sessions with Null =
+CALCULATE(COUNTROWS(searches_journeys), searches_journeys[had_null_result] = TRUE())
+
+Sessions Recovered =
+CALCULATE(COUNTROWS(searches_journeys), searches_journeys[recovered_from_null] = TRUE())
+```
+- **Insight**: Visual representation of how many null-result sessions eventually succeed
+
+### Row 3: Session Flow Patterns
+
+#### Chart 5: Tab Switching Analysis
+- **Type**: Clustered Bar Chart
+- **Setup**:
+  1. Drag `journey_outcome` to **Axis**
+  2. Create two measures: sessions with `had_tab_switch = TRUE` vs `FALSE`
+- **Insight**: Do users who switch tabs have different success rates?
+
+#### Chart 6: Click Categories Distribution
+- **Type**: Histogram
+- **Setup**:
+  1. Drag `distinct_click_categories` to **Axis**
+  2. Count of sessions to **Values**
+- **Insight**: Most users should have 1-2 categories; many with 3+ may indicate confusion
+
+### Row 4: Term Trend Detection
+
+#### Chart 7: New Terms Over Time
+- **Type**: Line Chart
+- **Setup**:
+  1. Drag `session_date` to **X-axis**
+  2. Use `New Terms Count` measure as **Values**
+- **Insight**: Spike in new terms may indicate emerging topics or organizational changes
+
+#### Chart 8: Recently Emerged Terms Table
+- **Type**: Table
+- **Columns**: `search_term`, `first_seen_date`, Sum of `search_count`, `Term CTR %`
+- **Filter**: `first_seen_date` >= DATE (recent, e.g., last 7 days)
+- **Sort**: By Sum of `search_count` descending
+- **Insight**: Identify trending new topics that may need content attention
+
+### Key Insights This Page Provides
+
+| Question | Metric | Action |
+|----------|--------|--------|
+| Are new users struggling? | Compare first-time vs returning success | Improve onboarding, add search tips |
+| Can users recover from failed searches? | Null Recovery Rate % | If low, improve suggestions/synonyms |
+| Are users confused about tab navigation? | Tab Switch Rate % | If high, reconsider tab organization |
+| What new topics are emerging? | New Terms list | Create content for trending terms |
+
+---
+
 ## Key Questions This Dashboard Answers
 
 ### Daily Trends
@@ -690,10 +865,21 @@ SWITCH(
 1. **How fast do results appear?** - Search-to-result timing
 2. **Are there performance issues?** - Sessions in slow timing buckets
 
-### Temporal Patterns (New)
+### Temporal Patterns
 1. **Which days are busiest?** - `day_of_week` in daily file
 2. **When do users search?** - `searches_morning`, `searches_afternoon`, `searches_evening`, `searches_night`
 3. **When is a specific term searched?** - Hour distribution per term in terms file
+
+### User Cohorts & Behavior
+1. **Are new users struggling?** - Compare `First-Time User Success Rate %` vs `Returning User Success Rate %`
+2. **How is user acquisition trending?** - `new_users` vs `returning_users` over time
+3. **Can users recover from failed searches?** - `Null Recovery Rate %`
+4. **Do users switch tabs to find content?** - `Tab Switch Rate %`, `distinct_click_categories`
+
+### Term Trends
+1. **What new topics are emerging?** - Filter by `is_new_term = TRUE`, sort by volume
+2. **When did a term first appear?** - `first_seen_date` in terms file
+3. **Is search vocabulary expanding?** - `New Terms Count` measure over time
 
 ---
 

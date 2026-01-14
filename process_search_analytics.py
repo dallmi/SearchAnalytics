@@ -394,6 +394,22 @@ def export_parquet_files(con, output_dir):
                     SUM(CASE WHEN had_results = 1 AND had_clicks = 0 THEN 1 ELSE 0 END) as sessions_abandoned
                 FROM session_stats
                 GROUP BY session_date
+            ),
+            user_first_seen AS (
+                -- Find the first date each user appeared
+                SELECT user_id, MIN(session_date) as first_seen_date
+                FROM searches
+                GROUP BY user_id
+            ),
+            daily_user_cohorts AS (
+                -- Count new vs returning users per day
+                SELECT
+                    s.session_date,
+                    COUNT(DISTINCT CASE WHEN s.session_date = u.first_seen_date THEN s.user_id END) as new_users,
+                    COUNT(DISTINCT CASE WHEN s.session_date > u.first_seen_date THEN s.user_id END) as returning_users
+                FROM searches s
+                JOIN user_first_seen u ON s.user_id = u.user_id
+                GROUP BY s.session_date
             )
             SELECT
                 s.session_date as date,
@@ -443,9 +459,13 @@ def export_parquet_files(con, output_dir):
                 COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND s.event_hour >= 6 AND s.event_hour < 12 THEN 1 END) as searches_morning,
                 COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND s.event_hour >= 12 AND s.event_hour < 18 THEN 1 END) as searches_afternoon,
                 COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND s.event_hour >= 18 AND s.event_hour < 24 THEN 1 END) as searches_evening,
-                COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND (s.event_hour >= 0 AND s.event_hour < 6) THEN 1 END) as searches_night
+                COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND (s.event_hour >= 0 AND s.event_hour < 6) THEN 1 END) as searches_night,
+                -- User cohort metrics
+                MAX(uc.new_users) as new_users,
+                MAX(uc.returning_users) as returning_users
             FROM searches s
             JOIN daily_session_metrics d ON s.session_date = d.session_date
+            JOIN daily_user_cohorts uc ON s.session_date = uc.session_date
             GROUP BY 1
             ORDER BY 1
         ) TO '{daily_file}' (FORMAT PARQUET)
@@ -463,6 +483,7 @@ def export_parquet_files(con, output_dir):
                 SELECT
                     session_key,
                     session_date,
+                    user_id,
                     MIN(timestamp) as session_start,
                     COUNT(*) as total_events,
                     -- Timing metrics
@@ -486,9 +507,17 @@ def export_parquet_files(con, output_dir):
                     COUNT(CASE WHEN click_category = 'News' THEN 1 END) as news_clicks,
                     COUNT(CASE WHEN click_category = 'GoTo' THEN 1 END) as goto_clicks,
                     COUNT(CASE WHEN click_category = 'People' THEN 1 END) as people_clicks,
-                    MAX(CASE WHEN is_first_search_of_day = true THEN 1 ELSE 0 END) as includes_first_search_of_day
+                    MAX(CASE WHEN is_first_search_of_day = true THEN 1 ELSE 0 END) as includes_first_search_of_day,
+                    -- Session flow: distinct click categories used
+                    COUNT(DISTINCT click_category) as distinct_click_categories
                 FROM searches
-                GROUP BY session_key, session_date
+                GROUP BY session_key, session_date, user_id
+            ),
+            session_with_user_rank AS (
+                SELECT
+                    *,
+                    ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY session_start) as user_session_number
+                FROM session_data
             )
             SELECT
                 session_date,
@@ -591,8 +620,17 @@ def export_parquet_files(con, output_dir):
                     WHEN total_events <= 3 THEN 2
                     WHEN total_events <= 10 THEN 3
                     ELSE 4
-                END as session_complexity_sort
-            FROM session_data
+                END as session_complexity_sort,
+                -- Null result recovery analysis
+                CASE WHEN null_result_count > 0 THEN true ELSE false END as had_null_result,
+                CASE WHEN null_result_count > 0 AND click_count > 0 THEN true ELSE false END as recovered_from_null,
+                -- User cohort analysis
+                user_session_number,
+                CASE WHEN user_session_number = 1 THEN true ELSE false END as is_users_first_session,
+                -- Session flow analysis
+                distinct_click_categories,
+                CASE WHEN distinct_click_categories > 1 THEN true ELSE false END as had_tab_switch
+            FROM session_with_user_rank
             ORDER BY session_date, session_start
         ) TO '{journeys_file}' (FORMAT PARQUET)
     """)
@@ -628,6 +666,15 @@ def export_parquet_files(con, output_dir):
                 WHERE name = 'SEARCH_STARTED'
                    OR name = 'SEARCH_RESULT_COUNT'
                    OR click_category IS NOT NULL
+            ),
+            term_first_seen AS (
+                -- Find when each search term first appeared (for trend detection)
+                SELECT
+                    search_term_normalized,
+                    MIN(session_date) as first_seen_date
+                FROM searches
+                WHERE search_term_normalized IS NOT NULL AND search_term_normalized != ''
+                GROUP BY search_term_normalized
             )
             SELECT
                 session_date,
@@ -669,12 +716,16 @@ def export_parquet_files(con, output_dir):
                 COUNT(CASE WHEN name = 'SEARCH_STARTED' AND event_hour >= 6 AND event_hour < 12 THEN 1 END) as searches_morning,
                 COUNT(CASE WHEN name = 'SEARCH_STARTED' AND event_hour >= 12 AND event_hour < 18 THEN 1 END) as searches_afternoon,
                 COUNT(CASE WHEN name = 'SEARCH_STARTED' AND event_hour >= 18 AND event_hour < 24 THEN 1 END) as searches_evening,
-                COUNT(CASE WHEN name = 'SEARCH_STARTED' AND event_hour >= 0 AND event_hour < 6 THEN 1 END) as searches_night
-            FROM search_terms_with_context
-            WHERE active_search_term IS NOT NULL
-              AND active_search_term != ''
-            GROUP BY session_date, active_search_term
-            ORDER BY session_date, search_count DESC
+                COUNT(CASE WHEN name = 'SEARCH_STARTED' AND event_hour >= 0 AND event_hour < 6 THEN 1 END) as searches_night,
+                -- Trend detection columns
+                MAX(tfs.first_seen_date) as first_seen_date,
+                CASE WHEN stc.session_date = MAX(tfs.first_seen_date) THEN true ELSE false END as is_new_term
+            FROM search_terms_with_context stc
+            LEFT JOIN term_first_seen tfs ON stc.active_search_term = tfs.search_term_normalized
+            WHERE stc.active_search_term IS NOT NULL
+              AND stc.active_search_term != ''
+            GROUP BY stc.session_date, stc.active_search_term
+            ORDER BY stc.session_date, search_count DESC
         ) TO '{terms_file}' (FORMAT PARQUET)
     """)
     terms_count = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{terms_file}')").df()['n'][0]
