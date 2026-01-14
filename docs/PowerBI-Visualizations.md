@@ -467,6 +467,129 @@ Add slicers for:
 
 ---
 
+## Page 4: Search Terms Analysis
+
+### Understanding the Terms File
+
+The `searches_terms.parquet` file contains **one row per search term per day**. It enables analysis of which terms users search for and how successful those searches are.
+
+**Key columns:**
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `session_date` | Date | Date |
+| `search_term` | String | The normalized search query |
+| `search_count` | Integer | Times this term was searched |
+| `unique_users` | Integer | Distinct users who searched this |
+| `unique_sessions` | Integer | Sessions containing this term |
+| `result_events` | Integer | Result count events for this term |
+| `null_result_count` | Integer | Searches returning 0 results |
+| `click_count` | Integer | Clicks attributed to this term |
+| `clicks_general` | Integer | General tab clicks |
+| `clicks_all` | Integer | All tab clicks |
+| `clicks_news` | Integer | News tab clicks |
+| `clicks_goto` | Integer | GoTo clicks |
+| `clicks_people` | Integer | People clicks |
+
+### DAX Measures for Search Terms
+
+```dax
+// Total searches for all terms
+Total Term Searches = SUM(searches_terms[search_count])
+
+// Term CTR (Click-through rate)
+Term CTR % =
+DIVIDE(
+    SUM(searches_terms[click_count]),
+    SUM(searches_terms[search_count]),
+    0
+) * 100
+
+// Zero Result Rate for terms
+Term Zero Result Rate % =
+DIVIDE(
+    SUM(searches_terms[null_result_count]),
+    SUM(searches_terms[result_events]),
+    0
+) * 100
+
+// Term Abandonment Rate (had results but no click)
+Term Abandonment Rate % =
+DIVIDE(
+    SUM(searches_terms[result_events]) - SUM(searches_terms[null_result_count]) - SUM(searches_terms[click_count]),
+    SUM(searches_terms[result_events]) - SUM(searches_terms[null_result_count]),
+    0
+) * 100
+
+// Unique Terms Count
+Unique Terms = DISTINCTCOUNT(searches_terms[search_term])
+```
+
+### Row 1: Top Search Terms
+
+#### Chart 1: Top 20 Search Terms by Volume
+- **Type**: Bar Chart (Horizontal)
+- **Setup**:
+  1. Drag `search_term` to **Y-axis**
+  2. Drag `search_count` to **X-axis** → select **Sum**
+  3. Add a **Top N filter** on `search_term` = Top 20 by Sum of `search_count`
+- **Sort**: By X-axis values descending
+
+#### Chart 2: Search Term Word Cloud (Optional)
+- **Type**: Word Cloud (requires custom visual from AppSource)
+- **Category**: `search_term`
+- **Values**: `search_count`
+- **Note**: Install "Word Cloud" from Power BI AppSource
+
+### Row 2: Problem Terms (Actionable Insights)
+
+#### Chart 3: Terms with High Zero Result Rate
+- **Type**: Table
+- **Columns**: `search_term`, Sum of `search_count`, `Term Zero Result Rate %`
+- **Filter**: `Term Zero Result Rate %` > 50 AND Sum of `search_count` > 5
+- **Insight**: Content gaps - these terms need content created
+
+#### Chart 4: High Volume + Low CTR Terms
+- **Type**: Table
+- **Columns**: `search_term`, Sum of `search_count`, `Term CTR %`
+- **Filter**: `Term CTR %` < 20 AND Sum of `search_count` > 10 AND `Term Zero Result Rate %` < 50
+- **Insight**: Relevance problems - results exist but don't match user intent
+
+### Row 3: Success Stories
+
+#### Chart 5: High Performing Terms
+- **Type**: Table
+- **Columns**: `search_term`, Sum of `search_count`, `Term CTR %`
+- **Filter**: `Term CTR %` > 50 AND Sum of `search_count` > 10
+- **Insight**: Learn from these - what makes them successful?
+
+#### Chart 6: Search Term Trend (Selected Term)
+- **Type**: Line Chart
+- **Setup**:
+  1. Drag `session_date` to **X-axis**
+  2. Drag `search_count` to **Y-axis** → select **Sum**
+  3. Add a slicer for `search_term` to filter to specific terms
+- **Insight**: Track popularity of specific terms over time
+
+### Row 4: KPI Cards
+
+| Card | Measure | Description |
+|------|---------|-------------|
+| Unique Terms | `Unique Terms` | Total distinct search terms |
+| Avg CTR | `Term CTR %` | Overall click-through rate |
+| Zero Result Rate | `Term Zero Result Rate %` | % of searches with no results |
+| Top Term | First value of `search_term` sorted by `search_count` | Most searched term |
+
+### Key Questions This Page Answers
+
+1. **What are users searching for?** - Top search terms by volume
+2. **What content is missing?** - Terms with high zero result rate
+3. **Where is relevance poor?** - High volume terms with low CTR
+4. **What's working well?** - High CTR terms to learn from
+5. **Are search patterns changing?** - Term trends over time
+
+---
+
 ## Key Questions This Dashboard Answers
 
 ### Daily Trends

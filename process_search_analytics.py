@@ -591,6 +591,60 @@ def export_parquet_files(con, output_dir):
     journeys_count = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{journeys_file}')").df()['n'][0]
     log(f"  searches_journeys.parquet ({journeys_count:,} sessions)")
 
+    # Search terms analysis (aggregated by date + term)
+    terms_file = output_dir / 'searches_terms.parquet'
+    if terms_file.exists():
+        terms_file.unlink()
+    con.execute(f"""
+        COPY (
+            WITH search_terms_with_context AS (
+                -- Propagate search term forward to subsequent events (clicks, results)
+                SELECT
+                    session_date,
+                    session_key,
+                    user_id,
+                    name,
+                    is_null_result,
+                    click_category,
+                    search_term_normalized,
+                    -- Forward-fill search term to clicks and result events
+                    LAST_VALUE(search_term_normalized IGNORE NULLS) OVER (
+                        PARTITION BY session_key
+                        ORDER BY timestamp
+                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                    ) as active_search_term
+                FROM searches
+                WHERE name = 'SEARCH_STARTED'
+                   OR name = 'SEARCH_RESULT_COUNT'
+                   OR click_category IS NOT NULL
+            )
+            SELECT
+                session_date,
+                active_search_term as search_term,
+                -- Volume metrics
+                COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END) as search_count,
+                COUNT(DISTINCT user_id) as unique_users,
+                COUNT(DISTINCT session_key) as unique_sessions,
+                -- Result metrics
+                COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_events,
+                SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END) as null_result_count,
+                -- Click metrics (clicks attributed to this search term)
+                COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_count,
+                COUNT(CASE WHEN click_category = 'General' THEN 1 END) as clicks_general,
+                COUNT(CASE WHEN click_category = 'All' THEN 1 END) as clicks_all,
+                COUNT(CASE WHEN click_category = 'News' THEN 1 END) as clicks_news,
+                COUNT(CASE WHEN click_category = 'GoTo' THEN 1 END) as clicks_goto,
+                COUNT(CASE WHEN click_category = 'People' THEN 1 END) as clicks_people
+            FROM search_terms_with_context
+            WHERE active_search_term IS NOT NULL
+              AND active_search_term != ''
+            GROUP BY session_date, active_search_term
+            ORDER BY session_date, search_count DESC
+        ) TO '{terms_file}' (FORMAT PARQUET)
+    """)
+    terms_count = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{terms_file}')").df()['n'][0]
+    log(f"  searches_terms.parquet ({terms_count:,} term-day combinations)")
+
 
 def print_summary(con):
     """Print processing summary."""
