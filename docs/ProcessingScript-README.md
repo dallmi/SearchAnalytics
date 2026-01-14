@@ -145,6 +145,7 @@ The script creates a `searches` table with all calculated analytics columns:
 | Column | Description |
 |--------|-------------|
 | `is_null_result` | True if search returned 0 results |
+| `is_clickable_result` | True if search returned >0 results (user could click) |
 | `click_category` | Simplified click type (`General`, `All`, `News`, `GoTo`, `People`) |
 | `is_first_search_of_day` | True if this is user's first search of the day |
 
@@ -161,7 +162,7 @@ Four Parquet files are generated for Power BI:
 - **Content**: Aggregated metrics by day for trend analysis
 - **Columns include**:
   - `total_events`, `unique_sessions`, `unique_users`, `unique_search_terms`
-  - `search_starts`, `result_events`, `click_events`, `null_results`
+  - `search_starts`, `result_events`, `click_events`, `null_results`, `clickable_results`
   - **Rate metrics**:
     - `click_through_rate_pct` - Clicks / Searches × 100
     - `null_rate_pct` - Null results / Results shown × 100

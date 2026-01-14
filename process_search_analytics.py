@@ -287,6 +287,11 @@ def add_calculated_columns(con):
                 ELSE NULL
             END as is_null_result,
             CASE
+                WHEN name = 'SEARCH_RESULT_COUNT' AND CAST(CP_totalResultCount AS INTEGER) > 0 THEN true
+                WHEN name = 'SEARCH_RESULT_COUNT' THEN false
+                ELSE NULL
+            END as is_clickable_result,
+            CASE
                 WHEN name = 'SEARCH_TAB_CLICK' THEN 'General'
                 WHEN name = 'SEARCH_ALL_TAB_PAGE_CLICK' THEN 'All'
                 WHEN name = 'SEARCH_NEWS_TAB_PAGE_CLICK' THEN 'News'
@@ -380,13 +385,14 @@ def export_parquet_files(con, output_dir):
                 COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_events,
                 COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_events,
                 SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END) as null_results,
+                SUM(CASE WHEN is_clickable_result = true THEN 1 ELSE 0 END) as clickable_results,
                 -- Rate metrics
                 ROUND(100.0 * COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END)
                     / NULLIF(COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END), 0), 2) as click_through_rate_pct,
                 ROUND(100.0 * SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END)
                     / NULLIF(COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END), 0), 2) as null_rate_pct,
-                ROUND(100.0 * (COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' AND is_null_result = false THEN 1 END) - COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END))
-                    / NULLIF(COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' AND is_null_result = false THEN 1 END), 0), 2) as abandonment_rate_pct,
+                ROUND(100.0 * (SUM(CASE WHEN is_clickable_result = true THEN 1 ELSE 0 END) - COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END))
+                    / NULLIF(SUM(CASE WHEN is_clickable_result = true THEN 1 ELSE 0 END), 0), 2) as abandonment_rate_pct,
                 -- Session metrics
                 ROUND(1.0 * COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END)
                     / NULLIF(COUNT(DISTINCT session_key), 0), 2) as avg_searches_per_session,
