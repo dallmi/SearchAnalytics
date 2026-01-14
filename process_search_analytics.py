@@ -632,6 +632,11 @@ def export_parquet_files(con, output_dir):
             SELECT
                 session_date,
                 active_search_term as search_term,
+                -- Word count for query length analysis
+                CASE
+                    WHEN active_search_term IS NULL OR active_search_term = '' THEN 0
+                    ELSE LENGTH(active_search_term) - LENGTH(REPLACE(active_search_term, ' ', '')) + 1
+                END as word_count,
                 -- Volume metrics
                 COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END) as search_count,
                 COUNT(DISTINCT user_id) as unique_users,

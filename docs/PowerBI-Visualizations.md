@@ -498,6 +498,7 @@ The `searches_terms.parquet` file contains **one row per search term per day**. 
 |--------|------|-------------|
 | `session_date` | Date | Date |
 | `search_term` | String | The normalized search query |
+| `word_count` | Integer | Number of words in search term |
 | `search_count` | Integer | Times this term was searched |
 | `unique_users` | Integer | Distinct users who searched this |
 | `unique_sessions` | Integer | Sessions containing this term |
@@ -558,7 +559,52 @@ DIVIDE(
     SUM(searches_terms[clicks_with_timing]),
     BLANK()
 )
+
+// Word Count Bucket (for grouping query lengths)
+Word Count Bucket =
+SWITCH(
+    TRUE(),
+    searches_terms[word_count] = 1, "1 word",
+    searches_terms[word_count] <= 3, "2-3 words",
+    "4+ words"
+)
 ```
+
+### Query Length vs Success Analysis
+
+Use the `word_count` column to understand if longer queries perform better.
+
+**Create a calculated column** in Power BI (Model view → New Column):
+```dax
+Word Count Bucket =
+SWITCH(
+    TRUE(),
+    searches_terms[word_count] = 1, "1 word",
+    searches_terms[word_count] <= 3, "2-3 words",
+    "4+ words"
+)
+```
+
+**Visualization: CTR by Query Length**
+- **Type**: Bar Chart
+- **Setup**:
+  1. Drag `Word Count Bucket` to **Axis**
+  2. Drag `Term CTR %` measure to **Values**
+- **Insight**: Do longer, more specific queries have higher CTR?
+
+**Visualization: Null Rate by Query Length**
+- **Type**: Bar Chart
+- **Setup**:
+  1. Drag `Word Count Bucket` to **Axis**
+  2. Drag `Term Zero Result Rate %` measure to **Values**
+- **Insight**: Do very specific (4+ word) queries fail more often?
+
+**Expected Pattern:**
+| Word Count | Typical CTR | Typical Null Rate | Interpretation |
+|------------|-------------|-------------------|----------------|
+| 1 word | Low (15-20%) | Low (5-8%) | Vague queries, many results but poor match |
+| 2-3 words | High (25-40%) | Low (3-6%) | Optimal specificity |
+| 4+ words | Medium (20-30%) | Higher (10-15%) | Very specific, may not find exact match |
 
 ### Row 1: Top Search Terms
 
@@ -622,6 +668,7 @@ DIVIDE(
 3. **Where is relevance poor?** - High volume terms with low CTR
 4. **What's working well?** - High CTR terms to learn from
 5. **Are search patterns changing?** - Term trends over time
+6. **Do longer queries perform better?** - Query length vs CTR/null rate analysis
 
 ---
 
