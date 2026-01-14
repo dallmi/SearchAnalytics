@@ -267,6 +267,11 @@ The `searches_journeys.parquet` file contains **one row per session**. Each row 
 | `sec_search_to_result` | Decimal | Seconds from search to result |
 | `sec_result_to_click` | Decimal | Seconds from result to click |
 | `total_duration_sec` | Decimal | Total session duration in seconds |
+| `search_to_result_sort` | Integer | Sort order for search_to_result_bucket |
+| `result_to_click_sort` | Integer | Sort order for result_to_click_bucket |
+| `session_duration_sort` | Integer | Sort order for session_duration_bucket |
+| `journey_outcome_sort` | Integer | Sort order for journey_outcome |
+| `session_complexity_sort` | Integer | Sort order for session_complexity |
 
 ### DAX Measures for Journeys
 
@@ -340,70 +345,28 @@ Avg Searches per Session (Journeys) =
 AVERAGE(searches_journeys[search_count_in_session])
 ```
 
-### Sort Order Columns for Bucket Charts
+### Setting Up Sort Order for Columns
 
-The bucket columns are text and won't sort correctly by default. Create these calculated columns for proper sorting:
+The bucket and category columns are text and won't sort correctly by default (e.g., "10-30s" would come before "2-5s" alphabetically). The parquet file includes sort order columns to fix this.
 
-```dax
-// Add to searches_journeys table as calculated columns
+**To configure "Sort by column" in Power BI:**
 
-Search to Result Sort =
-SWITCH(
-    searches_journeys[search_to_result_bucket],
-    "< 0.5s", 1,
-    "0.5-1s", 2,
-    "1-2s", 3,
-    "2-5s", 4,
-    "> 5s", 5,
-    "No Result", 6,
-    99
-)
+1. Go to **Model view** (left sidebar)
+2. Select the text column you want to sort (e.g., `journey_outcome`)
+3. In the **Properties** pane, find **Sort by column**
+4. Select the corresponding sort column (e.g., `journey_outcome_sort`)
 
-Result to Click Sort =
-SWITCH(
-    searches_journeys[result_to_click_bucket],
-    "< 2s (quick)", 1,
-    "2-5s", 2,
-    "5-10s", 3,
-    "10-30s", 4,
-    "30-60s", 5,
-    "> 60s (browsing)", 6,
-    "No Click", 7,
-    99
-)
+**Column mappings:**
 
-Session Duration Sort =
-SWITCH(
-    searches_journeys[session_duration_bucket],
-    "< 5s (quick)", 1,
-    "5-30s", 2,
-    "30-60s", 3,
-    "1-3 min", 4,
-    "3-5 min", 5,
-    "> 5 min (extended)", 6,
-    99
-)
+| Text Column | Sort By Column |
+|-------------|----------------|
+| `journey_outcome` | `journey_outcome_sort` |
+| `session_complexity` | `session_complexity_sort` |
+| `search_to_result_bucket` | `search_to_result_sort` |
+| `result_to_click_bucket` | `result_to_click_sort` |
+| `session_duration_bucket` | `session_duration_sort` |
 
-Session Complexity Sort =
-SWITCH(
-    searches_journeys[session_complexity],
-    "Single Event", 1,
-    "Simple", 2,
-    "Medium", 3,
-    "Complex", 4,
-    99
-)
-
-Journey Outcome Sort =
-SWITCH(
-    searches_journeys[journey_outcome],
-    "Success", 1,
-    "Abandoned", 2,
-    "No Results", 3,
-    "Unknown", 4,
-    99
-)
-```
+Once configured, the text columns will sort in logical order everywhere they're used.
 
 ### Row 1: Journey Outcomes
 
@@ -417,14 +380,14 @@ SWITCH(
   - Abandoned = Orange (#F57C00)
   - No Results = Red (#C62828)
   - Unknown = Gray (#757575)
-- **Sort**: Use `Journey Outcome Sort` column
+- **Sort**: Configured via "Sort by column" (see above)
 
 #### Chart 2: Session Complexity Breakdown
 - **Type**: Bar Chart
 - **Setup**:
   1. Drag `session_complexity` to **Axis**
   2. Drag `session_complexity` to **Values** → select **Count**
-- **Sort**: Click chart → Sort by `Session Complexity Sort` (ascending)
+- **Sort**: Configured via "Sort by column" (see above)
 
 ### Row 2: Timing Analysis
 
@@ -433,7 +396,7 @@ SWITCH(
 - **Setup**:
   1. Drag `search_to_result_bucket` to **Axis**
   2. Drag `search_to_result_bucket` to **Values** → select **Count**
-- **Sort**: Click chart → Sort by `Search to Result Sort` (ascending)
+- **Sort**: Configured via "Sort by column" (see above)
 - **Insight**: Shows system performance - ideally most sessions should be < 2s
 
 #### Chart 4: Result-to-Click Time Distribution
@@ -441,7 +404,7 @@ SWITCH(
 - **Setup**:
   1. Drag `result_to_click_bucket` to **Axis**
   2. Drag `result_to_click_bucket` to **Values** → select **Count**
-- **Sort**: Click chart → Sort by `Result to Click Sort` (ascending)
+- **Sort**: Configured via "Sort by column" (see above)
 - **Insight**: Shows user decision time - quick clicks may indicate good relevance
 
 ### Row 3: Behavior Patterns
@@ -457,7 +420,7 @@ SWITCH(
 - **Setup**:
   1. Drag `session_duration_bucket` to **Axis**
   2. Drag `session_duration_bucket` to **Values** → select **Count**
-- **Sort**: Click chart → Sort by `Session Duration Sort` (ascending)
+- **Sort**: Configured via "Sort by column" (see above)
 - **Insight**: Very short sessions might be quick successes OR immediate abandonment
 
 ### Row 4: KPI Cards (Optional)

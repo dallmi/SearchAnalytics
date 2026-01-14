@@ -545,7 +545,45 @@ def export_parquet_files(con, output_dir):
                     WHEN total_events <= 3 THEN 'Simple'
                     WHEN total_events <= 10 THEN 'Medium'
                     ELSE 'Complex'
-                END as session_complexity
+                END as session_complexity,
+                -- Sort order columns for Power BI
+                CASE
+                    WHEN ms_search_to_result IS NULL THEN 6
+                    WHEN ms_search_to_result < 500 THEN 1
+                    WHEN ms_search_to_result < 1000 THEN 2
+                    WHEN ms_search_to_result < 2000 THEN 3
+                    WHEN ms_search_to_result < 5000 THEN 4
+                    ELSE 5
+                END as search_to_result_sort,
+                CASE
+                    WHEN ms_result_to_click IS NULL THEN 7
+                    WHEN ms_result_to_click < 2000 THEN 1
+                    WHEN ms_result_to_click < 5000 THEN 2
+                    WHEN ms_result_to_click < 10000 THEN 3
+                    WHEN ms_result_to_click < 30000 THEN 4
+                    WHEN ms_result_to_click < 60000 THEN 5
+                    ELSE 6
+                END as result_to_click_sort,
+                CASE
+                    WHEN total_duration_ms < 5000 THEN 1
+                    WHEN total_duration_ms < 30000 THEN 2
+                    WHEN total_duration_ms < 60000 THEN 3
+                    WHEN total_duration_ms < 180000 THEN 4
+                    WHEN total_duration_ms < 300000 THEN 5
+                    ELSE 6
+                END as session_duration_sort,
+                CASE
+                    WHEN click_count > 0 THEN 1
+                    WHEN result_count > 0 AND null_result_count = result_count AND click_count = 0 THEN 3
+                    WHEN result_count > 0 AND click_count = 0 THEN 2
+                    ELSE 4
+                END as journey_outcome_sort,
+                CASE
+                    WHEN total_events = 1 THEN 1
+                    WHEN total_events <= 3 THEN 2
+                    WHEN total_events <= 10 THEN 3
+                    ELSE 4
+                END as session_complexity_sort
             FROM session_data
             ORDER BY session_date, session_start
         ) TO '{journeys_file}' (FORMAT PARQUET)
