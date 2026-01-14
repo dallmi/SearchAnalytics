@@ -241,6 +241,25 @@ DIVIDE(
 - **Columns**: `date`, `search_starts`, `unique_users`, `Session Success Rate %`, `Null Rate %`
 - **Conditional Formatting**: Highlight low success rates or high null rates
 
+### Row 4: Temporal Patterns
+
+#### Chart 5: Searches by Day of Week
+- **Type**: Bar Chart
+- **Setup**:
+  1. Drag `day_of_week` to **Axis**
+  2. Drag `search_starts` to **Values** → select **Sum**
+- **Sort**: By `day_of_week_num` (configure in Model view: select `day_of_week`, set "Sort by column" to `day_of_week_num`)
+- **Insight**: Identify busiest days - weekday vs weekend patterns
+
+#### Chart 6: Search Time Distribution
+- **Type**: Stacked Bar or Pie Chart
+- **Values** (all from daily file):
+  - `searches_morning` (6:00-12:00)
+  - `searches_afternoon` (12:00-18:00)
+  - `searches_evening` (18:00-24:00)
+  - `searches_night` (0:00-6:00)
+- **Insight**: When do users search most? Morning rush, lunch break, end of day?
+
 ---
 
 ## Page 2: User Journey Analysis (Session Metrics)
@@ -493,6 +512,10 @@ The `searches_terms.parquet` file contains **one row per search term per day**. 
 | `avg_sec_to_click` | Float | Average seconds from result to click |
 | `clicks_with_timing` | Integer | Clicks with timing data (for weighting) |
 | `sum_sec_to_click` | Float | Sum of seconds to click (for weighted avg) |
+| `searches_morning` | Integer | Searches 6:00-12:00 |
+| `searches_afternoon` | Integer | Searches 12:00-18:00 |
+| `searches_evening` | Integer | Searches 18:00-24:00 |
+| `searches_night` | Integer | Searches 0:00-6:00 |
 
 ### DAX Measures for Search Terms
 
@@ -619,6 +642,11 @@ DIVIDE(
 ### System Performance
 1. **How fast do results appear?** - Search-to-result timing
 2. **Are there performance issues?** - Sessions in slow timing buckets
+
+### Temporal Patterns (New)
+1. **Which days are busiest?** - `day_of_week` in daily file
+2. **When do users search?** - `searches_morning`, `searches_afternoon`, `searches_evening`, `searches_night`
+3. **When is a specific term searched?** - Hour distribution per term in terms file
 
 ---
 

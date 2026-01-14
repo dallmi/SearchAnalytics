@@ -435,7 +435,15 @@ def export_parquet_files(con, output_dir):
                 COUNT(CASE WHEN s.click_category = 'All' THEN 1 END) as clicks_all,
                 COUNT(CASE WHEN s.click_category = 'News' THEN 1 END) as clicks_news,
                 COUNT(CASE WHEN s.click_category = 'GoTo' THEN 1 END) as clicks_goto,
-                COUNT(CASE WHEN s.click_category = 'People' THEN 1 END) as clicks_people
+                COUNT(CASE WHEN s.click_category = 'People' THEN 1 END) as clicks_people,
+                -- Temporal patterns
+                DAYNAME(s.session_date) as day_of_week,
+                ISODOW(s.session_date) as day_of_week_num,
+                -- Hour distribution (searches by time of day)
+                COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND s.event_hour >= 6 AND s.event_hour < 12 THEN 1 END) as searches_morning,
+                COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND s.event_hour >= 12 AND s.event_hour < 18 THEN 1 END) as searches_afternoon,
+                COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND s.event_hour >= 18 AND s.event_hour < 24 THEN 1 END) as searches_evening,
+                COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND (s.event_hour >= 0 AND s.event_hour < 6) THEN 1 END) as searches_night
             FROM searches s
             JOIN daily_session_metrics d ON s.session_date = d.session_date
             GROUP BY 1
@@ -609,6 +617,7 @@ def export_parquet_files(con, output_dir):
                     search_term_normalized,
                     prev_event,
                     ms_since_prev_event,
+                    event_hour,
                     -- Forward-fill search term to clicks and result events
                     LAST_VALUE(search_term_normalized IGNORE NULLS) OVER (
                         PARTITION BY session_key
@@ -650,7 +659,12 @@ def export_parquet_files(con, output_dir):
                     WHEN click_category IS NOT NULL AND prev_event = 'SEARCH_RESULT_COUNT'
                     THEN ms_since_prev_event / 1000.0
                     ELSE 0
-                END) as sum_sec_to_click
+                END) as sum_sec_to_click,
+                -- Hour distribution (when is this term searched?)
+                COUNT(CASE WHEN name = 'SEARCH_STARTED' AND event_hour >= 6 AND event_hour < 12 THEN 1 END) as searches_morning,
+                COUNT(CASE WHEN name = 'SEARCH_STARTED' AND event_hour >= 12 AND event_hour < 18 THEN 1 END) as searches_afternoon,
+                COUNT(CASE WHEN name = 'SEARCH_STARTED' AND event_hour >= 18 AND event_hour < 24 THEN 1 END) as searches_evening,
+                COUNT(CASE WHEN name = 'SEARCH_STARTED' AND event_hour >= 0 AND event_hour < 6 THEN 1 END) as searches_night
             FROM search_terms_with_context
             WHERE active_search_term IS NOT NULL
               AND active_search_term != ''
