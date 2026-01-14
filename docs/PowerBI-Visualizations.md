@@ -245,64 +245,232 @@ DIVIDE(
 
 ## Page 2: User Journey Analysis (Session Metrics)
 
-### Row 1: Journey Outcomes
+### Understanding the Journeys File
 
-#### Chart 1: Journey Outcome Distribution
-- **Type**: Donut Chart
-- **Legend**: `journey_outcome`
-- **Values**: Count of rows
-- **Colors**:
-  - Success = Green
-  - Abandoned = Yellow/Orange
-  - No Results = Red
-  - Unknown = Gray
+The `searches_journeys.parquet` file contains **one row per session**. Each row represents a complete user journey from first search to last action.
 
-```dax
-// Journey counts by outcome
-Success Count = CALCULATE(COUNTROWS(searches_journeys), searches_journeys[journey_outcome] = "Success")
-Abandoned Count = CALCULATE(COUNTROWS(searches_journeys), searches_journeys[journey_outcome] = "Abandoned")
-No Results Count = CALCULATE(COUNTROWS(searches_journeys), searches_journeys[journey_outcome] = "No Results")
-```
+**Key columns:**
 
-#### Chart 2: Session Complexity Breakdown
-- **Type**: Bar Chart
-- **Axis**: `session_complexity`
-- **Values**: Count of rows
-- **Sort Order**: Single Event > Simple > Medium > Complex
+| Column | Type | Description |
+|--------|------|-------------|
+| `session_date` | Date | Date of the session |
+| `journey_outcome` | String | Success, Abandoned, No Results, Unknown |
+| `search_count_in_session` | Integer | Number of searches in this session |
+| `result_count` | Integer | Number of SEARCH_RESULT_COUNT events |
+| `click_count` | Integer | Number of clicks |
+| `null_result_count` | Integer | Number of searches with 0 results |
+| `had_reformulation` | Boolean | Did user search multiple different terms? |
+| `session_complexity` | String | Single Event, Simple, Medium, Complex |
+| `search_to_result_bucket` | String | Time bucket for search-to-result |
+| `result_to_click_bucket` | String | Time bucket for result-to-click |
+| `session_duration_bucket` | String | Time bucket for total session duration |
+| `sec_search_to_result` | Decimal | Seconds from search to result |
+| `sec_result_to_click` | Decimal | Seconds from result to click |
+| `total_duration_sec` | Decimal | Total session duration in seconds |
 
-### Row 2: Timing Analysis
+### DAX Measures for Journeys
 
-#### Chart 3: Search-to-Result Time Distribution
-- **Type**: Bar Chart
-- **Axis**: `search_to_result_bucket`
-- **Values**: Count of rows
-- **Insight**: Shows system performance - how fast results appear
-
-#### Chart 4: Result-to-Click Time Distribution
-- **Type**: Bar Chart
-- **Axis**: `result_to_click_bucket`
-- **Values**: Count of rows
-- **Insight**: Shows user decision time - how long to evaluate results
-
-### Row 3: Behavior Patterns
-
-#### Chart 5: Reformulation Rate
-- **Type**: KPI or Gauge
-- **Value**: Percentage of sessions with `had_reformulation = true`
+Create these measures for the journeys visualizations:
 
 ```dax
+// Basic session count
+Session Count = COUNTROWS(searches_journeys)
+
+// Journey Outcome Counts
+Success Sessions =
+CALCULATE(
+    COUNTROWS(searches_journeys),
+    searches_journeys[journey_outcome] = "Success"
+)
+
+Abandoned Sessions =
+CALCULATE(
+    COUNTROWS(searches_journeys),
+    searches_journeys[journey_outcome] = "Abandoned"
+)
+
+No Results Sessions =
+CALCULATE(
+    COUNTROWS(searches_journeys),
+    searches_journeys[journey_outcome] = "No Results"
+)
+
+// Journey Outcome Rates
+Success Rate % =
+DIVIDE(
+    CALCULATE(COUNTROWS(searches_journeys), searches_journeys[journey_outcome] = "Success"),
+    COUNTROWS(searches_journeys),
+    0
+) * 100
+
+Abandonment Rate % =
+DIVIDE(
+    CALCULATE(COUNTROWS(searches_journeys), searches_journeys[journey_outcome] = "Abandoned"),
+    COUNTROWS(searches_journeys),
+    0
+) * 100
+
+No Results Rate % =
+DIVIDE(
+    CALCULATE(COUNTROWS(searches_journeys), searches_journeys[journey_outcome] = "No Results"),
+    COUNTROWS(searches_journeys),
+    0
+) * 100
+
+// Reformulation Rate
 Reformulation Rate % =
 DIVIDE(
     CALCULATE(COUNTROWS(searches_journeys), searches_journeys[had_reformulation] = TRUE()),
     COUNTROWS(searches_journeys),
     0
 ) * 100
+
+// Average Timing Metrics
+Avg Search to Result (sec) =
+AVERAGE(searches_journeys[sec_search_to_result])
+
+Avg Result to Click (sec) =
+AVERAGE(searches_journeys[sec_result_to_click])
+
+Avg Session Duration (sec) =
+AVERAGE(searches_journeys[total_duration_sec])
+
+// Average Searches per Session (from journeys)
+Avg Searches per Session (Journeys) =
+AVERAGE(searches_journeys[search_count_in_session])
 ```
+
+### Sort Order Columns for Bucket Charts
+
+The bucket columns are text and won't sort correctly by default. Create these calculated columns for proper sorting:
+
+```dax
+// Add to searches_journeys table as calculated columns
+
+Search to Result Sort =
+SWITCH(
+    searches_journeys[search_to_result_bucket],
+    "< 0.5s", 1,
+    "0.5-1s", 2,
+    "1-2s", 3,
+    "2-5s", 4,
+    "> 5s", 5,
+    "No Result", 6,
+    99
+)
+
+Result to Click Sort =
+SWITCH(
+    searches_journeys[result_to_click_bucket],
+    "< 2s (quick)", 1,
+    "2-5s", 2,
+    "5-10s", 3,
+    "10-30s", 4,
+    "30-60s", 5,
+    "> 60s (browsing)", 6,
+    "No Click", 7,
+    99
+)
+
+Session Duration Sort =
+SWITCH(
+    searches_journeys[session_duration_bucket],
+    "< 5s (quick)", 1,
+    "5-30s", 2,
+    "30-60s", 3,
+    "1-3 min", 4,
+    "3-5 min", 5,
+    "> 5 min (extended)", 6,
+    99
+)
+
+Session Complexity Sort =
+SWITCH(
+    searches_journeys[session_complexity],
+    "Single Event", 1,
+    "Simple", 2,
+    "Medium", 3,
+    "Complex", 4,
+    99
+)
+
+Journey Outcome Sort =
+SWITCH(
+    searches_journeys[journey_outcome],
+    "Success", 1,
+    "Abandoned", 2,
+    "No Results", 3,
+    "Unknown", 4,
+    99
+)
+```
+
+### Row 1: Journey Outcomes
+
+#### Chart 1: Journey Outcome Distribution
+- **Type**: Donut Chart
+- **Setup**:
+  1. Drag `journey_outcome` to **Legend**
+  2. Drag `journey_outcome` to **Values** → select **Count**
+- **Colors**:
+  - Success = Green (#2E7D32)
+  - Abandoned = Orange (#F57C00)
+  - No Results = Red (#C62828)
+  - Unknown = Gray (#757575)
+- **Sort**: Use `Journey Outcome Sort` column
+
+#### Chart 2: Session Complexity Breakdown
+- **Type**: Bar Chart
+- **Setup**:
+  1. Drag `session_complexity` to **Axis**
+  2. Drag `session_complexity` to **Values** → select **Count**
+- **Sort**: Click chart → Sort by `Session Complexity Sort` (ascending)
+
+### Row 2: Timing Analysis
+
+#### Chart 3: Search-to-Result Time Distribution
+- **Type**: Bar Chart (Clustered Bar)
+- **Setup**:
+  1. Drag `search_to_result_bucket` to **Axis**
+  2. Drag `search_to_result_bucket` to **Values** → select **Count**
+- **Sort**: Click chart → Sort by `Search to Result Sort` (ascending)
+- **Insight**: Shows system performance - ideally most sessions should be < 2s
+
+#### Chart 4: Result-to-Click Time Distribution
+- **Type**: Bar Chart (Clustered Bar)
+- **Setup**:
+  1. Drag `result_to_click_bucket` to **Axis**
+  2. Drag `result_to_click_bucket` to **Values** → select **Count**
+- **Sort**: Click chart → Sort by `Result to Click Sort` (ascending)
+- **Insight**: Shows user decision time - quick clicks may indicate good relevance
+
+### Row 3: Behavior Patterns
+
+#### Chart 5: Reformulation Rate
+- **Type**: Card or KPI
+- **Setup**: Use the `Reformulation Rate %` measure
+- **Target**: < 30% is good (users find what they need on first try)
+- **Insight**: High reformulation suggests search relevance issues
 
 #### Chart 6: Session Duration Distribution
 - **Type**: Bar Chart
-- **Axis**: `session_duration_bucket`
-- **Values**: Count of rows
+- **Setup**:
+  1. Drag `session_duration_bucket` to **Axis**
+  2. Drag `session_duration_bucket` to **Values** → select **Count**
+- **Sort**: Click chart → Sort by `Session Duration Sort` (ascending)
+- **Insight**: Very short sessions might be quick successes OR immediate abandonment
+
+### Row 4: KPI Cards (Optional)
+
+Create a row of KPI cards for quick insights:
+
+| Card | Measure | Target |
+|------|---------|--------|
+| Total Sessions | `Session Count` | - |
+| Success Rate | `Success Rate %` | > 40% |
+| Avg Searches/Session | `Avg Searches per Session (Journeys)` | < 2 |
+| Reformulation Rate | `Reformulation Rate %` | < 30% |
+| Avg Time to Click | `Avg Result to Click (sec)` | < 10s |
 
 ---
 
