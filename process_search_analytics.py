@@ -164,9 +164,18 @@ def load_file_to_temp_table(con, input_path, temp_table='temp_import'):
             val = str(sample.iloc[0, 0])
             fmt = None
 
-            # Format: dd/MM/yyyy HH:mm:ss.fffffff (App Insights CSV export with microseconds)
+            # Debug: Log timestamp column values for troubleshooting
+            if 'timestamp' in col.lower():
+                log(f"  DEBUG: Column '{col}' sample value: '{val}'")
+
+            # Format: dd/MM/yyyy HH:mm:ss.fffffff (App Insights export with microseconds)
+            # Note: strptime %f only supports 6 digits, so we truncate longer fractional seconds
             if re.match(r'^\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}\.\d+$', val):
                 fmt = '%d/%m/%Y %H:%M:%S.%f'
+                # Check if fractional seconds > 6 digits, need special handling
+                frac_part = val.split('.')[-1]
+                if len(frac_part) > 6:
+                    fmt = 'TRUNCATE_FRAC'  # Special marker for truncation
             # Format: dd/MM/yyyy HH:mm:ss (App Insights without microseconds)
             elif re.match(r'^\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}$', val):
                 fmt = '%d/%m/%Y %H:%M:%S'
@@ -185,8 +194,46 @@ def load_file_to_temp_table(con, input_path, temp_table='temp_import'):
             # Format: dd.MM.yyyy (German date only)
             elif re.match(r'^\d{2}\.\d{2}\.\d{4}$', val):
                 fmt = '%d.%m.%Y'
+            # Format: yyyy-MM-dd HH:mm:ss.ffffff (ISO format with microseconds)
+            elif re.match(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+$', val):
+                fmt = '%Y-%m-%d %H:%M:%S.%f'
+            # Format: yyyy-MM-dd HH:mm:ss (ISO format)
+            elif re.match(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$', val):
+                fmt = '%Y-%m-%d %H:%M:%S'
+            # Format: yyyy-MM-ddTHH:mm:ss (ISO with T separator)
+            elif re.match(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}', val):
+                fmt = 'ISO'  # Use DuckDB's native parsing
 
-            if fmt:
+            if fmt == 'TRUNCATE_FRAC':
+                # dd/MM/yyyy HH:mm:ss with >6 digit fractional seconds - truncate to 6 digits
+                try:
+                    con.execute(f'ALTER TABLE {temp_table} ADD COLUMN "{col}_temp" TIMESTAMP')
+                    # Truncate fractional seconds to 6 digits using string manipulation
+                    con.execute(f'''
+                        UPDATE {temp_table} SET "{col}_temp" = strptime(
+                            CASE
+                                WHEN "{col}" LIKE '%.%'
+                                THEN SUBSTRING("{col}", 1, POSITION('.' IN "{col}") + 6)
+                                ELSE "{col}"
+                            END,
+                            '%d/%m/%Y %H:%M:%S.%f'
+                        )
+                    ''')
+                    con.execute(f'ALTER TABLE {temp_table} DROP COLUMN "{col}"')
+                    con.execute(f'ALTER TABLE {temp_table} RENAME COLUMN "{col}_temp" TO "{col}"')
+                except Exception as e:
+                    log(f"  WARNING: Failed to convert '{col}' with truncation: {e}")
+            elif fmt == 'ISO':
+                # ISO format - use CAST instead of strptime
+                try:
+                    con.execute(f'ALTER TABLE {temp_table} ADD COLUMN "{col}_temp" TIMESTAMP')
+                    con.execute(f'UPDATE {temp_table} SET "{col}_temp" = CAST("{col}" AS TIMESTAMP)')
+                    con.execute(f'ALTER TABLE {temp_table} DROP COLUMN "{col}"')
+                    con.execute(f'ALTER TABLE {temp_table} RENAME COLUMN "{col}_temp" TO "{col}"')
+                except Exception:
+                    pass
+            elif fmt:
+                # Regular format - use strptime
                 try:
                     con.execute(f'ALTER TABLE {temp_table} ADD COLUMN "{col}_temp" TIMESTAMP')
                     con.execute(f'UPDATE {temp_table} SET "{col}_temp" = strptime("{col}", \'{fmt}\')')
@@ -194,6 +241,21 @@ def load_file_to_temp_table(con, input_path, temp_table='temp_import'):
                     con.execute(f'ALTER TABLE {temp_table} RENAME COLUMN "{col}_temp" TO "{col}"')
                 except Exception:
                     pass
+
+    # Fallback: Try to convert any remaining VARCHAR timestamp column using CAST
+    schema = con.execute(f"DESCRIBE {temp_table}").df()
+    for _, row in schema.iterrows():
+        col = row['column_name']
+        col_type = row['column_type']
+        if col.lower() == 'timestamp' and col_type == 'VARCHAR':
+            try:
+                con.execute(f'ALTER TABLE {temp_table} ADD COLUMN "{col}_temp" TIMESTAMP')
+                con.execute(f'UPDATE {temp_table} SET "{col}_temp" = TRY_CAST("{col}" AS TIMESTAMP)')
+                con.execute(f'ALTER TABLE {temp_table} DROP COLUMN "{col}"')
+                con.execute(f'ALTER TABLE {temp_table} RENAME COLUMN "{col}_temp" TO "{col}"')
+                log(f"  Converted '{col}' to TIMESTAMP using TRY_CAST")
+            except Exception as e:
+                log(f"  WARNING: Could not convert '{col}' to TIMESTAMP: {e}")
 
     # Check for timestamp precision and warn if microseconds are missing
     schema = con.execute(f"DESCRIBE {temp_table}").df()
