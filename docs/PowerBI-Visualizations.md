@@ -436,6 +436,73 @@ DIVIDE(
 ) * 100
 ```
 
+### Journey Types Analysis
+
+The Journey Types view provides a human-readable summary of session patterns, showing exactly what happened in each session (e.g., "1 Search → 1 Result → 1 Click").
+
+**Step 1: Create a Calculated Column** (Model view → `searches_journeys` → New Column)
+
+```dax
+Journey_Type =
+VAR searches = [search_count_in_session]
+VAR results = [result_count]
+VAR clicks = [click_count]
+VAR nulls = [null_result_count]
+RETURN
+SWITCH(
+    TRUE(),
+    searches > 0 && results > 0 && clicks > 0,
+        searches & " Search → " & results & " Result → " & clicks & " Click",
+    searches > 0 && results > 0 && nulls > 0 && clicks = 0,
+        searches & " Search → " & results & " Result (incl. " & nulls & " null) → No Click",
+    searches > 0 && results > 0 && clicks = 0,
+        searches & " Search → " & results & " Result → Abandoned",
+    searches > 0 && results = 0,
+        searches & " Search → No Result",
+    "Other"
+)
+```
+
+**Step 2: Create a Percentage Measure** (optional)
+
+```dax
+Journey Type % =
+DIVIDE(
+    COUNTROWS(searches_journeys),
+    CALCULATE(COUNTROWS(searches_journeys), ALL(searches_journeys[Journey_Type])),
+    0
+) * 100
+```
+
+**Step 3: Create the Visualization**
+
+- **Type**: Table or Horizontal Bar Chart
+- **Setup for Table**:
+  1. Drag `Journey_Type` to **Columns**
+  2. Add count of `Journey_Type` (Sessions)
+  3. Add `Journey Type %` measure
+  4. Sort by Sessions descending
+- **Setup for Bar Chart**:
+  1. Drag `Journey_Type` to **Y-axis**
+  2. Count of `Journey_Type` to **X-axis**
+  3. Sort by value descending
+
+**Example Output:**
+
+| Journey_Type | Sessions | % |
+|--------------|----------|---|
+| 1 Search → 1 Result → 1 Click | 1,245 | 45.2% |
+| 1 Search → 1 Result → Abandoned | 532 | 19.3% |
+| 2 Search → 2 Result → 1 Click | 289 | 10.5% |
+| 1 Search → 1 Result (incl. 1 null) → No Click | 156 | 5.7% |
+| 1 Search → No Result | 98 | 3.6% |
+
+**What this tells you:**
+- **Ideal pattern**: "1 Search → 1 Result → 1 Click" (user found what they needed immediately)
+- **Refinement needed**: "2+ Search" patterns indicate users had to refine their query
+- **Content gap**: "No Result" patterns suggest missing content
+- **Relevance issue**: "Abandoned" patterns suggest results weren't relevant
+
 ### Setting Up Sort Order for Columns
 
 The bucket and category columns are text and won't sort correctly by default (e.g., "10-30s" would come before "2-5s" alphabetically). The parquet file includes sort order columns to fix this.
