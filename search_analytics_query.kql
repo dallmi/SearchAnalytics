@@ -16,10 +16,10 @@
 // Output: All keys become columns dynamically. CustomProps keys are prefixed
 //         with "CP_" to distinguish them from top-level keys.
 //
-// HOW TO USE: Copy from "let TimeRange" to "order by timestamp desc" (lines 24-47)
+// HOW TO USE: Copy from "set truncationmaxrecords" to "order by" (lines 27-51)
 //
-// NOTE: timestamp_full preserves millisecond precision for CSV export.
-//       The standard timestamp column loses precision when exported via Excel.
+// NOTE: 'timestamp [UTC]' is formatted as 'dd/MM/yyyy HH:mm:ss.fffffff' to preserve
+//       millisecond precision for CSV export (Excel truncates the native format).
 // ============================================================================
 
 
@@ -45,9 +45,10 @@ let SearchData = customEvents
 SearchData
 | evaluate bag_unpack(finalBag)
 | project-away rowId, mainBag, cpMerged
-| extend timestamp_full = format_datetime(timestamp, 'yyyy-MM-dd HH:mm:ss.fffffff')
-| project-reorder timestamp_full, timestamp, name, client_CountryOrRegion, user_Id, session_Id
-| order by timestamp desc
+| extend ['timestamp [UTC]'] = format_datetime(timestamp, 'dd/MM/yyyy HH:mm:ss.fffffff')
+| project-away timestamp
+| project-reorder ['timestamp [UTC]'], name, client_CountryOrRegion, user_Id, session_Id
+| order by ['timestamp [UTC]'] desc
 // === COPY TO HERE ===
 
 
