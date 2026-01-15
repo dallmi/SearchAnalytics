@@ -467,7 +467,10 @@ def add_calculated_columns(con):
                 WHEN DATEDIFF('millisecond', LAG(timestamp) OVER (PARTITION BY session_key ORDER BY timestamp), timestamp) < 30000 THEN '10-30s'
                 WHEN DATEDIFF('millisecond', LAG(timestamp) OVER (PARTITION BY session_key ORDER BY timestamp), timestamp) < 60000 THEN '30-60s'
                 ELSE '> 60s'
-            END as time_since_prev_bucket
+            END as time_since_prev_bucket,
+            -- Carry forward the most recent SEARCH_STARTED timestamp for timing calculation
+            LAST_VALUE(CASE WHEN name = 'SEARCH_STARTED' THEN timestamp END IGNORE NULLS)
+                OVER (PARTITION BY session_key ORDER BY timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as last_search_started_ts
         FROM searches s
     """)
 
@@ -635,8 +638,9 @@ def export_parquet_files(con, output_dir):
                     user_id,
                     MIN(timestamp) as session_start,
                     COUNT(*) as total_events,
-                    -- Timing metrics (SEARCH_COMPLETED precedes SEARCH_RESULT_COUNT)
-                    MIN(CASE WHEN name = 'SEARCH_RESULT_COUNT' AND prev_event = 'SEARCH_COMPLETED' THEN ms_since_prev_event END) as ms_search_to_result,
+                    -- Timing metrics (SEARCH_STARTED to SEARCH_RESULT_COUNT = full user-perceived latency)
+                    MIN(CASE WHEN name = 'SEARCH_RESULT_COUNT' AND last_search_started_ts IS NOT NULL
+                        THEN DATEDIFF('millisecond', last_search_started_ts, timestamp) END) as ms_search_to_result,
                     MIN(CASE WHEN click_category IS NOT NULL AND prev_event = 'SEARCH_RESULT_COUNT' THEN ms_since_prev_event END) as ms_result_to_click,
                     DATEDIFF('millisecond', MIN(timestamp), MAX(timestamp)) as total_duration_ms,
                     -- Event counts
