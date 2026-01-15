@@ -145,17 +145,21 @@ def load_file_to_temp_table(con, input_path, temp_table='temp_import'):
     schema = con.execute(f"DESCRIBE {temp_table}").df()
     col_names = schema['column_name'].tolist()
 
-    rename_map = {'user_Id': 'user_id', 'session_Id': 'session_id'}
+    rename_map = {
+        'user_Id': 'user_id',
+        'session_Id': 'session_id',
+        'timestamp [UTC]': 'timestamp'  # App Insights export column name
+    }
     for old_name, new_name in rename_map.items():
         if old_name in col_names:
-            con.execute(f"ALTER TABLE {temp_table} RENAME COLUMN {old_name} TO {new_name}")
+            con.execute(f'ALTER TABLE {temp_table} RENAME COLUMN "{old_name}" TO {new_name}')
 
     # Convert date formats (German dd.MM.yyyy and App Insights dd/MM/yyyy)
     schema = con.execute(f"DESCRIBE {temp_table}").df()
     varchar_cols = schema[schema['column_type'] == 'VARCHAR']['column_name'].tolist()
 
     for col in varchar_cols:
-        sample = con.execute(f"SELECT {col} FROM {temp_table} WHERE {col} IS NOT NULL LIMIT 1").df()
+        sample = con.execute(f'SELECT "{col}" FROM {temp_table} WHERE "{col}" IS NOT NULL LIMIT 1').df()
         if len(sample) > 0:
             val = str(sample.iloc[0, 0])
             fmt = None
@@ -184,10 +188,10 @@ def load_file_to_temp_table(con, input_path, temp_table='temp_import'):
 
             if fmt:
                 try:
-                    con.execute(f"ALTER TABLE {temp_table} ADD COLUMN {col}_temp TIMESTAMP")
-                    con.execute(f"UPDATE {temp_table} SET {col}_temp = strptime({col}, '{fmt}')")
-                    con.execute(f"ALTER TABLE {temp_table} DROP COLUMN {col}")
-                    con.execute(f"ALTER TABLE {temp_table} RENAME COLUMN {col}_temp TO {col}")
+                    con.execute(f'ALTER TABLE {temp_table} ADD COLUMN "{col}_temp" TIMESTAMP')
+                    con.execute(f'UPDATE {temp_table} SET "{col}_temp" = strptime("{col}", \'{fmt}\')')
+                    con.execute(f'ALTER TABLE {temp_table} DROP COLUMN "{col}"')
+                    con.execute(f'ALTER TABLE {temp_table} RENAME COLUMN "{col}_temp" TO "{col}"')
                 except Exception:
                     pass
 
