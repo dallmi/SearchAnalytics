@@ -389,6 +389,8 @@ def add_calculated_columns(con):
         CREATE TABLE searches AS
         SELECT
             r.*,
+            -- Timestamp as string for Power BI (Parquet connector loses precision)
+            STRFTIME(timestamp, '%Y-%m-%d %H:%M:%S.%g') as timestamp_str,
             -- Session columns
             DATE_TRUNC('day', timestamp)::DATE as session_date,
             COALESCE(CAST(DATE_TRUNC('day', timestamp)::DATE AS VARCHAR), '') || '_' ||
@@ -668,6 +670,7 @@ def export_parquet_files(con, output_dir):
             SELECT
                 session_date,
                 session_start,
+                STRFTIME(session_start, '%Y-%m-%d %H:%M:%S.%g') as session_start_str,
                 total_events,
                 search_count_in_session,
                 result_count,
