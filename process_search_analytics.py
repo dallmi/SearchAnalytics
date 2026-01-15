@@ -131,7 +131,32 @@ def load_file_to_temp_table(con, input_path, temp_table='temp_import'):
     if input_path.suffix.lower() in ['.xlsx', '.xls']:
         # Use pandas to read Excel files (works in corporate environments without DuckDB extension)
         import pandas as pd
-        df = pd.read_excel(input_path)
+
+        # First pass: read only column names (nrows=0 to avoid parsing data)
+        df_cols = pd.read_excel(input_path, nrows=0)
+        all_cols = df_cols.columns.tolist()
+        timestamp_cols = [col for col in all_cols if 'timestamp' in col.lower()]
+
+        # Read Excel with timestamp columns as strings to preserve precision
+        # Excel datetime values lose subsecond precision, so we must read as string
+        if timestamp_cols:
+            dtype_dict = {col: str for col in timestamp_cols}
+            df = pd.read_excel(input_path, dtype=dtype_dict)
+            log(f"  Reading timestamp columns as strings: {timestamp_cols}")
+
+            # Debug: show actual timestamp values from Excel
+            for col in timestamp_cols:
+                non_null = df[col].dropna()
+                if len(non_null) > 0:
+                    sample_val = non_null.iloc[0]
+                    log(f"  DEBUG: Excel '{col}' sample: '{sample_val}' (type: {type(sample_val).__name__})")
+                    # Check if it looks like a datetime object (precision lost) vs string
+                    if hasattr(sample_val, 'strftime'):
+                        log(f"  WARNING: Excel stored '{col}' as datetime, precision may be lost!")
+                        log(f"           Consider exporting from App Insights as CSV instead.")
+        else:
+            df = pd.read_excel(input_path)
+
         con.register('excel_df', df)
         con.execute(f"CREATE TABLE {temp_table} AS SELECT * FROM excel_df")
         con.unregister('excel_df')
@@ -477,6 +502,18 @@ def export_parquet_files(con, output_dir):
     raw_count = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{raw_file}')").df()['n'][0]
     raw_size = os.path.getsize(raw_file) / (1024 * 1024)
     log(f"  searches_raw.parquet ({raw_count:,} rows, {raw_size:.1f} MB)")
+
+    # Verify timestamp precision in parquet
+    ts_sample = con.execute(f"""
+        SELECT timestamp,
+               EXTRACT(second FROM timestamp) as secs,
+               EXTRACT(microsecond FROM timestamp) as microsecs
+        FROM read_parquet('{raw_file}')
+        WHERE timestamp IS NOT NULL
+        LIMIT 3
+    """).df()
+    for _, row in ts_sample.iterrows():
+        log(f"  DEBUG Parquet timestamp: {row['timestamp']} (sec={row['secs']}, microsec={row['microsecs']})")
 
     # Daily aggregation
     daily_file = output_dir / 'searches_daily.parquet'
