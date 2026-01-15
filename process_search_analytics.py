@@ -634,8 +634,8 @@ def export_parquet_files(con, output_dir):
                     user_id,
                     MIN(timestamp) as session_start,
                     COUNT(*) as total_events,
-                    -- Timing metrics
-                    MIN(CASE WHEN name = 'SEARCH_RESULT_COUNT' AND prev_event = 'SEARCH_STARTED' THEN ms_since_prev_event END) as ms_search_to_result,
+                    -- Timing metrics (SEARCH_COMPLETED precedes SEARCH_RESULT_COUNT)
+                    MIN(CASE WHEN name = 'SEARCH_RESULT_COUNT' AND prev_event = 'SEARCH_COMPLETED' THEN ms_since_prev_event END) as ms_search_to_result,
                     MIN(CASE WHEN click_category IS NOT NULL AND prev_event = 'SEARCH_RESULT_COUNT' THEN ms_since_prev_event END) as ms_result_to_click,
                     DATEDIFF('millisecond', MIN(timestamp), MAX(timestamp)) as total_duration_ms,
                     -- Event counts
