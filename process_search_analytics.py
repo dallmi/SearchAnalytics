@@ -129,13 +129,12 @@ def load_file_to_temp_table(con, input_path, temp_table='temp_import'):
     con.execute(f"DROP TABLE IF EXISTS {temp_table}")
 
     if input_path.suffix.lower() in ['.xlsx', '.xls']:
-        # Install and load the excel extension for reading Excel files
-        con.execute("INSTALL excel")
-        con.execute("LOAD excel")
-        con.execute(f"""
-            CREATE TABLE {temp_table} AS
-            SELECT * FROM read_xlsx('{input_path}')
-        """)
+        # Use pandas to read Excel files (works in corporate environments without DuckDB extension)
+        import pandas as pd
+        df = pd.read_excel(input_path)
+        con.register('excel_df', df)
+        con.execute(f"CREATE TABLE {temp_table} AS SELECT * FROM excel_df")
+        con.unregister('excel_df')
     else:
         con.execute(f"""
             CREATE TABLE {temp_table} AS
