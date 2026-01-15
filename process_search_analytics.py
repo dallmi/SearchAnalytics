@@ -388,7 +388,8 @@ def add_calculated_columns(con):
     con.execute("""
         CREATE TABLE searches AS
         SELECT
-            r.*,
+            r.* EXCLUDE(name),
+            UPPER(r.name) as name,
             -- Timestamp as string for Power BI (Parquet connector loses precision)
             STRFTIME(timestamp, '%Y-%m-%d %H:%M:%S.%g') as timestamp_str,
             -- Session columns
