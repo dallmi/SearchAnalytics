@@ -148,7 +148,7 @@ def load_file_to_temp_table(con, input_path, temp_table='temp_import'):
         if old_name in col_names:
             con.execute(f"ALTER TABLE {temp_table} RENAME COLUMN {old_name} TO {new_name}")
 
-    # Convert German date formats
+    # Convert date formats (German dd.MM.yyyy and App Insights dd/MM/yyyy)
     schema = con.execute(f"DESCRIBE {temp_table}").df()
     varchar_cols = schema[schema['column_type'] == 'VARCHAR']['column_name'].tolist()
 
@@ -156,19 +156,60 @@ def load_file_to_temp_table(con, input_path, temp_table='temp_import'):
         sample = con.execute(f"SELECT {col} FROM {temp_table} WHERE {col} IS NOT NULL LIMIT 1").df()
         if len(sample) > 0:
             val = str(sample.iloc[0, 0])
-            if re.match(r'^\d{2}\.\d{2}\.\d{4}', val):
-                try:
-                    if re.match(r'^\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}(:\d{2})?$', val):
-                        fmt = '%d.%m.%Y %H:%M:%S' if val.count(':') == 2 else '%d.%m.%Y %H:%M'
-                    else:
-                        fmt = '%d.%m.%Y'
+            fmt = None
 
+            # Format: dd/MM/yyyy HH:mm:ss.fffffff (App Insights CSV export with microseconds)
+            if re.match(r'^\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}\.\d+$', val):
+                fmt = '%d/%m/%Y %H:%M:%S.%f'
+            # Format: dd/MM/yyyy HH:mm:ss (App Insights without microseconds)
+            elif re.match(r'^\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}$', val):
+                fmt = '%d/%m/%Y %H:%M:%S'
+            # Format: dd/MM/yyyy HH:mm
+            elif re.match(r'^\d{2}/\d{2}/\d{4} \d{2}:\d{2}$', val):
+                fmt = '%d/%m/%Y %H:%M'
+            # Format: dd/MM/yyyy (date only)
+            elif re.match(r'^\d{2}/\d{2}/\d{4}$', val):
+                fmt = '%d/%m/%Y'
+            # Format: dd.MM.yyyy HH:mm:ss (German with seconds)
+            elif re.match(r'^\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2}$', val):
+                fmt = '%d.%m.%Y %H:%M:%S'
+            # Format: dd.MM.yyyy HH:mm (German without seconds)
+            elif re.match(r'^\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}$', val):
+                fmt = '%d.%m.%Y %H:%M'
+            # Format: dd.MM.yyyy (German date only)
+            elif re.match(r'^\d{2}\.\d{2}\.\d{4}$', val):
+                fmt = '%d.%m.%Y'
+
+            if fmt:
+                try:
                     con.execute(f"ALTER TABLE {temp_table} ADD COLUMN {col}_temp TIMESTAMP")
                     con.execute(f"UPDATE {temp_table} SET {col}_temp = strptime({col}, '{fmt}')")
                     con.execute(f"ALTER TABLE {temp_table} DROP COLUMN {col}")
                     con.execute(f"ALTER TABLE {temp_table} RENAME COLUMN {col}_temp TO {col}")
                 except Exception:
                     pass
+
+    # Check for timestamp precision and warn if microseconds are missing
+    schema = con.execute(f"DESCRIBE {temp_table}").df()
+    timestamp_cols = [col for col in schema['column_name'].tolist()
+                      if 'timestamp' in col.lower()]
+
+    for col in timestamp_cols:
+        # Check if any row has non-zero microseconds
+        try:
+            result = con.execute(f"""
+                SELECT COUNT(*) as cnt
+                FROM {temp_table}
+                WHERE EXTRACT(microsecond FROM "{col}") != 0
+            """).df()
+            has_microseconds = result['cnt'][0] > 0
+
+            if not has_microseconds:
+                log(f"  WARNING: Column '{col}' has no microsecond precision!")
+                log(f"           Event ordering may be inaccurate for timing calculations.")
+                log(f"           For precise timing, export from App Insights as CSV (not Excel).")
+        except Exception:
+            pass  # Column might not be a timestamp type
 
     row_count = con.execute(f"SELECT COUNT(*) as n FROM {temp_table}").df()['n'][0]
     return row_count
