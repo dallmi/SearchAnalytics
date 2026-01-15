@@ -129,9 +129,12 @@ def load_file_to_temp_table(con, input_path, temp_table='temp_import'):
     con.execute(f"DROP TABLE IF EXISTS {temp_table}")
 
     if input_path.suffix.lower() in ['.xlsx', '.xls']:
+        # Install and load the excel extension for reading Excel files
+        con.execute("INSTALL excel")
+        con.execute("LOAD excel")
         con.execute(f"""
             CREATE TABLE {temp_table} AS
-            SELECT * FROM st_read('{input_path}')
+            SELECT * FROM read_xlsx('{input_path}')
         """)
     else:
         con.execute(f"""
