@@ -778,11 +778,13 @@ Now your bar charts will sort correctly: 1 word → 2 words → 3 words → 4 wo
 - **Insight**: Do very specific (4+ word) queries fail more often?
 
 **Expected Pattern:**
-| Word Count | Typical CTR | Typical Null Rate | Interpretation |
-|------------|-------------|-------------------|----------------|
+| Query Length | Typical CTR | Typical Null Rate | Interpretation |
+|--------------|-------------|-------------------|----------------|
 | 1 word | Low (15-20%) | Low (5-8%) | Vague queries, many results but poor match |
-| 2-3 words | High (25-40%) | Low (3-6%) | Optimal specificity |
-| 4+ words | Medium (20-30%) | Higher (10-15%) | Very specific, may not find exact match |
+| 2 words | Medium (20-30%) | Low (4-6%) | Starting to get specific |
+| 3 words | High (25-40%) | Low (3-5%) | Optimal specificity |
+| 4 words | High (25-35%) | Medium (5-8%) | Specific, good match potential |
+| 5+ words | Medium (20-30%) | Higher (10-15%) | Very specific, may not find exact match |
 
 ### Row 1: Top Search Terms
 
