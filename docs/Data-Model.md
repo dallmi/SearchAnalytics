@@ -11,6 +11,8 @@ This document explains how raw search analytics events are transformed into mean
 3. [Timing Calculations](#3-timing-calculations)
 4. [Business Rules & Classifications](#4-business-rules--classifications)
 5. [Output Files & Column Definitions](#5-output-files--column-definitions)
+6. [Power BI Calculated Columns](#6-power-bi-calculated-columns)
+7. [Power BI Measures](#7-power-bi-measures)
 
 ---
 
@@ -419,23 +421,41 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 |--------|------|-------------|-------------|
 | `session_date` | Date | Date of session | |
 | `session_start` | Timestamp | First event timestamp | MIN(timestamp) |
+| `session_start_str` | String | Session start as string | STRFTIME for Power BI compatibility |
 | `total_events` | Integer | Events in session | COUNT(*) |
 | `search_count_in_session` | Integer | SEARCH_STARTED events | COUNT(SEARCH_STARTED) |
 | `result_count` | Integer | SEARCH_RESULT_COUNT events | COUNT(SEARCH_RESULT_COUNT) |
 | `click_count` | Integer | Click events | COUNT(click_category IS NOT NULL) |
 | `unique_search_terms` | Integer | Distinct queries | COUNT(DISTINCT search_term) |
 | `null_result_count` | Integer | Zero-result events | SUM(is_null_result) |
+| `max_total_results` | Integer | Max results shown | MAX(CP_totalResultCount) |
 | `sec_search_to_result` | Float | Seconds: search to results | MIN(ms_search_to_result) / 1000 |
 | `sec_result_to_click` | Float | Seconds: results to click | MIN(ms_result_to_click) / 1000 |
 | `total_duration_sec` | Float | Session length in seconds | (MAX - MIN timestamp) / 1000 |
+| `first_event_hour` | Integer | Hour of first event (0-23) | MIN(event_hour) |
+| `last_event_hour` | Integer | Hour of last event (0-23) | MAX(event_hour) |
+| `general_clicks` | Integer | General tab clicks | COUNT(click_category='General') |
+| `all_tab_clicks` | Integer | All tab clicks | COUNT(click_category='All') |
+| `news_clicks` | Integer | News tab clicks | COUNT(click_category='News') |
+| `goto_clicks` | Integer | GoTo tab clicks | COUNT(click_category='GoTo') |
+| `people_clicks` | Integer | People tab clicks | COUNT(click_category='People') |
+| `includes_first_search_of_day` | Boolean | Session has day's first search | MAX(is_first_search_of_day) |
 | `search_to_result_bucket` | String | Latency category | See Time Buckets |
 | `result_to_click_bucket` | String | Decision time category | See Time Buckets |
+| `session_duration_bucket` | String | Session length category | < 5s, 5-30s, 30-60s, 1-3 min, etc. |
 | `journey_outcome` | String | Session result | Success/No Results/Abandoned |
 | `had_reformulation` | Boolean | User changed query | unique_search_terms > 1 |
 | `session_complexity` | String | Session size category | Based on total_events |
+| `search_to_result_sort` | Integer | Sort order for latency bucket | 1-6 for Power BI sorting |
+| `result_to_click_sort` | Integer | Sort order for click time bucket | 1-7 for Power BI sorting |
+| `session_duration_sort` | Integer | Sort order for duration bucket | 1-6 for Power BI sorting |
+| `journey_outcome_sort` | Integer | Sort order for outcome | 1=Success, 2=Abandoned, 3=No Results |
+| `session_complexity_sort` | Integer | Sort order for complexity | 1-4 for Power BI sorting |
 | `had_null_result` | Boolean | Had zero-result search | null_result_count > 0 |
 | `recovered_from_null` | Boolean | Success despite null result | null_result > 0 AND click > 0 |
+| `user_session_number` | Integer | User's session sequence | ROW_NUMBER per user |
 | `is_users_first_session` | Boolean | First time user | user_session_number = 1 |
+| `distinct_click_categories` | Integer | Tab types clicked | COUNT(DISTINCT click_category) |
 | `had_tab_switch` | Boolean | Clicked multiple tabs | distinct_click_categories > 1 |
 
 ---
@@ -452,22 +472,39 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `total_events` | Integer | All events | COUNT(*) |
 | `unique_sessions` | Integer | Distinct sessions | COUNT(DISTINCT session_key) |
 | `unique_users` | Integer | Distinct users | COUNT(DISTINCT user_id) |
+| `unique_search_terms` | Integer | Distinct search queries | COUNT(DISTINCT search_term_normalized) |
 | `search_starts` | Integer | SEARCH_STARTED events | COUNT(SEARCH_STARTED) |
 | `result_events` | Integer | SEARCH_RESULT_COUNT events | COUNT(SEARCH_RESULT_COUNT) |
 | `click_events` | Integer | Click events | COUNT(click_category) |
 | `null_results` | Integer | Zero-result events | SUM(is_null_result) |
+| `result_events_with_results` | Integer | Results with >0 hits | SUM(is_clickable_result) |
 | `sessions_with_results` | Integer | Sessions that got results | From session_stats CTE |
 | `sessions_with_clicks` | Integer | Sessions with clicks | From session_stats CTE |
 | `sessions_abandoned` | Integer | Results but no click | sessions_with_results - sessions_with_clicks |
 | `click_rate_pct` | Float | Click rate | click_events / search_starts * 100 |
 | `null_rate_pct` | Float | Null result rate | null_results / result_events * 100 |
 | `session_success_rate_pct` | Float | Session success | sessions_with_clicks / sessions_with_results * 100 |
-| `new_users` | Integer | First-time users today | Users where first_seen = today |
-| `returning_users` | Integer | Repeat users today | Users where first_seen < today |
+| `session_abandonment_rate_pct` | Float | Session abandonment | sessions_abandoned / sessions_with_results * 100 |
+| `avg_searches_per_session` | Float | Avg searches per session | search_starts / unique_sessions |
+| `avg_search_term_length` | Float | Avg query char length | AVG(search_term_length) |
+| `avg_search_term_words` | Float | Avg query word count | AVG(search_term_word_count) |
+| `sum_search_term_length` | Integer | Sum of query lengths | SUM(search_term_length) - for weighted avg in DAX |
+| `sum_search_term_words` | Integer | Sum of word counts | SUM(search_term_word_count) - for weighted avg in DAX |
+| `search_term_count` | Integer | Count of queries | COUNT(search_term_length IS NOT NULL) |
+| `first_searches_of_day` | Integer | First searches of day | COUNT(is_first_search_of_day) |
+| `clicks_general` | Integer | General tab clicks | COUNT(click_category='General') |
+| `clicks_all` | Integer | All tab clicks | COUNT(click_category='All') |
+| `clicks_news` | Integer | News tab clicks | COUNT(click_category='News') |
+| `clicks_goto` | Integer | GoTo tab clicks | COUNT(click_category='GoTo') |
+| `clicks_people` | Integer | People tab clicks | COUNT(click_category='People') |
+| `day_of_week` | String | Day name | DAYNAME(session_date) |
+| `day_of_week_num` | Integer | ISO day number (1=Mon) | ISODOW(session_date) |
 | `searches_morning` | Integer | Searches 6:00-12:00 | Hour-based filter |
 | `searches_afternoon` | Integer | Searches 12:00-18:00 | Hour-based filter |
 | `searches_evening` | Integer | Searches 18:00-24:00 | Hour-based filter |
 | `searches_night` | Integer | Searches 0:00-6:00 | Hour-based filter |
+| `new_users` | Integer | First-time users today | Users where first_seen = today |
+| `returning_users` | Integer | Repeat users today | Users where first_seen < today |
 
 ---
 
@@ -491,9 +528,183 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `clicks_general` | Integer | General tab clicks | COUNT(click_category='General') |
 | `clicks_all` | Integer | All tab clicks | COUNT(click_category='All') |
 | `clicks_news` | Integer | News tab clicks | COUNT(click_category='News') |
+| `clicks_goto` | Integer | GoTo tab clicks | COUNT(click_category='GoTo') |
+| `clicks_people` | Integer | People tab clicks | COUNT(click_category='People') |
 | `avg_sec_to_click` | Float | Avg decision time | AVG(ms_result_to_click) / 1000 |
+| `clicks_with_timing` | Integer | Clicks with timing data | COUNT(click after SEARCH_RESULT_COUNT) |
+| `sum_sec_to_click` | Float | Sum of click times | SUM(ms_result_to_click) / 1000 - for weighted avg in DAX |
+| `searches_morning` | Integer | Searches 6:00-12:00 | Hour-based filter |
+| `searches_afternoon` | Integer | Searches 12:00-18:00 | Hour-based filter |
+| `searches_evening` | Integer | Searches 18:00-24:00 | Hour-based filter |
+| `searches_night` | Integer | Searches 0:00-6:00 | Hour-based filter |
 | `first_seen_date` | Date | First day term appeared | MIN(session_date) over all time |
 | `is_new_term` | Boolean | First appearance today | session_date = first_seen_date |
+
+---
+
+## 6. Power BI Calculated Columns
+
+These columns are created in Power BI using DAX and are not present in the parquet files.
+
+### searches_terms Table
+
+#### Query_Length_Bucket
+Categorizes search queries by word count for visualization.
+
+```dax
+Query_Length_Bucket =
+SWITCH(
+    TRUE(),
+    searches_terms[word_count] = 1, "1 word",
+    searches_terms[word_count] = 2, "2 words",
+    searches_terms[word_count] = 3, "3 words",
+    searches_terms[word_count] = 4, "4 words",
+    searches_terms[word_count] >= 5, "5+ words",
+    "Unknown"
+)
+```
+
+#### Query_Length_Sort
+Sort order for Query_Length_Bucket. Set "Sort by column" in Power BI.
+
+```dax
+Query_Length_Sort =
+SWITCH(
+    TRUE(),
+    searches_terms[word_count] = 1, 1,
+    searches_terms[word_count] = 2, 2,
+    searches_terms[word_count] = 3, 3,
+    searches_terms[word_count] = 4, 4,
+    searches_terms[word_count] >= 5, 5,
+    99
+)
+```
+
+#### Term_Outcome
+Classifies search term performance into actionable categories.
+
+```dax
+Term_Outcome =
+VAR nullRate = DIVIDE([null_result_count], [result_events], 0)
+VAR ctr = DIVIDE([click_count], [search_count], 0)
+RETURN
+SWITCH(
+    TRUE(),
+    nullRate = 1, "Zero Results",
+    nullRate > 0.5, "Mostly No Results",
+    ctr = 0, "No Clicks",
+    ctr < 0.2, "Low CTR",
+    "Success"
+)
+```
+
+| Category | Meaning | Action |
+|----------|---------|--------|
+| Zero Results | 100% null rate | Content gap - add content |
+| Mostly No Results | >50% null rate | Partial gap - improve coverage |
+| No Clicks | Has results but 0 clicks | Poor relevance - tune ranking |
+| Low CTR | <20% click rate | Suboptimal - review content |
+| Success | Good performance | Monitor |
+
+### searches_journeys Table
+
+#### Journey_Type
+Combines outcome and behavior flags for segmentation.
+
+```dax
+Journey_Type =
+searches_journeys[journey_outcome] &
+IF(searches_journeys[had_reformulation], " (Refined)", "") &
+IF(searches_journeys[recovered_from_null], " (Recovered)", "")
+```
+
+---
+
+## 7. Power BI Measures
+
+These measures are created in Power BI for aggregated calculations.
+
+### Search Effectiveness Score
+
+Combined metric considering both CTR and null rate. Higher is better.
+
+```dax
+Search Effectiveness Score =
+VAR ctr = DIVIDE(SUM(searches_terms[click_count]), SUM(searches_terms[search_count]), 0)
+VAR nullRate = DIVIDE(SUM(searches_terms[null_result_count]), SUM(searches_terms[result_events]), 0)
+RETURN
+(ctr * 100) - (nullRate * 50)
+```
+
+**Score interpretation:**
+- Positive scores: Good performance (CTR outweighs null rate penalty)
+- Near zero: Balanced but could improve
+- Negative scores: High null rates hurting performance
+
+### Term CTR %
+
+Click-through rate for search terms.
+
+```dax
+Term CTR % =
+DIVIDE(
+    SUM(searches_terms[click_count]),
+    SUM(searches_terms[search_count]),
+    0
+) * 100
+```
+
+### Term Null Rate %
+
+Percentage of searches returning zero results.
+
+```dax
+Term Null Rate % =
+DIVIDE(
+    SUM(searches_terms[null_result_count]),
+    SUM(searches_terms[result_events]),
+    0
+) * 100
+```
+
+### Weighted Avg Search Term Length
+
+Correctly weighted average across days (use instead of AVERAGE on avg_search_term_length).
+
+```dax
+Weighted Avg Search Term Length =
+DIVIDE(
+    SUM(searches_daily[sum_search_term_length]),
+    SUM(searches_daily[search_term_count]),
+    0
+)
+```
+
+### Weighted Avg Search Term Words
+
+Correctly weighted average across days.
+
+```dax
+Weighted Avg Search Term Words =
+DIVIDE(
+    SUM(searches_daily[sum_search_term_words]),
+    SUM(searches_daily[search_term_count]),
+    0
+)
+```
+
+### Weighted Avg Sec to Click
+
+Correctly weighted average click time (for terms aggregation).
+
+```dax
+Weighted Avg Sec to Click =
+DIVIDE(
+    SUM(searches_terms[sum_sec_to_click]),
+    SUM(searches_terms[clicks_with_timing]),
+    0
+)
+```
 
 ---
 
@@ -536,3 +747,4 @@ timestamp,name,user_Id,session_Id,CP_searchQuery,CP_totalResultCount
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2025-01-15 | Initial documentation |
+| 1.1 | 2025-01-16 | Added missing parquet columns (click breakdowns, sort columns, timing aggregates), Power BI calculated columns section, Power BI measures section |
