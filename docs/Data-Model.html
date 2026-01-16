@@ -1,0 +1,1608 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Data Model &amp; Calculation Logic</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown.min.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Data Model &amp; Calculation Logic</h1>
+</header>
+<h1 id="data-model-calculation-logic">Data Model &amp; Calculation
+Logic</h1>
+<p>This document explains how raw search analytics events are
+transformed into meaningful metrics. It covers event sequences, timing
+calculations, and business rules with clear examples.</p>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol type="1">
+<li><a href="#1-event-types--sequence">Event Types &amp;
+Sequence</a></li>
+<li><a href="#2-processing-pipeline-overview">Processing Pipeline
+Overview</a></li>
+<li><a href="#3-timing-calculations">Timing Calculations</a></li>
+<li><a href="#4-business-rules--classifications">Business Rules &amp;
+Classifications</a></li>
+<li><a href="#5-output-files--column-definitions">Output Files &amp;
+Column Definitions</a></li>
+<li><a href="#6-power-bi-calculated-columns">Power BI Calculated
+Columns</a></li>
+<li><a href="#7-power-bi-measures">Power BI Measures</a></li>
+</ol>
+<hr />
+<h2 id="event-types-sequence">1. Event Types &amp; Sequence</h2>
+<h3 id="search-event-types">Search Event Types</h3>
+<p>The search system generates these event types (stored in the
+<code>name</code> column):</p>
+<table>
+<colgroup>
+<col style="width: 21%" />
+<col style="width: 40%" />
+<col style="width: 37%" />
+</colgroup>
+<thead>
+<tr>
+<th>Event</th>
+<th>Description</th>
+<th>When Fired</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SEARCH_STARTED</code></td>
+<td>User initiates a search</td>
+<td>User types query and presses Enter</td>
+</tr>
+<tr>
+<td><code>SEARCH_COMPLETED</code></td>
+<td>Search query submitted to backend</td>
+<td>Query sent to search service</td>
+</tr>
+<tr>
+<td><code>SEARCH_RESULT_COUNT</code></td>
+<td>Results returned to user</td>
+<td>Search results displayed</td>
+</tr>
+<tr>
+<td><code>SEARCH_TAB_CLICK</code></td>
+<td>User clicks a General result</td>
+<td>Click on main search tab</td>
+</tr>
+<tr>
+<td><code>SEARCH_ALL_TAB_PAGE_CLICK</code></td>
+<td>User clicks an All tab result</td>
+<td>Click on All tab</td>
+</tr>
+<tr>
+<td><code>SEARCH_NEWS_TAB_PAGE_CLICK</code></td>
+<td>User clicks a News result</td>
+<td>Click on News tab</td>
+</tr>
+<tr>
+<td><code>SEARCH_GOTO_TAB_PAGE_CLICK</code></td>
+<td>User clicks a GoTo result</td>
+<td>Click on GoTo tab</td>
+</tr>
+<tr>
+<td><code>SEARCH_PEOPLE_*</code></td>
+<td>User clicks a People result</td>
+<td>Click on People tab</td>
+</tr>
+</tbody>
+</table>
+<h3 id="typical-event-sequence">Typical Event Sequence</h3>
+<pre><code>User types &quot;project budget&quot; and presses Enter
+    |
+    v
+[SEARCH_STARTED]  &lt;-- timestamp: 10:30:15.123
+    |
+    v
+[SEARCH_COMPLETED]  &lt;-- timestamp: 10:30:15.234  (111ms later)
+    |
+    v
+[SEARCH_RESULT_COUNT]  &lt;-- timestamp: 10:30:15.567  (333ms after COMPLETED)
+    |                                               (444ms after STARTED)
+    v
+User sees results, clicks one
+    |
+    v
+[SEARCH_TAB_CLICK]  &lt;-- timestamp: 10:30:18.890  (3.3s after results shown)</code></pre>
+<h3 id="example-complete-session">Example: Complete Session</h3>
+<pre><code>Session: 2025-01-15_user123_session456
+
+Event 1: SEARCH_STARTED      @ 10:30:15.123   (search term: &quot;budget report&quot;)
+Event 2: SEARCH_COMPLETED    @ 10:30:15.234
+Event 3: SEARCH_RESULT_COUNT @ 10:30:15.567   (15 results found)
+Event 4: SEARCH_TAB_CLICK    @ 10:30:18.890   (user clicked a result)
+Event 5: SEARCH_STARTED      @ 10:30:45.000   (user searches again: &quot;2024 budget&quot;)
+Event 6: SEARCH_COMPLETED    @ 10:30:45.100
+Event 7: SEARCH_RESULT_COUNT @ 10:30:45.400   (8 results found)
+Event 8: SEARCH_TAB_CLICK    @ 10:30:52.500   (user clicked another result)</code></pre>
+<hr />
+<h2 id="processing-pipeline-overview">2. Processing Pipeline
+Overview</h2>
+<h3 id="data-flow">Data Flow</h3>
+<pre><code>                 KQL Export (CSV/Excel)
+                         |
+                         v
+              +---------------------+
+              |   Raw Data Import   |
+              |  (load_file_to_     |
+              |   temp_table)       |
+              +---------------------+
+                         |
+         - Parse timestamps (preserve milliseconds)
+         - Normalize column names
+         - Handle Excel datetime precision issues
+                         |
+                         v
+              +---------------------+
+              |  Column Enrichment  |
+              |  (add_calculated_   |
+              |   columns)          |
+              +---------------------+
+                         |
+         - Normalize event names to UPPERCASE
+         - Calculate session_key
+         - Add timing columns (prev_event, ms_since_prev)
+         - Derive flags (is_null_result, click_category)
+         - Calculate search term metrics
+                         |
+                         v
+              +---------------------+
+              |   Parquet Export    |
+              |  (export_parquet_   |
+              |   files)            |
+              +---------------------+
+                    /    |    \
+                   /     |     \
+                  v      v      v
+           +-------+ +--------+ +-------+
+           | Raw   | | Daily  | | Terms |
+           +-------+ +--------+ +-------+
+                     +----------+
+                     | Journeys |
+                     +----------+</code></pre>
+<h3 id="key-transformations">Key Transformations</h3>
+<h4 id="event-name-normalization">1. Event Name Normalization</h4>
+<p>Raw event names come in mixed case from App Insights. We normalize to
+uppercase for consistent matching.</p>
+<pre><code>Input:  &quot;Search_completed&quot;
+Output: &quot;SEARCH_COMPLETED&quot;</code></pre>
+<h4 id="session-key-generation">2. Session Key Generation</h4>
+<p>A unique session is identified by combining date + user + session
+ID:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>session_key <span class="op">=</span> session_date <span class="op">||</span> <span class="st">&#39;_&#39;</span> <span class="op">||</span> user_id <span class="op">||</span> <span class="st">&#39;_&#39;</span> <span class="op">||</span> session_id</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="co">-- Example: &quot;2025-01-15_user123_abc789&quot;</span></span></code></pre></div>
+<h4 id="search-term-normalization">3. Search Term Normalization</h4>
+<p>Search terms are cleaned for consistent aggregation:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>search_term_normalized <span class="op">=</span> <span class="fu">LOWER</span>(<span class="fu">TRIM</span>(<span class="fu">COALESCE</span>(CP_searchQuery, searchQuery, <span class="kw">query</span>)))</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co">-- Input:  &quot;  Budget Report  &quot;</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co">-- Output: &quot;budget report&quot;</span></span></code></pre></div>
+<hr />
+<h2 id="timing-calculations">3. Timing Calculations</h2>
+<h3 id="ms_search_to_result-user-perceived-latency">ms_search_to_result
+(User-Perceived Latency)</h3>
+<p><strong>What it measures:</strong> The time from when a user
+initiates a search until they see results.</p>
+<p><strong>Event span:</strong> <code>SEARCH_STARTED</code> –&gt;
+<code>SEARCH_RESULT_COUNT</code></p>
+<p><strong>How it’s calculated:</strong></p>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- Step 1: Track the most recent SEARCH_STARTED timestamp</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>last_search_started_ts <span class="op">=</span> <span class="fu">LAST_VALUE</span>(</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">CASE</span> <span class="cf">WHEN</span> name <span class="op">=</span> <span class="st">&#39;SEARCH_STARTED&#39;</span> <span class="cf">THEN</span> <span class="dt">timestamp</span> <span class="cf">END</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>    IGNORE <span class="kw">NULLS</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>) <span class="kw">OVER</span> (<span class="kw">PARTITION</span> <span class="kw">BY</span> session_key <span class="kw">ORDER</span> <span class="kw">BY</span> <span class="dt">timestamp</span>)</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="co">-- Step 2: Calculate time difference when SEARCH_RESULT_COUNT occurs</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>ms_search_to_result <span class="op">=</span> DATEDIFF(<span class="st">&#39;millisecond&#39;</span>, last_search_started_ts, <span class="dt">timestamp</span>)</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a><span class="co">-- Only when name = &#39;SEARCH_RESULT_COUNT&#39;</span></span></code></pre></div>
+<p><strong>Example:</strong></p>
+<pre><code>Event: SEARCH_STARTED      @ 10:30:15.123
+Event: SEARCH_COMPLETED    @ 10:30:15.234
+Event: SEARCH_RESULT_COUNT @ 10:30:15.567
+
+ms_search_to_result = 10:30:15.567 - 10:30:15.123 = 444ms</code></pre>
+<h3 id="ms_result_to_click-decision-time">ms_result_to_click (Decision
+Time)</h3>
+<p><strong>What it measures:</strong> How long the user takes to click a
+result after seeing search results.</p>
+<p><strong>Event span:</strong> <code>SEARCH_RESULT_COUNT</code> –&gt;
+<code>Click Event</code></p>
+<p><strong>How it’s calculated:</strong></p>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>ms_result_to_click <span class="op">=</span> ms_since_prev_event</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="co">-- Only when click_category IS NOT NULL AND prev_event = &#39;SEARCH_RESULT_COUNT&#39;</span></span></code></pre></div>
+<p><strong>Example:</strong></p>
+<pre><code>Event: SEARCH_RESULT_COUNT @ 10:30:15.567
+Event: SEARCH_TAB_CLICK    @ 10:30:18.890
+
+ms_result_to_click = 10:30:18.890 - 10:30:15.567 = 3,323ms (3.3 seconds)</code></pre>
+<h3 id="ms_since_prev_event-inter-event-timing">ms_since_prev_event
+(Inter-Event Timing)</h3>
+<p><strong>What it measures:</strong> Time between any two consecutive
+events in a session.</p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>ms_since_prev_event <span class="op">=</span> DATEDIFF(<span class="st">&#39;millisecond&#39;</span>,</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">LAG</span>(<span class="dt">timestamp</span>) <span class="kw">OVER</span> (<span class="kw">PARTITION</span> <span class="kw">BY</span> session_key <span class="kw">ORDER</span> <span class="kw">BY</span> <span class="dt">timestamp</span>),</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    <span class="dt">timestamp</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div>
+<p><strong>Example:</strong></p>
+<pre><code>Event 1: SEARCH_STARTED      @ 10:30:15.123  --&gt; ms_since_prev = NULL (first event)
+Event 2: SEARCH_COMPLETED    @ 10:30:15.234  --&gt; ms_since_prev = 111ms
+Event 3: SEARCH_RESULT_COUNT @ 10:30:15.567  --&gt; ms_since_prev = 333ms
+Event 4: SEARCH_TAB_CLICK    @ 10:30:18.890  --&gt; ms_since_prev = 3,323ms</code></pre>
+<h3 id="time-buckets">Time Buckets</h3>
+<p>Timing values are bucketed for easier visualization:</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Bucket</th>
+<th>Range</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>search_to_result</td>
+<td><code>&lt; 0.5s</code></td>
+<td>0-499ms</td>
+</tr>
+<tr>
+<td></td>
+<td><code>0.5-1s</code></td>
+<td>500-999ms</td>
+</tr>
+<tr>
+<td></td>
+<td><code>1-2s</code></td>
+<td>1000-1999ms</td>
+</tr>
+<tr>
+<td></td>
+<td><code>2-5s</code></td>
+<td>2000-4999ms</td>
+</tr>
+<tr>
+<td></td>
+<td><code>&gt; 5s</code></td>
+<td>5000ms+</td>
+</tr>
+<tr>
+<td></td>
+<td><code>No Result</code></td>
+<td>NULL (no SEARCH_RESULT_COUNT event)</td>
+</tr>
+<tr>
+<td>result_to_click</td>
+<td><code>&lt; 2s (quick)</code></td>
+<td>0-1999ms</td>
+</tr>
+<tr>
+<td></td>
+<td><code>2-5s</code></td>
+<td>2000-4999ms</td>
+</tr>
+<tr>
+<td></td>
+<td><code>5-10s</code></td>
+<td>5000-9999ms</td>
+</tr>
+<tr>
+<td></td>
+<td><code>10-30s</code></td>
+<td>10000-29999ms</td>
+</tr>
+<tr>
+<td></td>
+<td><code>30-60s</code></td>
+<td>30000-59999ms</td>
+</tr>
+<tr>
+<td></td>
+<td><code>&gt; 60s (browsing)</code></td>
+<td>60000ms+</td>
+</tr>
+<tr>
+<td></td>
+<td><code>No Click</code></td>
+<td>NULL (user didn’t click)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="business-rules-classifications">4. Business Rules &amp;
+Classifications</h2>
+<h3 id="is_null_result">is_null_result</h3>
+<p><strong>Definition:</strong> The search returned zero results.</p>
+<div class="sourceCode" id="cb13"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>is_null_result <span class="op">=</span> <span class="cf">CASE</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">WHEN</span> name <span class="op">=</span> <span class="st">&#39;SEARCH_RESULT_COUNT&#39;</span> <span class="kw">AND</span> CP_totalResultCount <span class="op">=</span> <span class="dv">0</span> <span class="cf">THEN</span> <span class="kw">true</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">WHEN</span> name <span class="op">=</span> <span class="st">&#39;SEARCH_RESULT_COUNT&#39;</span> <span class="kw">AND</span> CP_totalResultCount <span class="op">&gt;</span> <span class="dv">0</span> <span class="cf">THEN</span> <span class="kw">false</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">ELSE</span> <span class="kw">NULL</span>  <span class="co">-- Only meaningful for SEARCH_RESULT_COUNT events</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a><span class="cf">END</span></span></code></pre></div>
+<p><strong>Example:</strong></p>
+<pre><code>Event: SEARCH_RESULT_COUNT with CP_totalResultCount = 0
+--&gt; is_null_result = true (user saw &quot;No results found&quot;)
+
+Event: SEARCH_RESULT_COUNT with CP_totalResultCount = 15
+--&gt; is_null_result = false (user saw 15 results)</code></pre>
+<h3 id="click_category">click_category</h3>
+<p><strong>Definition:</strong> Categorizes click events by which
+tab/section was clicked.</p>
+<div class="sourceCode" id="cb15"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>click_category <span class="op">=</span> <span class="cf">CASE</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">WHEN</span> name <span class="op">=</span> <span class="st">&#39;SEARCH_TAB_CLICK&#39;</span> <span class="cf">THEN</span> <span class="st">&#39;General&#39;</span></span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">WHEN</span> name <span class="op">=</span> <span class="st">&#39;SEARCH_ALL_TAB_PAGE_CLICK&#39;</span> <span class="cf">THEN</span> <span class="st">&#39;All&#39;</span></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">WHEN</span> name <span class="op">=</span> <span class="st">&#39;SEARCH_NEWS_TAB_PAGE_CLICK&#39;</span> <span class="cf">THEN</span> <span class="st">&#39;News&#39;</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">WHEN</span> name <span class="op">=</span> <span class="st">&#39;SEARCH_GOTO_TAB_PAGE_CLICK&#39;</span> <span class="cf">THEN</span> <span class="st">&#39;GoTo&#39;</span></span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">WHEN</span> name <span class="kw">LIKE</span> <span class="st">&#39;%PEOPLE%&#39;</span> <span class="cf">THEN</span> <span class="st">&#39;People&#39;</span></span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    <span class="cf">ELSE</span> <span class="kw">NULL</span>  <span class="co">-- Not a click event</span></span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a><span class="cf">END</span></span></code></pre></div>
+<h3 id="journey_outcome-session-level">journey_outcome
+(Session-Level)</h3>
+<p><strong>Definition:</strong> Classifies how a search session
+ended.</p>
+<div class="sourceCode" id="cb16"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>journey_outcome <span class="op">=</span> <span class="cf">CASE</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">WHEN</span> click_count <span class="op">&gt;</span> <span class="dv">0</span> <span class="cf">THEN</span> <span class="st">&#39;Success&#39;</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">WHEN</span> result_count <span class="op">&gt;</span> <span class="dv">0</span> <span class="kw">AND</span> null_result_count <span class="op">=</span> result_count <span class="kw">AND</span> click_count <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>        <span class="cf">THEN</span> <span class="st">&#39;No Results&#39;</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">WHEN</span> result_count <span class="op">&gt;</span> <span class="dv">0</span> <span class="kw">AND</span> click_count <span class="op">=</span> <span class="dv">0</span> <span class="cf">THEN</span> <span class="st">&#39;Abandoned&#39;</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    <span class="cf">ELSE</span> <span class="st">&#39;Unknown&#39;</span></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a><span class="cf">END</span></span></code></pre></div>
+<p><strong>Example scenarios:</strong></p>
+<table>
+<colgroup>
+<col style="width: 15%" />
+<col style="width: 20%" />
+<col style="width: 21%" />
+<col style="width: 29%" />
+<col style="width: 13%" />
+</colgroup>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>click_count</th>
+<th>result_count</th>
+<th>null_result_count</th>
+<th>Outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>User searched, clicked a result</td>
+<td>1</td>
+<td>1</td>
+<td>0</td>
+<td><strong>Success</strong></td>
+</tr>
+<tr>
+<td>User searched, got 0 results</td>
+<td>0</td>
+<td>1</td>
+<td>1</td>
+<td><strong>No Results</strong></td>
+</tr>
+<tr>
+<td>User searched, saw results but didn’t click</td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+<td><strong>Abandoned</strong></td>
+</tr>
+<tr>
+<td>Incomplete session data</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><strong>Unknown</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="session_complexity">session_complexity</h3>
+<p><strong>Definition:</strong> Categorizes sessions by number of
+events.</p>
+<div class="sourceCode" id="cb17"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>session_complexity <span class="op">=</span> <span class="cf">CASE</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">WHEN</span> total_events <span class="op">=</span> <span class="dv">1</span> <span class="cf">THEN</span> <span class="st">&#39;Single Event&#39;</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">WHEN</span> total_events <span class="op">&lt;=</span> <span class="dv">3</span> <span class="cf">THEN</span> <span class="st">&#39;Simple&#39;</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>    <span class="cf">WHEN</span> total_events <span class="op">&lt;=</span> <span class="dv">10</span> <span class="cf">THEN</span> <span class="st">&#39;Medium&#39;</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">ELSE</span> <span class="st">&#39;Complex&#39;</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a><span class="cf">END</span></span></code></pre></div>
+<h3 id="had_reformulation">had_reformulation</h3>
+<p><strong>Definition:</strong> Did the user refine/change their search
+query within the session?</p>
+<div class="sourceCode" id="cb18"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>had_reformulation <span class="op">=</span> <span class="cf">CASE</span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">WHEN</span> unique_search_terms <span class="op">&gt;</span> <span class="dv">1</span> <span class="cf">THEN</span> <span class="kw">true</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">ELSE</span> <span class="kw">false</span></span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a><span class="cf">END</span></span></code></pre></div>
+<p><strong>Example:</strong></p>
+<pre><code>Session with searches: &quot;budget&quot;, &quot;2024 budget&quot;, &quot;budget report Q4&quot;
+--&gt; unique_search_terms = 3
+--&gt; had_reformulation = true (user refined their search)</code></pre>
+<h3 id="recovered_from_null">recovered_from_null</h3>
+<p><strong>Definition:</strong> Did the user eventually find something
+despite getting zero results initially?</p>
+<div class="sourceCode" id="cb20"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>recovered_from_null <span class="op">=</span> <span class="cf">CASE</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>    <span class="cf">WHEN</span> null_result_count <span class="op">&gt;</span> <span class="dv">0</span> <span class="kw">AND</span> click_count <span class="op">&gt;</span> <span class="dv">0</span> <span class="cf">THEN</span> <span class="kw">true</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">ELSE</span> <span class="kw">false</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="cf">END</span></span></code></pre></div>
+<p><strong>Example:</strong></p>
+<pre><code>Session: Search &quot;bugdet&quot; (typo) --&gt; 0 results
+         Search &quot;budget&quot; --&gt; 15 results --&gt; Click
+--&gt; null_result_count = 1, click_count = 1
+--&gt; recovered_from_null = true</code></pre>
+<h3 id="user-cohort-is_users_first_session">User Cohort:
+is_users_first_session</h3>
+<p><strong>Definition:</strong> Is this the first time we’ve seen this
+user search?</p>
+<div class="sourceCode" id="cb22"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>user_session_number <span class="op">=</span> <span class="fu">ROW_NUMBER</span>() <span class="kw">OVER</span> (</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">PARTITION</span> <span class="kw">BY</span> user_id</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">ORDER</span> <span class="kw">BY</span> session_start</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>is_users_first_session <span class="op">=</span> <span class="cf">CASE</span> <span class="cf">WHEN</span> user_session_number <span class="op">=</span> <span class="dv">1</span> <span class="cf">THEN</span> <span class="kw">true</span> <span class="cf">ELSE</span> <span class="kw">false</span> <span class="cf">END</span></span></code></pre></div>
+<h3 id="new-vs-returning-users-daily">New vs Returning Users
+(Daily)</h3>
+<p><strong>Definition:</strong> Count of users who are new vs returning
+on each day.</p>
+<div class="sourceCode" id="cb23"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co">-- First, find when each user first appeared</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>first_seen_date <span class="op">=</span> <span class="fu">MIN</span>(session_date) <span class="kw">GROUP</span> <span class="kw">BY</span> user_id</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a><span class="co">-- Then classify on each day</span></span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>new_users <span class="op">=</span> <span class="fu">COUNT</span>(<span class="kw">DISTINCT</span> <span class="cf">CASE</span> <span class="cf">WHEN</span> session_date <span class="op">=</span> first_seen_date <span class="cf">THEN</span> user_id <span class="cf">END</span>)</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>returning_users <span class="op">=</span> <span class="fu">COUNT</span>(<span class="kw">DISTINCT</span> <span class="cf">CASE</span> <span class="cf">WHEN</span> session_date <span class="op">&gt;</span> first_seen_date <span class="cf">THEN</span> user_id <span class="cf">END</span>)</span></code></pre></div>
+<hr />
+<h2 id="output-files-column-definitions">5. Output Files &amp; Column
+Definitions</h2>
+<h3 id="searches_raw.parquet">searches_raw.parquet</h3>
+<p><strong>Granularity:</strong> One row per event (click, search,
+result)</p>
+<p><strong>Use case:</strong> Detailed event-level analysis,
+debugging</p>
+<table>
+<colgroup>
+<col style="width: 22%" />
+<col style="width: 16%" />
+<col style="width: 36%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Description</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>timestamp</code></td>
+<td>Timestamp</td>
+<td>Event timestamp (microsecond precision)</td>
+<td>2025-01-15 10:30:15.567123</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>String</td>
+<td>Event type (normalized to uppercase)</td>
+<td>SEARCH_RESULT_COUNT</td>
+</tr>
+<tr>
+<td><code>user_id</code></td>
+<td>String</td>
+<td>Anonymous user identifier</td>
+<td>user_abc123</td>
+</tr>
+<tr>
+<td><code>session_id</code></td>
+<td>String</td>
+<td>Session identifier</td>
+<td>sess_xyz789</td>
+</tr>
+<tr>
+<td><code>session_key</code></td>
+<td>String</td>
+<td>Composite key: date_user_session</td>
+<td>2025-01-15_user_abc123_sess_xyz789</td>
+</tr>
+<tr>
+<td><code>session_date</code></td>
+<td>Date</td>
+<td>Date of the event</td>
+<td>2025-01-15</td>
+</tr>
+<tr>
+<td><code>event_order</code></td>
+<td>Integer</td>
+<td>Sequence number within session</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>prev_event</code></td>
+<td>String</td>
+<td>Previous event type in session</td>
+<td>SEARCH_COMPLETED</td>
+</tr>
+<tr>
+<td><code>ms_since_prev_event</code></td>
+<td>Integer</td>
+<td>Milliseconds since previous event</td>
+<td>333</td>
+</tr>
+<tr>
+<td><code>search_term_normalized</code></td>
+<td>String</td>
+<td>Cleaned search query</td>
+<td>budget report</td>
+</tr>
+<tr>
+<td><code>is_null_result</code></td>
+<td>Boolean</td>
+<td>True if zero results returned</td>
+<td>false</td>
+</tr>
+<tr>
+<td><code>click_category</code></td>
+<td>String</td>
+<td>Click type (General/All/News/GoTo/People)</td>
+<td>General</td>
+</tr>
+<tr>
+<td><code>last_search_started_ts</code></td>
+<td>Timestamp</td>
+<td>Most recent SEARCH_STARTED timestamp</td>
+<td>2025-01-15 10:30:15.123</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="searches_journeys.parquet">searches_journeys.parquet</h3>
+<p><strong>Granularity:</strong> One row per search session</p>
+<p><strong>Use case:</strong> Session-level behavior analysis, funnel
+metrics</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 15%" />
+<col style="width: 32%" />
+<col style="width: 32%" />
+</colgroup>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Description</th>
+<th>Calculation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>session_date</code></td>
+<td>Date</td>
+<td>Date of session</td>
+<td></td>
+</tr>
+<tr>
+<td><code>session_start</code></td>
+<td>Timestamp</td>
+<td>First event timestamp</td>
+<td>MIN(timestamp)</td>
+</tr>
+<tr>
+<td><code>session_start_str</code></td>
+<td>String</td>
+<td>Session start as string</td>
+<td>STRFTIME for Power BI compatibility</td>
+</tr>
+<tr>
+<td><code>total_events</code></td>
+<td>Integer</td>
+<td>Events in session</td>
+<td>COUNT(*)</td>
+</tr>
+<tr>
+<td><code>search_count_in_session</code></td>
+<td>Integer</td>
+<td>SEARCH_STARTED events</td>
+<td>COUNT(SEARCH_STARTED)</td>
+</tr>
+<tr>
+<td><code>result_count</code></td>
+<td>Integer</td>
+<td>SEARCH_RESULT_COUNT events</td>
+<td>COUNT(SEARCH_RESULT_COUNT)</td>
+</tr>
+<tr>
+<td><code>click_count</code></td>
+<td>Integer</td>
+<td>Click events</td>
+<td>COUNT(click_category IS NOT NULL)</td>
+</tr>
+<tr>
+<td><code>unique_search_terms</code></td>
+<td>Integer</td>
+<td>Distinct queries</td>
+<td>COUNT(DISTINCT search_term)</td>
+</tr>
+<tr>
+<td><code>null_result_count</code></td>
+<td>Integer</td>
+<td>Zero-result events</td>
+<td>SUM(is_null_result)</td>
+</tr>
+<tr>
+<td><code>max_total_results</code></td>
+<td>Integer</td>
+<td>Max results shown</td>
+<td>MAX(CP_totalResultCount)</td>
+</tr>
+<tr>
+<td><code>sec_search_to_result</code></td>
+<td>Float</td>
+<td>Seconds: search to results</td>
+<td>MIN(ms_search_to_result) / 1000</td>
+</tr>
+<tr>
+<td><code>sec_result_to_click</code></td>
+<td>Float</td>
+<td>Seconds: results to click</td>
+<td>MIN(ms_result_to_click) / 1000</td>
+</tr>
+<tr>
+<td><code>total_duration_sec</code></td>
+<td>Float</td>
+<td>Session length in seconds</td>
+<td>(MAX - MIN timestamp) / 1000</td>
+</tr>
+<tr>
+<td><code>first_event_hour</code></td>
+<td>Integer</td>
+<td>Hour of first event (0-23)</td>
+<td>MIN(event_hour)</td>
+</tr>
+<tr>
+<td><code>last_event_hour</code></td>
+<td>Integer</td>
+<td>Hour of last event (0-23)</td>
+<td>MAX(event_hour)</td>
+</tr>
+<tr>
+<td><code>general_clicks</code></td>
+<td>Integer</td>
+<td>General tab clicks</td>
+<td>COUNT(click_category=‘General’)</td>
+</tr>
+<tr>
+<td><code>all_tab_clicks</code></td>
+<td>Integer</td>
+<td>All tab clicks</td>
+<td>COUNT(click_category=‘All’)</td>
+</tr>
+<tr>
+<td><code>news_clicks</code></td>
+<td>Integer</td>
+<td>News tab clicks</td>
+<td>COUNT(click_category=‘News’)</td>
+</tr>
+<tr>
+<td><code>goto_clicks</code></td>
+<td>Integer</td>
+<td>GoTo tab clicks</td>
+<td>COUNT(click_category=‘GoTo’)</td>
+</tr>
+<tr>
+<td><code>people_clicks</code></td>
+<td>Integer</td>
+<td>People tab clicks</td>
+<td>COUNT(click_category=‘People’)</td>
+</tr>
+<tr>
+<td><code>includes_first_search_of_day</code></td>
+<td>Boolean</td>
+<td>Session has day’s first search</td>
+<td>MAX(is_first_search_of_day)</td>
+</tr>
+<tr>
+<td><code>search_to_result_bucket</code></td>
+<td>String</td>
+<td>Latency category</td>
+<td>See Time Buckets</td>
+</tr>
+<tr>
+<td><code>result_to_click_bucket</code></td>
+<td>String</td>
+<td>Decision time category</td>
+<td>See Time Buckets</td>
+</tr>
+<tr>
+<td><code>session_duration_bucket</code></td>
+<td>String</td>
+<td>Session length category</td>
+<td>&lt; 5s, 5-30s, 30-60s, 1-3 min, etc.</td>
+</tr>
+<tr>
+<td><code>journey_outcome</code></td>
+<td>String</td>
+<td>Session result</td>
+<td>Success/No Results/Abandoned</td>
+</tr>
+<tr>
+<td><code>had_reformulation</code></td>
+<td>Boolean</td>
+<td>User changed query</td>
+<td>unique_search_terms &gt; 1</td>
+</tr>
+<tr>
+<td><code>session_complexity</code></td>
+<td>String</td>
+<td>Session size category</td>
+<td>Based on total_events</td>
+</tr>
+<tr>
+<td><code>search_to_result_sort</code></td>
+<td>Integer</td>
+<td>Sort order for latency bucket</td>
+<td>1-6 for Power BI sorting</td>
+</tr>
+<tr>
+<td><code>result_to_click_sort</code></td>
+<td>Integer</td>
+<td>Sort order for click time bucket</td>
+<td>1-7 for Power BI sorting</td>
+</tr>
+<tr>
+<td><code>session_duration_sort</code></td>
+<td>Integer</td>
+<td>Sort order for duration bucket</td>
+<td>1-6 for Power BI sorting</td>
+</tr>
+<tr>
+<td><code>journey_outcome_sort</code></td>
+<td>Integer</td>
+<td>Sort order for outcome</td>
+<td>1=Success, 2=Abandoned, 3=No Results</td>
+</tr>
+<tr>
+<td><code>session_complexity_sort</code></td>
+<td>Integer</td>
+<td>Sort order for complexity</td>
+<td>1-4 for Power BI sorting</td>
+</tr>
+<tr>
+<td><code>had_null_result</code></td>
+<td>Boolean</td>
+<td>Had zero-result search</td>
+<td>null_result_count &gt; 0</td>
+</tr>
+<tr>
+<td><code>recovered_from_null</code></td>
+<td>Boolean</td>
+<td>Success despite null result</td>
+<td>null_result &gt; 0 AND click &gt; 0</td>
+</tr>
+<tr>
+<td><code>user_session_number</code></td>
+<td>Integer</td>
+<td>User’s session sequence</td>
+<td>ROW_NUMBER per user</td>
+</tr>
+<tr>
+<td><code>is_users_first_session</code></td>
+<td>Boolean</td>
+<td>First time user</td>
+<td>user_session_number = 1</td>
+</tr>
+<tr>
+<td><code>distinct_click_categories</code></td>
+<td>Integer</td>
+<td>Tab types clicked</td>
+<td>COUNT(DISTINCT click_category)</td>
+</tr>
+<tr>
+<td><code>had_tab_switch</code></td>
+<td>Boolean</td>
+<td>Clicked multiple tabs</td>
+<td>distinct_click_categories &gt; 1</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="searches_daily.parquet">searches_daily.parquet</h3>
+<p><strong>Granularity:</strong> One row per day</p>
+<p><strong>Use case:</strong> Daily KPIs, trend analysis</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 15%" />
+<col style="width: 32%" />
+<col style="width: 32%" />
+</colgroup>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Description</th>
+<th>Calculation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>date</code></td>
+<td>Date</td>
+<td>The day</td>
+<td></td>
+</tr>
+<tr>
+<td><code>total_events</code></td>
+<td>Integer</td>
+<td>All events</td>
+<td>COUNT(*)</td>
+</tr>
+<tr>
+<td><code>unique_sessions</code></td>
+<td>Integer</td>
+<td>Distinct sessions</td>
+<td>COUNT(DISTINCT session_key)</td>
+</tr>
+<tr>
+<td><code>unique_users</code></td>
+<td>Integer</td>
+<td>Distinct users</td>
+<td>COUNT(DISTINCT user_id)</td>
+</tr>
+<tr>
+<td><code>unique_search_terms</code></td>
+<td>Integer</td>
+<td>Distinct search queries</td>
+<td>COUNT(DISTINCT search_term_normalized)</td>
+</tr>
+<tr>
+<td><code>search_starts</code></td>
+<td>Integer</td>
+<td>SEARCH_STARTED events</td>
+<td>COUNT(SEARCH_STARTED)</td>
+</tr>
+<tr>
+<td><code>result_events</code></td>
+<td>Integer</td>
+<td>SEARCH_RESULT_COUNT events</td>
+<td>COUNT(SEARCH_RESULT_COUNT)</td>
+</tr>
+<tr>
+<td><code>click_events</code></td>
+<td>Integer</td>
+<td>Click events</td>
+<td>COUNT(click_category)</td>
+</tr>
+<tr>
+<td><code>null_results</code></td>
+<td>Integer</td>
+<td>Zero-result events</td>
+<td>SUM(is_null_result)</td>
+</tr>
+<tr>
+<td><code>result_events_with_results</code></td>
+<td>Integer</td>
+<td>Results with &gt;0 hits</td>
+<td>SUM(is_clickable_result)</td>
+</tr>
+<tr>
+<td><code>sessions_with_results</code></td>
+<td>Integer</td>
+<td>Sessions that got results</td>
+<td>From session_stats CTE</td>
+</tr>
+<tr>
+<td><code>sessions_with_clicks</code></td>
+<td>Integer</td>
+<td>Sessions with clicks</td>
+<td>From session_stats CTE</td>
+</tr>
+<tr>
+<td><code>sessions_abandoned</code></td>
+<td>Integer</td>
+<td>Results but no click</td>
+<td>sessions_with_results - sessions_with_clicks</td>
+</tr>
+<tr>
+<td><code>click_rate_pct</code></td>
+<td>Float</td>
+<td>Click rate</td>
+<td>click_events / search_starts * 100</td>
+</tr>
+<tr>
+<td><code>null_rate_pct</code></td>
+<td>Float</td>
+<td>Null result rate</td>
+<td>null_results / result_events * 100</td>
+</tr>
+<tr>
+<td><code>session_success_rate_pct</code></td>
+<td>Float</td>
+<td>Session success</td>
+<td>sessions_with_clicks / sessions_with_results * 100</td>
+</tr>
+<tr>
+<td><code>session_abandonment_rate_pct</code></td>
+<td>Float</td>
+<td>Session abandonment</td>
+<td>sessions_abandoned / sessions_with_results * 100</td>
+</tr>
+<tr>
+<td><code>avg_searches_per_session</code></td>
+<td>Float</td>
+<td>Avg searches per session</td>
+<td>search_starts / unique_sessions</td>
+</tr>
+<tr>
+<td><code>avg_search_term_length</code></td>
+<td>Float</td>
+<td>Avg query char length</td>
+<td>AVG(search_term_length)</td>
+</tr>
+<tr>
+<td><code>avg_search_term_words</code></td>
+<td>Float</td>
+<td>Avg query word count</td>
+<td>AVG(search_term_word_count)</td>
+</tr>
+<tr>
+<td><code>sum_search_term_length</code></td>
+<td>Integer</td>
+<td>Sum of query lengths</td>
+<td>SUM(search_term_length) - for weighted avg in DAX</td>
+</tr>
+<tr>
+<td><code>sum_search_term_words</code></td>
+<td>Integer</td>
+<td>Sum of word counts</td>
+<td>SUM(search_term_word_count) - for weighted avg in DAX</td>
+</tr>
+<tr>
+<td><code>search_term_count</code></td>
+<td>Integer</td>
+<td>Count of queries</td>
+<td>COUNT(search_term_length IS NOT NULL)</td>
+</tr>
+<tr>
+<td><code>first_searches_of_day</code></td>
+<td>Integer</td>
+<td>First searches of day</td>
+<td>COUNT(is_first_search_of_day)</td>
+</tr>
+<tr>
+<td><code>clicks_general</code></td>
+<td>Integer</td>
+<td>General tab clicks</td>
+<td>COUNT(click_category=‘General’)</td>
+</tr>
+<tr>
+<td><code>clicks_all</code></td>
+<td>Integer</td>
+<td>All tab clicks</td>
+<td>COUNT(click_category=‘All’)</td>
+</tr>
+<tr>
+<td><code>clicks_news</code></td>
+<td>Integer</td>
+<td>News tab clicks</td>
+<td>COUNT(click_category=‘News’)</td>
+</tr>
+<tr>
+<td><code>clicks_goto</code></td>
+<td>Integer</td>
+<td>GoTo tab clicks</td>
+<td>COUNT(click_category=‘GoTo’)</td>
+</tr>
+<tr>
+<td><code>clicks_people</code></td>
+<td>Integer</td>
+<td>People tab clicks</td>
+<td>COUNT(click_category=‘People’)</td>
+</tr>
+<tr>
+<td><code>day_of_week</code></td>
+<td>String</td>
+<td>Day name</td>
+<td>DAYNAME(session_date)</td>
+</tr>
+<tr>
+<td><code>day_of_week_num</code></td>
+<td>Integer</td>
+<td>ISO day number (1=Mon)</td>
+<td>ISODOW(session_date)</td>
+</tr>
+<tr>
+<td><code>searches_morning</code></td>
+<td>Integer</td>
+<td>Searches 6:00-12:00</td>
+<td>Hour-based filter</td>
+</tr>
+<tr>
+<td><code>searches_afternoon</code></td>
+<td>Integer</td>
+<td>Searches 12:00-18:00</td>
+<td>Hour-based filter</td>
+</tr>
+<tr>
+<td><code>searches_evening</code></td>
+<td>Integer</td>
+<td>Searches 18:00-24:00</td>
+<td>Hour-based filter</td>
+</tr>
+<tr>
+<td><code>searches_night</code></td>
+<td>Integer</td>
+<td>Searches 0:00-6:00</td>
+<td>Hour-based filter</td>
+</tr>
+<tr>
+<td><code>new_users</code></td>
+<td>Integer</td>
+<td>First-time users today</td>
+<td>Users where first_seen = today</td>
+</tr>
+<tr>
+<td><code>returning_users</code></td>
+<td>Integer</td>
+<td>Repeat users today</td>
+<td>Users where first_seen &lt; today</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="searches_terms.parquet">searches_terms.parquet</h3>
+<p><strong>Granularity:</strong> One row per search term per day</p>
+<p><strong>Use case:</strong> Search term performance analysis, content
+gap identification</p>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 15%" />
+<col style="width: 32%" />
+<col style="width: 32%" />
+</colgroup>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Description</th>
+<th>Calculation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>session_date</code></td>
+<td>Date</td>
+<td>The day</td>
+<td></td>
+</tr>
+<tr>
+<td><code>search_term</code></td>
+<td>String</td>
+<td>Normalized search query</td>
+<td>LOWER(TRIM(query))</td>
+</tr>
+<tr>
+<td><code>word_count</code></td>
+<td>Integer</td>
+<td>Words in query</td>
+<td>COUNT of spaces + 1</td>
+</tr>
+<tr>
+<td><code>search_count</code></td>
+<td>Integer</td>
+<td>Times searched today</td>
+<td>COUNT(SEARCH_STARTED)</td>
+</tr>
+<tr>
+<td><code>unique_users</code></td>
+<td>Integer</td>
+<td>Users who searched this</td>
+<td>COUNT(DISTINCT user_id)</td>
+</tr>
+<tr>
+<td><code>unique_sessions</code></td>
+<td>Integer</td>
+<td>Sessions with this term</td>
+<td>COUNT(DISTINCT session_key)</td>
+</tr>
+<tr>
+<td><code>result_events</code></td>
+<td>Integer</td>
+<td>Result events for term</td>
+<td>COUNT(SEARCH_RESULT_COUNT)</td>
+</tr>
+<tr>
+<td><code>null_result_count</code></td>
+<td>Integer</td>
+<td>Zero-result count</td>
+<td>SUM(is_null_result)</td>
+</tr>
+<tr>
+<td><code>click_count</code></td>
+<td>Integer</td>
+<td>Clicks from this term</td>
+<td>COUNT(click_category)</td>
+</tr>
+<tr>
+<td><code>clicks_general</code></td>
+<td>Integer</td>
+<td>General tab clicks</td>
+<td>COUNT(click_category=‘General’)</td>
+</tr>
+<tr>
+<td><code>clicks_all</code></td>
+<td>Integer</td>
+<td>All tab clicks</td>
+<td>COUNT(click_category=‘All’)</td>
+</tr>
+<tr>
+<td><code>clicks_news</code></td>
+<td>Integer</td>
+<td>News tab clicks</td>
+<td>COUNT(click_category=‘News’)</td>
+</tr>
+<tr>
+<td><code>clicks_goto</code></td>
+<td>Integer</td>
+<td>GoTo tab clicks</td>
+<td>COUNT(click_category=‘GoTo’)</td>
+</tr>
+<tr>
+<td><code>clicks_people</code></td>
+<td>Integer</td>
+<td>People tab clicks</td>
+<td>COUNT(click_category=‘People’)</td>
+</tr>
+<tr>
+<td><code>avg_sec_to_click</code></td>
+<td>Float</td>
+<td>Avg decision time</td>
+<td>AVG(ms_result_to_click) / 1000</td>
+</tr>
+<tr>
+<td><code>clicks_with_timing</code></td>
+<td>Integer</td>
+<td>Clicks with timing data</td>
+<td>COUNT(click after SEARCH_RESULT_COUNT)</td>
+</tr>
+<tr>
+<td><code>sum_sec_to_click</code></td>
+<td>Float</td>
+<td>Sum of click times</td>
+<td>SUM(ms_result_to_click) / 1000 - for weighted avg in DAX</td>
+</tr>
+<tr>
+<td><code>searches_morning</code></td>
+<td>Integer</td>
+<td>Searches 6:00-12:00</td>
+<td>Hour-based filter</td>
+</tr>
+<tr>
+<td><code>searches_afternoon</code></td>
+<td>Integer</td>
+<td>Searches 12:00-18:00</td>
+<td>Hour-based filter</td>
+</tr>
+<tr>
+<td><code>searches_evening</code></td>
+<td>Integer</td>
+<td>Searches 18:00-24:00</td>
+<td>Hour-based filter</td>
+</tr>
+<tr>
+<td><code>searches_night</code></td>
+<td>Integer</td>
+<td>Searches 0:00-6:00</td>
+<td>Hour-based filter</td>
+</tr>
+<tr>
+<td><code>first_seen_date</code></td>
+<td>Date</td>
+<td>First day term appeared</td>
+<td>MIN(session_date) over all time</td>
+</tr>
+<tr>
+<td><code>is_new_term</code></td>
+<td>Boolean</td>
+<td>First appearance today</td>
+<td>session_date = first_seen_date</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="power-bi-calculated-columns">6. Power BI Calculated Columns</h2>
+<p>These columns are created in Power BI using DAX and are not present
+in the parquet files.</p>
+<h3 id="searches_terms-table">searches_terms Table</h3>
+<h4 id="query_length_bucket">Query_Length_Bucket</h4>
+<p>Categorizes search queries by word count for visualization.</p>
+<pre class="dax"><code>Query_Length_Bucket =
+SWITCH(
+    TRUE(),
+    searches_terms[word_count] = 1, &quot;1 word&quot;,
+    searches_terms[word_count] = 2, &quot;2 words&quot;,
+    searches_terms[word_count] = 3, &quot;3 words&quot;,
+    searches_terms[word_count] = 4, &quot;4 words&quot;,
+    searches_terms[word_count] &gt;= 5, &quot;5+ words&quot;,
+    &quot;Unknown&quot;
+)</code></pre>
+<h4 id="query_length_sort">Query_Length_Sort</h4>
+<p>Sort order for Query_Length_Bucket. Set “Sort by column” in Power
+BI.</p>
+<pre class="dax"><code>Query_Length_Sort =
+SWITCH(
+    TRUE(),
+    searches_terms[word_count] = 1, 1,
+    searches_terms[word_count] = 2, 2,
+    searches_terms[word_count] = 3, 3,
+    searches_terms[word_count] = 4, 4,
+    searches_terms[word_count] &gt;= 5, 5,
+    99
+)</code></pre>
+<h4 id="term_outcome">Term_Outcome</h4>
+<p>Classifies search term performance into actionable categories.</p>
+<pre class="dax"><code>Term_Outcome =
+VAR nullRate = DIVIDE([null_result_count], [result_events], 0)
+VAR ctr = DIVIDE([click_count], [search_count], 0)
+RETURN
+SWITCH(
+    TRUE(),
+    nullRate = 1, &quot;Zero Results&quot;,
+    nullRate &gt; 0.5, &quot;Mostly No Results&quot;,
+    ctr = 0, &quot;No Clicks&quot;,
+    ctr &lt; 0.2, &quot;Low CTR&quot;,
+    &quot;Success&quot;
+)</code></pre>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Meaning</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Zero Results</td>
+<td>100% null rate</td>
+<td>Content gap - add content</td>
+</tr>
+<tr>
+<td>Mostly No Results</td>
+<td>&gt;50% null rate</td>
+<td>Partial gap - improve coverage</td>
+</tr>
+<tr>
+<td>No Clicks</td>
+<td>Has results but 0 clicks</td>
+<td>Poor relevance - tune ranking</td>
+</tr>
+<tr>
+<td>Low CTR</td>
+<td>&lt;20% click rate</td>
+<td>Suboptimal - review content</td>
+</tr>
+<tr>
+<td>Success</td>
+<td>Good performance</td>
+<td>Monitor</td>
+</tr>
+</tbody>
+</table>
+<h3 id="searches_journeys-table">searches_journeys Table</h3>
+<h4 id="journey_type">Journey_Type</h4>
+<p>Combines outcome and behavior flags for segmentation.</p>
+<pre class="dax"><code>Journey_Type =
+searches_journeys[journey_outcome] &amp;
+IF(searches_journeys[had_reformulation], &quot; (Refined)&quot;, &quot;&quot;) &amp;
+IF(searches_journeys[recovered_from_null], &quot; (Recovered)&quot;, &quot;&quot;)</code></pre>
+<hr />
+<h2 id="power-bi-measures">7. Power BI Measures</h2>
+<p>These measures are created in Power BI for aggregated
+calculations.</p>
+<h3 id="search-effectiveness-score">Search Effectiveness Score</h3>
+<p>Combined metric considering both CTR and null rate. Higher is
+better.</p>
+<pre class="dax"><code>Search Effectiveness Score =
+VAR ctr = DIVIDE(SUM(searches_terms[click_count]), SUM(searches_terms[search_count]), 0)
+VAR nullRate = DIVIDE(SUM(searches_terms[null_result_count]), SUM(searches_terms[result_events]), 0)
+RETURN
+(ctr * 100) - (nullRate * 50)</code></pre>
+<p><strong>Score interpretation:</strong> - Positive scores: Good
+performance (CTR outweighs null rate penalty) - Near zero: Balanced but
+could improve - Negative scores: High null rates hurting performance</p>
+<h3 id="term-ctr">Term CTR %</h3>
+<p>Click-through rate for search terms.</p>
+<pre class="dax"><code>Term CTR % =
+DIVIDE(
+    SUM(searches_terms[click_count]),
+    SUM(searches_terms[search_count]),
+    0
+) * 100</code></pre>
+<h3 id="term-null-rate">Term Null Rate %</h3>
+<p>Percentage of searches returning zero results.</p>
+<pre class="dax"><code>Term Null Rate % =
+DIVIDE(
+    SUM(searches_terms[null_result_count]),
+    SUM(searches_terms[result_events]),
+    0
+) * 100</code></pre>
+<h3 id="weighted-avg-search-term-length">Weighted Avg Search Term
+Length</h3>
+<p>Correctly weighted average across days (use instead of AVERAGE on
+avg_search_term_length).</p>
+<pre class="dax"><code>Weighted Avg Search Term Length =
+DIVIDE(
+    SUM(searches_daily[sum_search_term_length]),
+    SUM(searches_daily[search_term_count]),
+    0
+)</code></pre>
+<h3 id="weighted-avg-search-term-words">Weighted Avg Search Term
+Words</h3>
+<p>Correctly weighted average across days.</p>
+<pre class="dax"><code>Weighted Avg Search Term Words =
+DIVIDE(
+    SUM(searches_daily[sum_search_term_words]),
+    SUM(searches_daily[search_term_count]),
+    0
+)</code></pre>
+<h3 id="weighted-avg-sec-to-click">Weighted Avg Sec to Click</h3>
+<p>Correctly weighted average click time (for terms aggregation).</p>
+<pre class="dax"><code>Weighted Avg Sec to Click =
+DIVIDE(
+    SUM(searches_terms[sum_sec_to_click]),
+    SUM(searches_terms[clicks_with_timing]),
+    0
+)</code></pre>
+<hr />
+<h2 id="example-full-data-flow">Example: Full Data Flow</h2>
+<h3 id="raw-input-from-app-insights">Raw Input (from App Insights)</h3>
+<pre class="csv"><code>timestamp,name,user_Id,session_Id,CP_searchQuery,CP_totalResultCount
+2025-01-15 10:30:15.123456,Search_Started,user123,sess456,budget report,
+2025-01-15 10:30:15.234567,Search_Completed,user123,sess456,budget report,
+2025-01-15 10:30:15.567890,Search_Result_Count,user123,sess456,,15
+2025-01-15 10:30:18.890123,Search_Tab_Click,user123,sess456,,</code></pre>
+<h3 id="after-processing-searches_raw.parquet">After Processing
+(searches_raw.parquet)</h3>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 4%" />
+<col style="width: 10%" />
+<col style="width: 9%" />
+<col style="width: 11%" />
+<col style="width: 10%" />
+<col style="width: 12%" />
+<col style="width: 12%" />
+<col style="width: 19%" />
+</colgroup>
+<thead>
+<tr>
+<th>timestamp</th>
+<th>name</th>
+<th>session_key</th>
+<th>prev_event</th>
+<th>ms_since_prev</th>
+<th>search_term</th>
+<th>is_null_result</th>
+<th>click_category</th>
+<th>last_search_started_ts</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10:30:15.123</td>
+<td>SEARCH_STARTED</td>
+<td>2025-01-15_user123_sess456</td>
+<td>NULL</td>
+<td>NULL</td>
+<td>budget report</td>
+<td>NULL</td>
+<td>NULL</td>
+<td>10:30:15.123</td>
+</tr>
+<tr>
+<td>10:30:15.234</td>
+<td>SEARCH_COMPLETED</td>
+<td>2025-01-15_user123_sess456</td>
+<td>SEARCH_STARTED</td>
+<td>111</td>
+<td>NULL</td>
+<td>NULL</td>
+<td>NULL</td>
+<td>10:30:15.123</td>
+</tr>
+<tr>
+<td>10:30:15.567</td>
+<td>SEARCH_RESULT_COUNT</td>
+<td>2025-01-15_user123_sess456</td>
+<td>SEARCH_COMPLETED</td>
+<td>333</td>
+<td>NULL</td>
+<td>false</td>
+<td>NULL</td>
+<td>10:30:15.123</td>
+</tr>
+<tr>
+<td>10:30:18.890</td>
+<td>SEARCH_TAB_CLICK</td>
+<td>2025-01-15_user123_sess456</td>
+<td>SEARCH_RESULT_COUNT</td>
+<td>3323</td>
+<td>NULL</td>
+<td>NULL</td>
+<td>General</td>
+<td>10:30:15.123</td>
+</tr>
+</tbody>
+</table>
+<h3 id="aggregated-searches_journeys.parquet">Aggregated
+(searches_journeys.parquet)</h3>
+<table>
+<colgroup>
+<col style="width: 12%" />
+<col style="width: 12%" />
+<col style="width: 12%" />
+<col style="width: 11%" />
+<col style="width: 19%" />
+<col style="width: 18%" />
+<col style="width: 14%" />
+</colgroup>
+<thead>
+<tr>
+<th>session_date</th>
+<th>total_events</th>
+<th>search_count</th>
+<th>click_count</th>
+<th>sec_search_to_result</th>
+<th>sec_result_to_click</th>
+<th>journey_outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2025-01-15</td>
+<td>4</td>
+<td>1</td>
+<td>1</td>
+<td>0.44</td>
+<td>3.32</td>
+<td>Success</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Calculation breakdown:</strong> -
+<code>sec_search_to_result</code>: 10:30:15.567 - 10:30:15.123 = 444ms =
+0.44s - <code>sec_result_to_click</code>: 10:30:18.890 - 10:30:15.567 =
+3323ms = 3.32s - <code>journey_outcome</code>: click_count &gt; 0 –&gt;
+“Success”</p>
+<hr />
+<h2 id="version-history">Version History</h2>
+<table>
+<colgroup>
+<col style="width: 37%" />
+<col style="width: 25%" />
+<col style="width: 37%" />
+</colgroup>
+<thead>
+<tr>
+<th>Version</th>
+<th>Date</th>
+<th>Changes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1.0</td>
+<td>2025-01-15</td>
+<td>Initial documentation</td>
+</tr>
+<tr>
+<td>1.1</td>
+<td>2025-01-16</td>
+<td>Added missing parquet columns (click breakdowns, sort columns,
+timing aggregates), Power BI calculated columns section, Power BI
+measures section</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>
