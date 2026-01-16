@@ -516,13 +516,14 @@ The bucket and category columns are text and won't sort correctly by default (e.
 
 **Column mappings:**
 
-| Text Column | Sort By Column |
-|-------------|----------------|
-| `journey_outcome` | `journey_outcome_sort` |
-| `session_complexity` | `session_complexity_sort` |
-| `search_to_result_bucket` | `search_to_result_sort` |
-| `result_to_click_bucket` | `result_to_click_sort` |
-| `session_duration_bucket` | `session_duration_sort` |
+| Text Column | Sort By Column | Table |
+|-------------|----------------|-------|
+| `journey_outcome` | `journey_outcome_sort` | searches_journeys |
+| `session_complexity` | `session_complexity_sort` | searches_journeys |
+| `search_to_result_bucket` | `search_to_result_sort` | searches_journeys |
+| `result_to_click_bucket` | `result_to_click_sort` | searches_journeys |
+| `session_duration_bucket` | `session_duration_sort` | searches_journeys |
+| `Query_Length_Bucket` | `Query_Length_Sort` | searches_terms (calculated) |
 
 Once configured, the text columns will sort in logical order everywhere they're used.
 
@@ -701,14 +702,8 @@ DIVIDE(
     BLANK()
 )
 
-// Word Count Bucket (for grouping query lengths)
-Word Count Bucket =
-SWITCH(
-    TRUE(),
-    searches_terms[word_count] = 1, "1 word",
-    searches_terms[word_count] <= 3, "2-3 words",
-    "4+ words"
-)
+// Query Length Bucket - see "Query Length vs Success Analysis" section below
+// for both the bucket column and the sort column definitions
 
 // New Terms Count (terms first seen on selected date range)
 New Terms Count =
@@ -730,29 +725,56 @@ DIVIDE(
 
 Use the `word_count` column to understand if longer queries perform better.
 
-**Create a calculated column** in Power BI (Model view → New Column):
+**Step 1: Create the Bucket Calculated Column** (Model view → `searches_terms` → New Column):
 ```dax
-Word Count Bucket =
+Query_Length_Bucket =
 SWITCH(
     TRUE(),
     searches_terms[word_count] = 1, "1 word",
-    searches_terms[word_count] <= 3, "2-3 words",
-    "4+ words"
+    searches_terms[word_count] = 2, "2 words",
+    searches_terms[word_count] = 3, "3 words",
+    searches_terms[word_count] = 4, "4 words",
+    searches_terms[word_count] >= 5, "5+ words",
+    "Unknown"
 )
 ```
+
+**Step 2: Create the Sort Column** (Model view → `searches_terms` → New Column):
+```dax
+Query_Length_Sort =
+SWITCH(
+    TRUE(),
+    searches_terms[word_count] = 1, 1,
+    searches_terms[word_count] = 2, 2,
+    searches_terms[word_count] = 3, 3,
+    searches_terms[word_count] = 4, 4,
+    searches_terms[word_count] >= 5, 5,
+    99
+)
+```
+
+**Step 3: Configure Sort Order**
+1. Go to **Model view** (left sidebar)
+2. Select `Query_Length_Bucket` column
+3. In **Column tools** ribbon → click **Sort by column**
+4. Select `Query_Length_Sort`
+
+Now your bar charts will sort correctly: 1 word → 2 words → 3 words → 4 words → 5+ words
 
 **Visualization: CTR by Query Length**
 - **Type**: Bar Chart
 - **Setup**:
-  1. Drag `Word Count Bucket` to **Axis**
+  1. Drag `Query_Length_Bucket` to **Axis**
   2. Drag `Term CTR %` measure to **Values**
+- **Sort**: Already configured via "Sort by column"
 - **Insight**: Do longer, more specific queries have higher CTR?
 
 **Visualization: Null Rate by Query Length**
 - **Type**: Bar Chart
 - **Setup**:
-  1. Drag `Word Count Bucket` to **Axis**
+  1. Drag `Query_Length_Bucket` to **Axis**
   2. Drag `Term Zero Result Rate %` measure to **Values**
+- **Sort**: Already configured via "Sort by column"
 - **Insight**: Do very specific (4+ word) queries fail more often?
 
 **Expected Pattern:**
