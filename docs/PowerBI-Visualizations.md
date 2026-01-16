@@ -786,6 +786,84 @@ Now your bar charts will sort correctly: 1 word → 2 words → 3 words → 4 wo
 | 4 words | High (25-35%) | Medium (5-8%) | Specific, good match potential |
 | 5+ words | Medium (20-30%) | Higher (10-15%) | Very specific, may not find exact match |
 
+### Advanced: Search Effectiveness Score
+
+Create a combined metric that shows overall query performance:
+
+```dax
+Search Effectiveness Score =
+VAR ctr = DIVIDE(SUM(searches_terms[click_count]), SUM(searches_terms[search_count]), 0)
+VAR nullRate = DIVIDE(SUM(searches_terms[null_result_count]), SUM(searches_terms[result_events]), 0)
+RETURN
+(ctr * 100) - (nullRate * 50)
+```
+
+**Interpretation**: Higher score = better performance (high CTR, low null rate). Negative scores indicate problematic query lengths.
+
+### Term Outcome Classification
+
+Create a calculated column to classify search terms by their outcome (Model view → `searches_terms` → New Column):
+
+```dax
+Term_Outcome =
+VAR nullRate = DIVIDE([null_result_count], [result_events], 0)
+VAR ctr = DIVIDE([click_count], [search_count], 0)
+RETURN
+SWITCH(
+    TRUE(),
+    nullRate = 1, "Zero Results",
+    nullRate > 0.5, "Mostly No Results",
+    ctr = 0, "No Clicks",
+    ctr < 0.2, "Low CTR",
+    "Success"
+)
+```
+
+### Recommended Filters for Query Analysis Page
+
+**Essential Filters:**
+
+| Filter | Type | Purpose |
+|--------|------|---------|
+| `session_date` | Date Range Slicer | Filter to specific time period |
+| Min Search Count | Numeric Slicer | Filter out low-volume terms (recommend: > 5) |
+
+**Drill-Down Filters:**
+
+| Filter | Type | Purpose |
+|--------|------|---------|
+| `Query_Length_Bucket` | Dropdown/Chips | Analyze specific query lengths |
+| `Term_Outcome` | Dropdown/Chips | Focus on problem areas (Zero Results, No Clicks) |
+| `is_new_term` | Toggle | Compare new vs established terms |
+
+**Min Search Count Filter Setup:**
+1. Create a measure:
+```dax
+Show Term =
+IF(SUM(searches_terms[search_count]) >= [Min Search Threshold Value], 1, 0)
+```
+2. Add a numeric slicer for threshold (default: 5)
+3. Filter visuals where `Show Term = 1`
+
+**Recommended Page Layout:**
+```
++--------------------------------------------------+
+| Filters:                                          |
+| [Date Range    ] [Min Searches: 5] [Term Outcome] |
+| [Query Length ▼]                                  |
++------------------------+-------------------------+
+|                        |                         |
+|  CTR by Query Length   |  Null Rate by Length    |
+|  (Bar Chart)           |  (Bar Chart)            |
+|                        |                         |
++------------------------+-------------------------+
+|                                                  |
+|  Search Effectiveness Score by Query Length      |
+|  (Bar Chart - combined metric)                   |
+|                                                  |
++--------------------------------------------------+
+```
+
 ### Row 1: Top Search Terms
 
 #### Chart 1: Top 20 Search Terms by Volume
