@@ -1,0 +1,70 @@
+// =============================================================================
+// 1_extract_events.kql
+// =============================================================================
+// Purpose: Extract search-related events from Azure Application Insights
+// Usage:   Run in App Insights > Logs, or via Azure Data Factory KQL activity
+// Output:  Raw events for loading into PostgreSQL raw_events table
+//
+// Schedule: Daily (extract previous 24 hours, or configurable date range)
+// =============================================================================
+
+// Configuration: Adjust date range as needed
+let startDate = ago(1d);  // For daily runs: previous 24 hours
+let endDate = now();
+
+// Alternative for backfill (uncomment and adjust):
+// let startDate = datetime(2025-01-01);
+// let endDate = datetime(2025-01-31);
+
+// =============================================================================
+// Main Query: Extract all search-related events
+// =============================================================================
+customEvents
+| where timestamp between (startDate .. endDate)
+| where name has "SEARCH" or name has "search"
+| project
+    // Core identifiers
+    timestamp,
+    name,
+    user_Id,
+    session_Id,
+
+    // Search context
+    customDimensions.searchQuery as searchQuery,
+    customDimensions.CP_searchQuery as CP_searchQuery,
+    customDimensions.query as query,
+
+    // Result metrics
+    customDimensions.CP_totalResultCount as CP_totalResultCount,
+    customDimensions.totalResultCount as totalResultCount,
+
+    // Tab/category context
+    customDimensions.CP_tab as CP_tab,
+    customDimensions.tab as tab,
+
+    // Additional context (optional - include if available)
+    customDimensions.CP_resultPosition as CP_resultPosition,
+    customDimensions.CP_clickedUrl as CP_clickedUrl,
+
+    // Client info (optional)
+    client_Type,
+    client_OS,
+    client_Browser
+| order by timestamp asc
+
+// =============================================================================
+// Notes for Azure Data Factory Integration:
+// =============================================================================
+// 1. Create a Linked Service to Application Insights
+// 2. Use "Azure Data Explorer Command" activity with this KQL
+// 3. Output to PostgreSQL via Copy Activity
+//
+// Expected columns in output:
+// - timestamp (datetime)
+// - name (string) - event name like SEARCH_STARTED, SEARCH_RESULT_COUNT
+// - user_Id (string)
+// - session_Id (string)
+// - searchQuery / CP_searchQuery / query (string) - search term
+// - CP_totalResultCount / totalResultCount (string/int) - result count
+// - CP_tab / tab (string) - clicked tab category
+// =============================================================================
