@@ -136,6 +136,24 @@ SELECT
     first_seen_date,
     is_new_term,
 
+    -- Query length buckets (for CTR/Null Rate by Query Length charts)
+    CASE
+        WHEN word_count = 1 THEN '1 word'
+        WHEN word_count = 2 THEN '2 words'
+        WHEN word_count = 3 THEN '3 words'
+        WHEN word_count = 4 THEN '4 words'
+        WHEN word_count >= 5 THEN '5+ words'
+        ELSE 'Unknown'
+    END as query_length_bucket,
+    CASE
+        WHEN word_count = 1 THEN 1
+        WHEN word_count = 2 THEN 2
+        WHEN word_count = 3 THEN 3
+        WHEN word_count = 4 THEN 4
+        WHEN word_count >= 5 THEN 5
+        ELSE 99
+    END as query_length_sort,
+
     -- Volume metrics
     search_count,
     unique_users,
@@ -216,6 +234,67 @@ WHERE sec_result_to_click IS NOT NULL
 GROUP BY session_date, result_to_click_bucket, result_to_click_sort;
 
 COMMENT ON VIEW rpt_timing_distribution IS 'Timing bucket distribution for histogram charts.';
+
+-- =============================================================================
+-- View: rpt_query_length_metrics
+-- Purpose: Pre-aggregated CTR and Null Rate by query length
+-- Power BI: Use for bar charts showing performance by query length
+-- =============================================================================
+CREATE OR REPLACE VIEW rpt_query_length_metrics AS
+SELECT
+    session_date,
+
+    -- Bucket with sort order
+    CASE
+        WHEN word_count = 1 THEN '1 word'
+        WHEN word_count = 2 THEN '2 words'
+        WHEN word_count = 3 THEN '3 words'
+        WHEN word_count = 4 THEN '4 words'
+        WHEN word_count >= 5 THEN '5+ words'
+        ELSE 'Unknown'
+    END as query_length_bucket,
+    CASE
+        WHEN word_count = 1 THEN 1
+        WHEN word_count = 2 THEN 2
+        WHEN word_count = 3 THEN 3
+        WHEN word_count = 4 THEN 4
+        WHEN word_count >= 5 THEN 5
+        ELSE 99
+    END as query_length_sort,
+
+    -- Volume
+    SUM(search_count) as total_searches,
+    SUM(click_count) as total_clicks,
+    SUM(result_events) as total_result_events,
+    SUM(null_result_count) as total_null_results,
+    COUNT(DISTINCT search_term) as unique_terms,
+
+    -- Rates (pre-calculated for easy visualization)
+    ROUND(100.0 * SUM(click_count) / NULLIF(SUM(search_count), 0), 2) as click_rate_pct,
+    ROUND(100.0 * SUM(null_result_count) / NULLIF(SUM(result_events), 0), 2) as null_rate_pct
+
+FROM searches_terms
+WHERE word_count > 0
+GROUP BY
+    session_date,
+    CASE
+        WHEN word_count = 1 THEN '1 word'
+        WHEN word_count = 2 THEN '2 words'
+        WHEN word_count = 3 THEN '3 words'
+        WHEN word_count = 4 THEN '4 words'
+        WHEN word_count >= 5 THEN '5+ words'
+        ELSE 'Unknown'
+    END,
+    CASE
+        WHEN word_count = 1 THEN 1
+        WHEN word_count = 2 THEN 2
+        WHEN word_count = 3 THEN 3
+        WHEN word_count = 4 THEN 4
+        WHEN word_count >= 5 THEN 5
+        ELSE 99
+    END;
+
+COMMENT ON VIEW rpt_query_length_metrics IS 'Pre-aggregated CTR and null rate by query length for bar chart visualization.';
 
 -- =============================================================================
 -- View: rpt_journey_types
@@ -566,7 +645,8 @@ SELECT * FROM v_data_quality_check;
 --
 -- ALWAYS AVAILABLE:
 --   rpt_searches_daily       - Daily event-level KPIs
---   rpt_searches_terms       - Search term analysis
+--   rpt_searches_terms       - Search term analysis (with query_length_bucket)
+--   rpt_query_length_metrics - CTR and null rate by query length (pre-aggregated)
 --   rpt_journey_funnel       - Funnel metrics
 */
 
@@ -579,6 +659,7 @@ SELECT * FROM v_data_quality_check;
 -- GRANT SELECT ON rpt_searches_terms TO powerbi_reader;
 -- GRANT SELECT ON rpt_journey_funnel TO powerbi_reader;
 -- GRANT SELECT ON rpt_timing_distribution TO powerbi_reader;
+-- GRANT SELECT ON rpt_query_length_metrics TO powerbi_reader;
 -- GRANT SELECT ON rpt_journey_types TO powerbi_reader;
 -- GRANT SELECT ON rpt_journeys_trend TO powerbi_reader;
 -- GRANT SELECT ON rpt_journeys_daily_agg TO powerbi_reader;
