@@ -317,9 +317,9 @@ If Power BI can't read the Parquet files:
 ### Search Events
 The telemetry captures two search initiation events that can overlap:
 - `SEARCH_TRIGGERED` - User initiates a search (presses enter, clicks button)
-- `SEARCH_STARTED` - System begins processing the search
+- `SEARCH_TRIGGERED` - System begins processing the search
 
-**Important:** To avoid double-counting, search counts use only `SEARCH_STARTED` events. This applies to:
+**Important:** To avoid double-counting, search counts use only `SEARCH_TRIGGERED` events. This applies to:
 - `search_starts` in daily parquet
 - `search_count_in_session` in journeys parquet
 - Click-through rate calculations

@@ -75,7 +75,7 @@ BEGIN
         COUNT(DISTINCT s.search_term_normalized) as unique_search_terms,
 
         -- Event counts
-        COUNT(CASE WHEN s.name = 'SEARCH_STARTED' THEN 1 END) as search_starts,
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' THEN 1 END) as search_starts,
         COUNT(CASE WHEN s.name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_events,
         COUNT(CASE WHEN s.click_category IS NOT NULL THEN 1 END) as click_events,
         SUM(CASE WHEN s.is_null_result = true THEN 1 ELSE 0 END)::INTEGER as null_results,
@@ -88,7 +88,7 @@ BEGIN
 
         -- Rate metrics (event-based)
         ROUND(100.0 * COUNT(CASE WHEN s.click_category IS NOT NULL THEN 1 END)
-            / NULLIF(COUNT(CASE WHEN s.name = 'SEARCH_STARTED' THEN 1 END), 0), 2) as click_rate_pct,
+            / NULLIF(COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' THEN 1 END), 0), 2) as click_rate_pct,
         ROUND(100.0 * SUM(CASE WHEN s.is_null_result = true THEN 1 ELSE 0 END)
             / NULLIF(COUNT(CASE WHEN s.name = 'SEARCH_RESULT_COUNT' THEN 1 END), 0), 2) as null_rate_pct,
 
@@ -99,7 +99,7 @@ BEGIN
             / NULLIF(MAX(d.sessions_with_results), 0), 2) as session_abandonment_rate_pct,
 
         -- Averages
-        ROUND(1.0 * COUNT(CASE WHEN s.name = 'SEARCH_STARTED' THEN 1 END)
+        ROUND(1.0 * COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' THEN 1 END)
             / NULLIF(COUNT(DISTINCT s.session_key), 0), 2) as avg_searches_per_session,
         ROUND(AVG(s.search_term_length)::NUMERIC, 1) as avg_search_term_length,
         ROUND(AVG(s.search_term_word_count)::NUMERIC, 1) as avg_search_term_words,
@@ -122,10 +122,10 @@ BEGIN
         EXTRACT(ISODOW FROM s.session_date)::INTEGER as day_of_week_num,
 
         -- Time distribution (when are searches happening?)
-        COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND s.event_hour >= 6 AND s.event_hour < 12 THEN 1 END)::INTEGER as searches_morning,
-        COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND s.event_hour >= 12 AND s.event_hour < 18 THEN 1 END)::INTEGER as searches_afternoon,
-        COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND s.event_hour >= 18 AND s.event_hour < 24 THEN 1 END)::INTEGER as searches_evening,
-        COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND s.event_hour >= 0 AND s.event_hour < 6 THEN 1 END)::INTEGER as searches_night,
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 6 AND s.event_hour < 12 THEN 1 END)::INTEGER as searches_morning,
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 12 AND s.event_hour < 18 THEN 1 END)::INTEGER as searches_afternoon,
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 18 AND s.event_hour < 24 THEN 1 END)::INTEGER as searches_evening,
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 0 AND s.event_hour < 6 THEN 1 END)::INTEGER as searches_night,
 
         -- User cohort metrics
         MAX(uc.new_users)::INTEGER as new_users,
@@ -204,7 +204,7 @@ BEGIN
         COUNT(DISTINCT s.session_key),
         COUNT(DISTINCT s.user_id),
         COUNT(DISTINCT s.search_term_normalized),
-        COUNT(CASE WHEN s.name = 'SEARCH_STARTED' THEN 1 END),
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' THEN 1 END),
         COUNT(CASE WHEN s.name = 'SEARCH_RESULT_COUNT' THEN 1 END),
         COUNT(CASE WHEN s.click_category IS NOT NULL THEN 1 END),
         SUM(CASE WHEN s.is_null_result = true THEN 1 ELSE 0 END)::INTEGER,
@@ -213,12 +213,12 @@ BEGIN
         MAX(d.sessions_with_clicks)::INTEGER,
         MAX(d.sessions_abandoned)::INTEGER,
         ROUND(100.0 * COUNT(CASE WHEN s.click_category IS NOT NULL THEN 1 END)
-            / NULLIF(COUNT(CASE WHEN s.name = 'SEARCH_STARTED' THEN 1 END), 0), 2),
+            / NULLIF(COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' THEN 1 END), 0), 2),
         ROUND(100.0 * SUM(CASE WHEN s.is_null_result = true THEN 1 ELSE 0 END)
             / NULLIF(COUNT(CASE WHEN s.name = 'SEARCH_RESULT_COUNT' THEN 1 END), 0), 2),
         ROUND(100.0 * MAX(d.sessions_with_clicks) / NULLIF(MAX(d.sessions_with_results), 0), 2),
         ROUND(100.0 * MAX(d.sessions_abandoned) / NULLIF(MAX(d.sessions_with_results), 0), 2),
-        ROUND(1.0 * COUNT(CASE WHEN s.name = 'SEARCH_STARTED' THEN 1 END)
+        ROUND(1.0 * COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' THEN 1 END)
             / NULLIF(COUNT(DISTINCT s.session_key), 0), 2),
         ROUND(AVG(s.search_term_length)::NUMERIC, 1),
         ROUND(AVG(s.search_term_word_count)::NUMERIC, 1),
@@ -233,10 +233,10 @@ BEGIN
         COUNT(CASE WHEN s.click_category = 'People' THEN 1 END)::INTEGER,
         TRIM(TO_CHAR(s.session_date, 'Day')),
         EXTRACT(ISODOW FROM s.session_date)::INTEGER,
-        COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND s.event_hour >= 6 AND s.event_hour < 12 THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND s.event_hour >= 12 AND s.event_hour < 18 THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND s.event_hour >= 18 AND s.event_hour < 24 THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND s.event_hour >= 0 AND s.event_hour < 6 THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 6 AND s.event_hour < 12 THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 12 AND s.event_hour < 18 THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 18 AND s.event_hour < 24 THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 0 AND s.event_hour < 6 THEN 1 END)::INTEGER,
         MAX(uc.new_users)::INTEGER,
         MAX(uc.returning_users)::INTEGER
     FROM searches s

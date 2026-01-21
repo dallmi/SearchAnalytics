@@ -199,7 +199,7 @@ CREATE TABLE searches (
     sec_since_prev_event    NUMERIC(10,3),
     time_since_prev_bucket  VARCHAR(20),
 
-    -- Timing reference (for SEARCH_STARTED → RESULT calculation)
+    -- Timing reference (for SEARCH_TRIGGERED → RESULT calculation)
     last_search_started_ts  TIMESTAMP,
 
     -- Search term analysis

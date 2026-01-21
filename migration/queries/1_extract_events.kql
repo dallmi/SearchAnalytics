@@ -61,7 +61,7 @@ customEvents
 //
 // Expected columns in output:
 // - timestamp (datetime)
-// - name (string) - event name like SEARCH_STARTED, SEARCH_RESULT_COUNT
+// - name (string) - event name like SEARCH_TRIGGERED, SEARCH_RESULT_COUNT
 // - user_Id (string)
 // - session_Id (string)
 // - searchQuery / CP_searchQuery / query (string) - search term

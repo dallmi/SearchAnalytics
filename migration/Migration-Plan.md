@@ -248,7 +248,7 @@ Transformations:
 Aggregations:
 • COUNT events per session
 • MIN/MAX timestamps for duration
-• Timing: SEARCH_STARTED → SEARCH_RESULT_COUNT
+• Timing: SEARCH_TRIGGERED → SEARCH_RESULT_COUNT
 • Journey outcome classification
 ```
 
@@ -317,7 +317,7 @@ This ensures unique session identification across days even if session IDs repea
 
 Events within a session follow this typical sequence:
 ```
-SEARCH_STARTED → SEARCH_COMPLETED → SEARCH_RESULT_COUNT → [CLICK]
+SEARCH_TRIGGERED → SEARCH_COMPLETED → SEARCH_RESULT_COUNT → [CLICK]
      │                                      │                 │
      └──────── User-perceived latency ──────┘                 │
                                             │                 │
@@ -325,7 +325,7 @@ SEARCH_STARTED → SEARCH_COMPLETED → SEARCH_RESULT_COUNT → [CLICK]
 ```
 
 **Key timing calculation:**
-- `ms_search_to_result`: Time from SEARCH_STARTED to SEARCH_RESULT_COUNT
+- `ms_search_to_result`: Time from SEARCH_TRIGGERED to SEARCH_RESULT_COUNT
 - `ms_result_to_click`: Time from SEARCH_RESULT_COUNT to click event
 
 ### Window Functions Used
@@ -334,7 +334,7 @@ SEARCH_STARTED → SEARCH_COMPLETED → SEARCH_RESULT_COUNT → [CLICK]
 |----------|---------|
 | `ROW_NUMBER()` | Event ordering within session |
 | `LAG()` | Previous event name and timestamp |
-| `LAST_VALUE(...IGNORE NULLS)` | Carry forward last SEARCH_STARTED timestamp |
+| `LAST_VALUE(...IGNORE NULLS)` | Carry forward last SEARCH_TRIGGERED timestamp |
 
 ### Journey Outcome Classification
 

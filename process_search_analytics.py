@@ -468,8 +468,8 @@ def add_calculated_columns(con):
                 WHEN DATEDIFF('millisecond', LAG(timestamp) OVER (PARTITION BY session_key ORDER BY timestamp), timestamp) < 60000 THEN '30-60s'
                 ELSE '> 60s'
             END as time_since_prev_bucket,
-            -- Carry forward the most recent SEARCH_STARTED timestamp for timing calculation
-            LAST_VALUE(CASE WHEN name = 'SEARCH_STARTED' THEN timestamp END IGNORE NULLS)
+            -- Carry forward the most recent SEARCH_TRIGGERED timestamp for timing calculation
+            LAST_VALUE(CASE WHEN name = 'SEARCH_TRIGGERED' THEN timestamp END IGNORE NULLS)
                 OVER (PARTITION BY session_key ORDER BY timestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) as last_search_started_ts
         FROM searches s
     """)
@@ -480,10 +480,10 @@ def add_calculated_columns(con):
         SELECT
             s.*,
             CASE
-                WHEN name = 'SEARCH_STARTED' AND
+                WHEN name = 'SEARCH_TRIGGERED' AND
                      ROW_NUMBER() OVER (PARTITION BY user_id, session_date ORDER BY timestamp) = 1
                 THEN true
-                WHEN name = 'SEARCH_STARTED'
+                WHEN name = 'SEARCH_TRIGGERED'
                 THEN false
                 ELSE NULL
             END as is_first_search_of_day
@@ -569,7 +569,7 @@ def export_parquet_files(con, output_dir):
                 COUNT(DISTINCT s.session_key) as unique_sessions,
                 COUNT(DISTINCT s.user_id) as unique_users,
                 COUNT(DISTINCT s.search_term_normalized) as unique_search_terms,
-                COUNT(CASE WHEN s.name = 'SEARCH_STARTED' THEN 1 END) as search_starts,
+                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' THEN 1 END) as search_starts,
                 COUNT(CASE WHEN s.name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_events,
                 COUNT(CASE WHEN s.click_category IS NOT NULL THEN 1 END) as click_events,
                 SUM(CASE WHEN s.is_null_result = true THEN 1 ELSE 0 END) as null_results,
@@ -580,7 +580,7 @@ def export_parquet_files(con, output_dir):
                 MAX(d.sessions_abandoned) as sessions_abandoned,
                 -- Rate metrics (event-based, can exceed 100% due to multiple clicks per search)
                 ROUND(100.0 * COUNT(CASE WHEN s.click_category IS NOT NULL THEN 1 END)
-                    / NULLIF(COUNT(CASE WHEN s.name = 'SEARCH_STARTED' THEN 1 END), 0), 2) as click_rate_pct,
+                    / NULLIF(COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' THEN 1 END), 0), 2) as click_rate_pct,
                 ROUND(100.0 * SUM(CASE WHEN s.is_null_result = true THEN 1 ELSE 0 END)
                     / NULLIF(COUNT(CASE WHEN s.name = 'SEARCH_RESULT_COUNT' THEN 1 END), 0), 2) as null_rate_pct,
                 -- Session-based rates (always 0-100%)
@@ -589,7 +589,7 @@ def export_parquet_files(con, output_dir):
                 ROUND(100.0 * MAX(d.sessions_abandoned)
                     / NULLIF(MAX(d.sessions_with_results), 0), 2) as session_abandonment_rate_pct,
                 -- Session metrics
-                ROUND(1.0 * COUNT(CASE WHEN s.name = 'SEARCH_STARTED' THEN 1 END)
+                ROUND(1.0 * COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' THEN 1 END)
                     / NULLIF(COUNT(DISTINCT s.session_key), 0), 2) as avg_searches_per_session,
                 -- Search term metrics (includes SUM columns for weighted DAX calculations)
                 ROUND(AVG(s.search_term_length), 1) as avg_search_term_length,
@@ -608,10 +608,10 @@ def export_parquet_files(con, output_dir):
                 DAYNAME(s.session_date) as day_of_week,
                 ISODOW(s.session_date) as day_of_week_num,
                 -- Hour distribution (searches by time of day)
-                COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND s.event_hour >= 6 AND s.event_hour < 12 THEN 1 END) as searches_morning,
-                COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND s.event_hour >= 12 AND s.event_hour < 18 THEN 1 END) as searches_afternoon,
-                COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND s.event_hour >= 18 AND s.event_hour < 24 THEN 1 END) as searches_evening,
-                COUNT(CASE WHEN s.name = 'SEARCH_STARTED' AND (s.event_hour >= 0 AND s.event_hour < 6) THEN 1 END) as searches_night,
+                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 6 AND s.event_hour < 12 THEN 1 END) as searches_morning,
+                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 12 AND s.event_hour < 18 THEN 1 END) as searches_afternoon,
+                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 18 AND s.event_hour < 24 THEN 1 END) as searches_evening,
+                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND (s.event_hour >= 0 AND s.event_hour < 6) THEN 1 END) as searches_night,
                 -- User cohort metrics
                 MAX(uc.new_users) as new_users,
                 MAX(uc.returning_users) as returning_users
@@ -638,13 +638,13 @@ def export_parquet_files(con, output_dir):
                     user_id,
                     MIN(timestamp) as session_start,
                     COUNT(*) as total_events,
-                    -- Timing metrics (SEARCH_STARTED to SEARCH_RESULT_COUNT = full user-perceived latency)
+                    -- Timing metrics (SEARCH_TRIGGERED to SEARCH_RESULT_COUNT = full user-perceived latency)
                     MIN(CASE WHEN name = 'SEARCH_RESULT_COUNT' AND last_search_started_ts IS NOT NULL
                         THEN DATEDIFF('millisecond', last_search_started_ts, timestamp) END) as ms_search_to_result,
                     MIN(CASE WHEN click_category IS NOT NULL AND prev_event = 'SEARCH_RESULT_COUNT' THEN ms_since_prev_event END) as ms_result_to_click,
                     DATEDIFF('millisecond', MIN(timestamp), MAX(timestamp)) as total_duration_ms,
                     -- Event counts
-                    COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END) as search_count_in_session,
+                    COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' THEN 1 END) as search_count_in_session,
                     COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_count,
                     COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_count,
                     COUNT(DISTINCT search_term_normalized) as unique_search_terms,
@@ -817,7 +817,7 @@ def export_parquet_files(con, output_dir):
                         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
                     ) as active_search_term
                 FROM searches
-                WHERE name = 'SEARCH_STARTED'
+                WHERE name = 'SEARCH_TRIGGERED'
                    OR name = 'SEARCH_RESULT_COUNT'
                    OR click_category IS NOT NULL
             ),
@@ -839,7 +839,7 @@ def export_parquet_files(con, output_dir):
                     ELSE LENGTH(active_search_term) - LENGTH(REPLACE(active_search_term, ' ', '')) + 1
                 END as word_count,
                 -- Volume metrics
-                COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END) as search_count,
+                COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' THEN 1 END) as search_count,
                 COUNT(DISTINCT user_id) as unique_users,
                 COUNT(DISTINCT session_key) as unique_sessions,
                 -- Result metrics
@@ -867,10 +867,10 @@ def export_parquet_files(con, output_dir):
                     ELSE 0
                 END) as sum_sec_to_click,
                 -- Hour distribution (when is this term searched?)
-                COUNT(CASE WHEN name = 'SEARCH_STARTED' AND event_hour >= 6 AND event_hour < 12 THEN 1 END) as searches_morning,
-                COUNT(CASE WHEN name = 'SEARCH_STARTED' AND event_hour >= 12 AND event_hour < 18 THEN 1 END) as searches_afternoon,
-                COUNT(CASE WHEN name = 'SEARCH_STARTED' AND event_hour >= 18 AND event_hour < 24 THEN 1 END) as searches_evening,
-                COUNT(CASE WHEN name = 'SEARCH_STARTED' AND event_hour >= 0 AND event_hour < 6 THEN 1 END) as searches_night,
+                COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 6 AND event_hour < 12 THEN 1 END) as searches_morning,
+                COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 12 AND event_hour < 18 THEN 1 END) as searches_afternoon,
+                COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 18 AND event_hour < 24 THEN 1 END) as searches_evening,
+                COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 0 AND event_hour < 6 THEN 1 END) as searches_night,
                 -- Trend detection columns
                 MAX(tfs.first_seen_date) as first_seen_date,
                 CASE WHEN stc.session_date = MAX(tfs.first_seen_date) THEN true ELSE false END as is_new_term

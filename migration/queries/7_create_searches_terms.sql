@@ -57,7 +57,7 @@ BEGIN
                 LIMIT 1
             ) as active_search_term
         FROM searches s
-        WHERE name = 'SEARCH_STARTED'
+        WHERE name = 'SEARCH_TRIGGERED'
            OR name = 'SEARCH_RESULT_COUNT'
            OR click_category IS NOT NULL
     ),
@@ -82,7 +82,7 @@ BEGIN
         END as word_count,
 
         -- Volume metrics
-        COUNT(CASE WHEN stc.name = 'SEARCH_STARTED' THEN 1 END)::INTEGER as search_count,
+        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' THEN 1 END)::INTEGER as search_count,
         COUNT(DISTINCT stc.user_id)::INTEGER as unique_users,
         COUNT(DISTINCT stc.session_key)::INTEGER as unique_sessions,
 
@@ -116,10 +116,10 @@ BEGIN
         END)::NUMERIC(12,2) as sum_sec_to_click,
 
         -- Time distribution (when is this term searched?)
-        COUNT(CASE WHEN stc.name = 'SEARCH_STARTED' AND stc.event_hour >= 6 AND stc.event_hour < 12 THEN 1 END)::INTEGER as searches_morning,
-        COUNT(CASE WHEN stc.name = 'SEARCH_STARTED' AND stc.event_hour >= 12 AND stc.event_hour < 18 THEN 1 END)::INTEGER as searches_afternoon,
-        COUNT(CASE WHEN stc.name = 'SEARCH_STARTED' AND stc.event_hour >= 18 AND stc.event_hour < 24 THEN 1 END)::INTEGER as searches_evening,
-        COUNT(CASE WHEN stc.name = 'SEARCH_STARTED' AND stc.event_hour >= 0 AND stc.event_hour < 6 THEN 1 END)::INTEGER as searches_night,
+        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 6 AND stc.event_hour < 12 THEN 1 END)::INTEGER as searches_morning,
+        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 12 AND stc.event_hour < 18 THEN 1 END)::INTEGER as searches_afternoon,
+        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 18 AND stc.event_hour < 24 THEN 1 END)::INTEGER as searches_evening,
+        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 0 AND stc.event_hour < 6 THEN 1 END)::INTEGER as searches_night,
 
         -- Trend detection columns
         MAX(tfs.first_seen_date) as first_seen_date,
@@ -179,7 +179,7 @@ BEGIN
             ) as active_search_term
         FROM searches s
         WHERE session_date >= p_start_date
-          AND (name = 'SEARCH_STARTED' OR name = 'SEARCH_RESULT_COUNT' OR click_category IS NOT NULL)
+          AND (name = 'SEARCH_TRIGGERED' OR name = 'SEARCH_RESULT_COUNT' OR click_category IS NOT NULL)
     ),
     term_first_seen AS (
         SELECT search_term_normalized, MIN(session_date) as first_seen_date
@@ -192,7 +192,7 @@ BEGIN
         stc.active_search_term,
         CASE WHEN stc.active_search_term IS NULL OR stc.active_search_term = '' THEN 0
              ELSE LENGTH(stc.active_search_term) - LENGTH(REPLACE(stc.active_search_term, ' ', '')) + 1 END,
-        COUNT(CASE WHEN stc.name = 'SEARCH_STARTED' THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' THEN 1 END)::INTEGER,
         COUNT(DISTINCT stc.user_id)::INTEGER,
         COUNT(DISTINCT stc.session_key)::INTEGER,
         COUNT(CASE WHEN stc.name = 'SEARCH_RESULT_COUNT' THEN 1 END)::INTEGER,
@@ -208,10 +208,10 @@ BEGIN
         COUNT(CASE WHEN stc.click_category IS NOT NULL AND stc.prev_event = 'SEARCH_RESULT_COUNT' THEN 1 END)::INTEGER,
         SUM(CASE WHEN stc.click_category IS NOT NULL AND stc.prev_event = 'SEARCH_RESULT_COUNT'
             THEN stc.ms_since_prev_event / 1000.0 ELSE 0 END)::NUMERIC(12,2),
-        COUNT(CASE WHEN stc.name = 'SEARCH_STARTED' AND stc.event_hour >= 6 AND stc.event_hour < 12 THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN stc.name = 'SEARCH_STARTED' AND stc.event_hour >= 12 AND stc.event_hour < 18 THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN stc.name = 'SEARCH_STARTED' AND stc.event_hour >= 18 AND stc.event_hour < 24 THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN stc.name = 'SEARCH_STARTED' AND stc.event_hour >= 0 AND stc.event_hour < 6 THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 6 AND stc.event_hour < 12 THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 12 AND stc.event_hour < 18 THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 18 AND stc.event_hour < 24 THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 0 AND stc.event_hour < 6 THEN 1 END)::INTEGER,
         MAX(tfs.first_seen_date),
         CASE WHEN stc.session_date = MAX(tfs.first_seen_date) THEN true ELSE false END
     FROM search_terms_with_context stc

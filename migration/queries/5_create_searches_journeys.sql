@@ -36,7 +36,7 @@ BEGIN
             MIN(timestamp) as session_start,
             COUNT(*) as total_events,
 
-            -- Timing metrics (SEARCH_STARTED to SEARCH_RESULT_COUNT = full user-perceived latency)
+            -- Timing metrics (SEARCH_TRIGGERED to SEARCH_RESULT_COUNT = full user-perceived latency)
             MIN(CASE
                 WHEN name = 'SEARCH_RESULT_COUNT' AND last_search_started_ts IS NOT NULL
                 THEN EXTRACT(EPOCH FROM (timestamp - last_search_started_ts)) * 1000
@@ -52,7 +52,7 @@ BEGIN
             (EXTRACT(EPOCH FROM (MAX(timestamp) - MIN(timestamp))) * 1000)::BIGINT as total_duration_ms,
 
             -- Event counts
-            COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END) as search_count_in_session,
+            COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' THEN 1 END) as search_count_in_session,
             COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_count,
             COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_count,
             COUNT(DISTINCT search_term_normalized) as unique_search_terms,
@@ -265,7 +265,7 @@ BEGIN
             MIN(CASE WHEN click_category IS NOT NULL AND prev_event = 'SEARCH_RESULT_COUNT'
                 THEN ms_since_prev_event END) as ms_result_to_click,
             (EXTRACT(EPOCH FROM (MAX(timestamp) - MIN(timestamp))) * 1000)::BIGINT as total_duration_ms,
-            COUNT(CASE WHEN name = 'SEARCH_STARTED' THEN 1 END) as search_count_in_session,
+            COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' THEN 1 END) as search_count_in_session,
             COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_count,
             COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_count,
             COUNT(DISTINCT search_term_normalized) as unique_search_terms,

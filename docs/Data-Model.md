@@ -24,7 +24,7 @@ The search system generates these event types (stored in the `name` column):
 
 | Event | Description | When Fired |
 |-------|-------------|------------|
-| `SEARCH_STARTED` | User initiates a search | User types query and presses Enter |
+| `SEARCH_TRIGGERED` | User initiates a search | User types query and presses Enter |
 | `SEARCH_COMPLETED` | Search query submitted to backend | Query sent to search service |
 | `SEARCH_RESULT_COUNT` | Results returned to user | Search results displayed |
 | `SEARCH_TAB_CLICK` | User clicks a General result | Click on main search tab |
@@ -39,7 +39,7 @@ The search system generates these event types (stored in the `name` column):
 User types "project budget" and presses Enter
     |
     v
-[SEARCH_STARTED]  <-- timestamp: 10:30:15.123
+[SEARCH_TRIGGERED]  <-- timestamp: 10:30:15.123
     |
     v
 [SEARCH_COMPLETED]  <-- timestamp: 10:30:15.234  (111ms later)
@@ -59,11 +59,11 @@ User sees results, clicks one
 ```
 Session: 2025-01-15_user123_session456
 
-Event 1: SEARCH_STARTED      @ 10:30:15.123   (search term: "budget report")
+Event 1: SEARCH_TRIGGERED      @ 10:30:15.123   (search term: "budget report")
 Event 2: SEARCH_COMPLETED    @ 10:30:15.234
 Event 3: SEARCH_RESULT_COUNT @ 10:30:15.567   (15 results found)
 Event 4: SEARCH_TAB_CLICK    @ 10:30:18.890   (user clicked a result)
-Event 5: SEARCH_STARTED      @ 10:30:45.000   (user searches again: "2024 budget")
+Event 5: SEARCH_TRIGGERED      @ 10:30:45.000   (user searches again: "2024 budget")
 Event 6: SEARCH_COMPLETED    @ 10:30:45.100
 Event 7: SEARCH_RESULT_COUNT @ 10:30:45.400   (8 results found)
 Event 8: SEARCH_TAB_CLICK    @ 10:30:52.500   (user clicked another result)
@@ -154,14 +154,14 @@ search_term_normalized = LOWER(TRIM(COALESCE(CP_searchQuery, searchQuery, query)
 
 **What it measures:** The time from when a user initiates a search until they see results.
 
-**Event span:** `SEARCH_STARTED` --> `SEARCH_RESULT_COUNT`
+**Event span:** `SEARCH_TRIGGERED` --> `SEARCH_RESULT_COUNT`
 
 **How it's calculated:**
 
 ```sql
--- Step 1: Track the most recent SEARCH_STARTED timestamp
+-- Step 1: Track the most recent SEARCH_TRIGGERED timestamp
 last_search_started_ts = LAST_VALUE(
-    CASE WHEN name = 'SEARCH_STARTED' THEN timestamp END
+    CASE WHEN name = 'SEARCH_TRIGGERED' THEN timestamp END
     IGNORE NULLS
 ) OVER (PARTITION BY session_key ORDER BY timestamp)
 
@@ -173,7 +173,7 @@ ms_search_to_result = DATEDIFF('millisecond', last_search_started_ts, timestamp)
 **Example:**
 
 ```
-Event: SEARCH_STARTED      @ 10:30:15.123
+Event: SEARCH_TRIGGERED      @ 10:30:15.123
 Event: SEARCH_COMPLETED    @ 10:30:15.234
 Event: SEARCH_RESULT_COUNT @ 10:30:15.567
 
@@ -216,7 +216,7 @@ ms_since_prev_event = DATEDIFF('millisecond',
 **Example:**
 
 ```
-Event 1: SEARCH_STARTED      @ 10:30:15.123  --> ms_since_prev = NULL (first event)
+Event 1: SEARCH_TRIGGERED      @ 10:30:15.123  --> ms_since_prev = NULL (first event)
 Event 2: SEARCH_COMPLETED    @ 10:30:15.234  --> ms_since_prev = 111ms
 Event 3: SEARCH_RESULT_COUNT @ 10:30:15.567  --> ms_since_prev = 333ms
 Event 4: SEARCH_TAB_CLICK    @ 10:30:18.890  --> ms_since_prev = 3,323ms
@@ -407,7 +407,7 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `search_term_normalized` | String | Cleaned search query | budget report |
 | `is_null_result` | Boolean | True if zero results returned | false |
 | `click_category` | String | Click type (General/All/News/GoTo/People) | General |
-| `last_search_started_ts` | Timestamp | Most recent SEARCH_STARTED timestamp | 2025-01-15 10:30:15.123 |
+| `last_search_started_ts` | Timestamp | Most recent SEARCH_TRIGGERED timestamp | 2025-01-15 10:30:15.123 |
 
 ---
 
@@ -423,7 +423,7 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `session_start` | Timestamp | First event timestamp | MIN(timestamp) |
 | `session_start_str` | String | Session start as string | STRFTIME for Power BI compatibility |
 | `total_events` | Integer | Events in session | COUNT(*) |
-| `search_count_in_session` | Integer | SEARCH_STARTED events | COUNT(SEARCH_STARTED) |
+| `search_count_in_session` | Integer | SEARCH_TRIGGERED events | COUNT(SEARCH_TRIGGERED) |
 | `result_count` | Integer | SEARCH_RESULT_COUNT events | COUNT(SEARCH_RESULT_COUNT) |
 | `click_count` | Integer | Click events | COUNT(click_category IS NOT NULL) |
 | `unique_search_terms` | Integer | Distinct queries | COUNT(DISTINCT search_term) |
@@ -473,7 +473,7 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `unique_sessions` | Integer | Distinct sessions | COUNT(DISTINCT session_key) |
 | `unique_users` | Integer | Distinct users | COUNT(DISTINCT user_id) |
 | `unique_search_terms` | Integer | Distinct search queries | COUNT(DISTINCT search_term_normalized) |
-| `search_starts` | Integer | SEARCH_STARTED events | COUNT(SEARCH_STARTED) |
+| `search_starts` | Integer | SEARCH_TRIGGERED events | COUNT(SEARCH_TRIGGERED) |
 | `result_events` | Integer | SEARCH_RESULT_COUNT events | COUNT(SEARCH_RESULT_COUNT) |
 | `click_events` | Integer | Click events | COUNT(click_category) |
 | `null_results` | Integer | Zero-result events | SUM(is_null_result) |
@@ -519,7 +519,7 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `session_date` | Date | The day | |
 | `search_term` | String | Normalized search query | LOWER(TRIM(query)) |
 | `word_count` | Integer | Words in query | COUNT of spaces + 1 |
-| `search_count` | Integer | Times searched today | COUNT(SEARCH_STARTED) |
+| `search_count` | Integer | Times searched today | COUNT(SEARCH_TRIGGERED) |
 | `unique_users` | Integer | Users who searched this | COUNT(DISTINCT user_id) |
 | `unique_sessions` | Integer | Sessions with this term | COUNT(DISTINCT session_key) |
 | `result_events` | Integer | Result events for term | COUNT(SEARCH_RESULT_COUNT) |
@@ -724,8 +724,8 @@ timestamp,name,user_Id,session_Id,CP_searchQuery,CP_totalResultCount
 
 | timestamp | name | session_key | prev_event | ms_since_prev | search_term | is_null_result | click_category | last_search_started_ts |
 |-----------|------|-------------|------------|---------------|-------------|----------------|----------------|------------------------|
-| 10:30:15.123 | SEARCH_STARTED | 2025-01-15_user123_sess456 | NULL | NULL | budget report | NULL | NULL | 10:30:15.123 |
-| 10:30:15.234 | SEARCH_COMPLETED | 2025-01-15_user123_sess456 | SEARCH_STARTED | 111 | NULL | NULL | NULL | 10:30:15.123 |
+| 10:30:15.123 | SEARCH_TRIGGERED | 2025-01-15_user123_sess456 | NULL | NULL | budget report | NULL | NULL | 10:30:15.123 |
+| 10:30:15.234 | SEARCH_COMPLETED | 2025-01-15_user123_sess456 | SEARCH_TRIGGERED | 111 | NULL | NULL | NULL | 10:30:15.123 |
 | 10:30:15.567 | SEARCH_RESULT_COUNT | 2025-01-15_user123_sess456 | SEARCH_COMPLETED | 333 | NULL | false | NULL | 10:30:15.123 |
 | 10:30:18.890 | SEARCH_TAB_CLICK | 2025-01-15_user123_sess456 | SEARCH_RESULT_COUNT | 3323 | NULL | NULL | General | 10:30:15.123 |
 

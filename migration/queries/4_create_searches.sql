@@ -126,14 +126,14 @@ BEGIN
         LAG(b.name) OVER (PARTITION BY b.session_key ORDER BY b.timestamp) as prev_event,
         LAG(b.timestamp) OVER (PARTITION BY b.session_key ORDER BY b.timestamp) as prev_timestamp,
 
-        -- Carry forward last SEARCH_STARTED timestamp
+        -- Carry forward last SEARCH_TRIGGERED timestamp
         -- PostgreSQL doesn't have IGNORE NULLS, so we use a subquery workaround
         (
             SELECT MAX(sub.timestamp)
             FROM temp_searches_base sub
             WHERE sub.session_key = b.session_key
               AND sub.timestamp <= b.timestamp
-              AND UPPER(sub.name) = 'SEARCH_STARTED'
+              AND UPPER(sub.name) = 'SEARCH_TRIGGERED'
         ) as last_search_started_ts
 
     FROM temp_searches_base b;
@@ -211,10 +211,10 @@ BEGIN
         f.click_category,
         -- is_first_search_of_day
         CASE
-            WHEN f.name = 'SEARCH_STARTED' AND
+            WHEN f.name = 'SEARCH_TRIGGERED' AND
                  ROW_NUMBER() OVER (PARTITION BY f.user_id, f.session_date ORDER BY f.timestamp) = 1
             THEN true
-            WHEN f.name = 'SEARCH_STARTED'
+            WHEN f.name = 'SEARCH_TRIGGERED'
             THEN false
             ELSE NULL
         END as is_first_search_of_day
@@ -323,7 +323,7 @@ BEGIN
                    COALESCE(sub.user_id, '') || '_' ||
                    COALESCE(sub.session_id, '') = w.session_key
                AND sub.timestamp <= w.timestamp
-               AND UPPER(sub.name) = 'SEARCH_STARTED') as last_search_started_ts,
+               AND UPPER(sub.name) = 'SEARCH_TRIGGERED') as last_search_started_ts,
             CASE WHEN w.prev_timestamp IS NOT NULL
                  THEN (EXTRACT(EPOCH FROM (w.timestamp - w.prev_timestamp)) * 1000)::BIGINT
                  ELSE NULL END as ms_since_prev_event,
@@ -356,10 +356,10 @@ BEGIN
         t.event_hour, t.event_weekday, t.event_weekday_num,
         t.is_null_result, t.is_clickable_result, t.click_category,
         CASE
-            WHEN t.name = 'SEARCH_STARTED' AND
+            WHEN t.name = 'SEARCH_TRIGGERED' AND
                  ROW_NUMBER() OVER (PARTITION BY t.user_id, t.session_date ORDER BY t.timestamp) = 1
             THEN true
-            WHEN t.name = 'SEARCH_STARTED' THEN false
+            WHEN t.name = 'SEARCH_TRIGGERED' THEN false
             ELSE NULL
         END as is_first_search_of_day
     FROM with_timing t;
