@@ -789,3 +789,4 @@ timestamp,name,user_Id,session_Id,CP_searchQuery,CP_totalResultCount
 |---------|------|---------|
 | 1.0 | 2025-01-15 | Initial documentation |
 | 1.1 | 2025-01-16 | Added missing parquet columns (click breakdowns, sort columns, timing aggregates), Power BI calculated columns section, Power BI measures section |
+| 1.2 | 2025-01-23 | Added CET timezone support: timestamp_cet columns, CET-based session_date/event_hour/event_weekday, updated time distribution documentation |
