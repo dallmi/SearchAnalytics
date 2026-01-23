@@ -392,9 +392,12 @@ def add_calculated_columns(con):
             UPPER(r.name) as name,
             -- Timestamp as string for Power BI (Parquet connector loses precision)
             STRFTIME(timestamp, '%Y-%m-%d %H:%M:%S.%g') as timestamp_str,
-            -- Session columns
-            DATE_TRUNC('day', timestamp)::DATE as session_date,
-            COALESCE(CAST(DATE_TRUNC('day', timestamp)::DATE AS VARCHAR), '') || '_' ||
+            -- CET timestamp (handles CET/CEST automatically via Europe/Berlin timezone)
+            timezone('Europe/Berlin', timestamp) as timestamp_cet,
+            STRFTIME(timezone('Europe/Berlin', timestamp), '%Y-%m-%d %H:%M:%S.%g') as timestamp_cet_str,
+            -- Session columns (CET-based)
+            DATE_TRUNC('day', timezone('Europe/Berlin', timestamp))::DATE as session_date,
+            COALESCE(CAST(DATE_TRUNC('day', timezone('Europe/Berlin', timestamp))::DATE AS VARCHAR), '') || '_' ||
                 COALESCE(user_id, '') || '_' ||
                 COALESCE(session_id, '') as session_key,
             -- Time interval columns (calculated via window functions below)
@@ -413,10 +416,10 @@ def add_calculated_columns(con):
                 ELSE LENGTH(LOWER(TRIM(COALESCE(CP_searchQuery, searchQuery, query)))) -
                      LENGTH(REPLACE(LOWER(TRIM(COALESCE(CP_searchQuery, searchQuery, query))), ' ', '')) + 1
             END as search_term_word_count,
-            -- Time extraction
-            EXTRACT(HOUR FROM timestamp)::INTEGER as event_hour,
-            DAYNAME(timestamp) as event_weekday,
-            ISODOW(timestamp) as event_weekday_num,
+            -- Time extraction (CET-based)
+            EXTRACT(HOUR FROM timezone('Europe/Berlin', timestamp))::INTEGER as event_hour,
+            DAYNAME(timezone('Europe/Berlin', timestamp)) as event_weekday,
+            ISODOW(timezone('Europe/Berlin', timestamp)) as event_weekday_num,
             -- Flags
             CASE
                 WHEN name = 'SEARCH_RESULT_COUNT' AND CAST(CP_totalResultCount AS INTEGER) = 0 THEN true
@@ -607,11 +610,11 @@ def export_parquet_files(con, output_dir):
                 -- Temporal patterns
                 DAYNAME(s.session_date) as day_of_week,
                 ISODOW(s.session_date) as day_of_week_num,
-                -- Hour distribution (searches by time of day)
-                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 6 AND s.event_hour < 12 THEN 1 END) as searches_morning,
-                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 12 AND s.event_hour < 18 THEN 1 END) as searches_afternoon,
-                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 18 AND s.event_hour < 24 THEN 1 END) as searches_evening,
-                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND (s.event_hour >= 0 AND s.event_hour < 6) THEN 1 END) as searches_night,
+                -- Hour distribution (searches by time of day, CET-based)
+                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 6 AND s.event_hour < 12 THEN 1 END) as searches_morning,   -- 6-12 CET
+                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 12 AND s.event_hour < 18 THEN 1 END) as searches_afternoon, -- 12-18 CET
+                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 18 AND s.event_hour < 24 THEN 1 END) as searches_evening,   -- 18-24 CET
+                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND (s.event_hour >= 0 AND s.event_hour < 6) THEN 1 END) as searches_night,     -- 0-6 CET
                 -- User cohort metrics
                 MAX(uc.new_users) as new_users,
                 MAX(uc.returning_users) as returning_users
@@ -866,11 +869,11 @@ def export_parquet_files(con, output_dir):
                     THEN ms_since_prev_event / 1000.0
                     ELSE 0
                 END) as sum_sec_to_click,
-                -- Hour distribution (when is this term searched?)
-                COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 6 AND event_hour < 12 THEN 1 END) as searches_morning,
-                COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 12 AND event_hour < 18 THEN 1 END) as searches_afternoon,
-                COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 18 AND event_hour < 24 THEN 1 END) as searches_evening,
-                COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 0 AND event_hour < 6 THEN 1 END) as searches_night,
+                -- Hour distribution (when is this term searched? CET-based)
+                COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 6 AND event_hour < 12 THEN 1 END) as searches_morning,   -- 6-12 CET
+                COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 12 AND event_hour < 18 THEN 1 END) as searches_afternoon, -- 12-18 CET
+                COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 18 AND event_hour < 24 THEN 1 END) as searches_evening,   -- 18-24 CET
+                COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 0 AND event_hour < 6 THEN 1 END) as searches_night,       -- 0-6 CET
                 -- Trend detection columns
                 MAX(tfs.first_seen_date) as first_seen_date,
                 CASE WHEN stc.session_date = MAX(tfs.first_seen_date) THEN true ELSE false END as is_new_term

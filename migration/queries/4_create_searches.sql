@@ -61,20 +61,23 @@ BEGIN
 
         -- Timestamp string for Power BI (preserves precision)
         TO_CHAR(r.timestamp, 'YYYY-MM-DD HH24:MI:SS.MS') as timestamp_str,
+        -- CET timestamp (handles CET/CEST automatically via Europe/Berlin timezone)
+        r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin' as timestamp_cet,
+        TO_CHAR(r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin', 'YYYY-MM-DD HH24:MI:SS.MS') as timestamp_cet_str,
 
-        -- Session identification
-        DATE(r.timestamp) as session_date,
-        COALESCE(TO_CHAR(DATE(r.timestamp), 'YYYY-MM-DD'), '') || '_' ||
+        -- Session identification (CET-based)
+        DATE(r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin') as session_date,
+        COALESCE(TO_CHAR(DATE(r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin'), 'YYYY-MM-DD'), '') || '_' ||
             COALESCE(r.user_id, '') || '_' ||
             COALESCE(r.session_id, '') as session_key,
 
         -- Search term normalization
         LOWER(TRIM(COALESCE(r.cp_search_query, r.search_query, r.query))) as search_term_normalized,
 
-        -- Time extraction
-        EXTRACT(HOUR FROM r.timestamp)::INTEGER as event_hour,
-        TO_CHAR(r.timestamp, 'Day') as event_weekday,
-        EXTRACT(ISODOW FROM r.timestamp)::INTEGER as event_weekday_num,
+        -- Time extraction (CET-based)
+        EXTRACT(HOUR FROM r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin')::INTEGER as event_hour,
+        TO_CHAR(r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin', 'Day') as event_weekday,
+        EXTRACT(ISODOW FROM r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin')::INTEGER as event_weekday_num,
 
         -- Click category based on event name
         CASE
@@ -191,6 +194,8 @@ BEGIN
         f.cp_result_position,
         f.cp_clicked_url,
         f.timestamp_str,
+        f.timestamp_cet,
+        f.timestamp_cet_str,
         f.session_date,
         f.session_key,
         f.event_order,
@@ -276,14 +281,16 @@ BEGIN
             END as cp_result_position,
             r.cp_clicked_url,
             TO_CHAR(r.timestamp, 'YYYY-MM-DD HH24:MI:SS.MS') as timestamp_str,
-            DATE(r.timestamp) as session_date,
-            COALESCE(TO_CHAR(DATE(r.timestamp), 'YYYY-MM-DD'), '') || '_' ||
+            r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin' as timestamp_cet,
+            TO_CHAR(r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin', 'YYYY-MM-DD HH24:MI:SS.MS') as timestamp_cet_str,
+            DATE(r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin') as session_date,
+            COALESCE(TO_CHAR(DATE(r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin'), 'YYYY-MM-DD'), '') || '_' ||
                 COALESCE(r.user_id, '') || '_' ||
                 COALESCE(r.session_id, '') as session_key,
             LOWER(TRIM(COALESCE(r.cp_search_query, r.search_query, r.query))) as search_term_normalized,
-            EXTRACT(HOUR FROM r.timestamp)::INTEGER as event_hour,
-            TO_CHAR(r.timestamp, 'Day') as event_weekday,
-            EXTRACT(ISODOW FROM r.timestamp)::INTEGER as event_weekday_num,
+            EXTRACT(HOUR FROM r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin')::INTEGER as event_hour,
+            TO_CHAR(r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin', 'Day') as event_weekday,
+            EXTRACT(ISODOW FROM r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin')::INTEGER as event_weekday_num,
             CASE
                 WHEN UPPER(r.name) = 'SEARCH_TAB_CLICK' THEN 'General'
                 WHEN UPPER(r.name) = 'SEARCH_ALL_TAB_PAGE_CLICK' THEN 'All'
@@ -293,7 +300,7 @@ BEGIN
                 ELSE NULL
             END as click_category
         FROM raw_events r
-        WHERE DATE(r.timestamp) >= p_start_date
+        WHERE DATE(r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin') >= p_start_date
     ),
     windowed AS (
         SELECT
@@ -319,7 +326,7 @@ BEGIN
             w.*,
             (SELECT MAX(sub.timestamp)
              FROM raw_events sub
-             WHERE COALESCE(TO_CHAR(DATE(sub.timestamp), 'YYYY-MM-DD'), '') || '_' ||
+             WHERE COALESCE(TO_CHAR(DATE(sub.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin'), 'YYYY-MM-DD'), '') || '_' ||
                    COALESCE(sub.user_id, '') || '_' ||
                    COALESCE(sub.session_id, '') = w.session_key
                AND sub.timestamp <= w.timestamp
@@ -348,7 +355,7 @@ BEGIN
         t.timestamp, t.name, t.user_id, t.session_id,
         t.search_query, t.cp_search_query, t.query,
         t.cp_total_result_count, t.cp_tab, t.cp_result_position, t.cp_clicked_url,
-        t.timestamp_str, t.session_date, t.session_key,
+        t.timestamp_str, t.timestamp_cet, t.timestamp_cet_str, t.session_date, t.session_key,
         t.event_order, t.prev_event, t.prev_timestamp,
         t.ms_since_prev_event, t.sec_since_prev_event, t.time_since_prev_bucket,
         t.last_search_started_ts,

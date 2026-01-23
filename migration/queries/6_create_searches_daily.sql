@@ -121,11 +121,11 @@ BEGIN
         TRIM(TO_CHAR(s.session_date, 'Day')) as day_of_week,
         EXTRACT(ISODOW FROM s.session_date)::INTEGER as day_of_week_num,
 
-        -- Time distribution (when are searches happening?)
-        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 6 AND s.event_hour < 12 THEN 1 END)::INTEGER as searches_morning,
-        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 12 AND s.event_hour < 18 THEN 1 END)::INTEGER as searches_afternoon,
-        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 18 AND s.event_hour < 24 THEN 1 END)::INTEGER as searches_evening,
-        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 0 AND s.event_hour < 6 THEN 1 END)::INTEGER as searches_night,
+        -- Time distribution (CET-based hours)
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 6 AND s.event_hour < 12 THEN 1 END)::INTEGER as searches_morning,   -- 6-12 CET
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 12 AND s.event_hour < 18 THEN 1 END)::INTEGER as searches_afternoon, -- 12-18 CET
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 18 AND s.event_hour < 24 THEN 1 END)::INTEGER as searches_evening,   -- 18-24 CET
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 0 AND s.event_hour < 6 THEN 1 END)::INTEGER as searches_night,       -- 0-6 CET
 
         -- User cohort metrics
         MAX(uc.new_users)::INTEGER as new_users,

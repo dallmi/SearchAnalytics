@@ -186,8 +186,11 @@ CREATE TABLE searches (
 
     -- Timestamp string for Power BI (preserves millisecond precision)
     timestamp_str           VARCHAR(30),
+    -- CET timestamp (handles CET/CEST automatically)
+    timestamp_cet           TIMESTAMP,
+    timestamp_cet_str       VARCHAR(30),
 
-    -- Session identification
+    -- Session identification (CET-based)
     session_date            DATE NOT NULL,
     session_key             VARCHAR(600) NOT NULL,
 
@@ -207,7 +210,7 @@ CREATE TABLE searches (
     search_term_length      INTEGER,
     search_term_word_count  INTEGER,
 
-    -- Time extraction
+    -- Time extraction (CET-based)
     event_hour              INTEGER,
     event_weekday           VARCHAR(10),
     event_weekday_num       INTEGER,

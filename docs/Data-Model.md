@@ -137,7 +137,46 @@ session_key = session_date || '_' || user_id || '_' || session_id
 -- Example: "2025-01-15_user123_abc789"
 ```
 
-#### 3. Search Term Normalization
+#### 3. CET Timezone Conversion
+All time-derived columns use Central European Time (CET/CEST) instead of UTC:
+
+```sql
+-- DuckDB:
+timestamp_cet = timezone('Europe/Berlin', timestamp)
+
+-- PostgreSQL:
+timestamp_cet = timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin'
+```
+
+This automatically handles:
+- **CET (UTC+1)**: Standard time (late October to late March)
+- **CEST (UTC+2)**: Daylight saving time (late March to late October)
+
+**Columns derived from CET timestamp:**
+- `session_date`: Extracted from CET timestamp (affects session boundaries)
+- `session_key`: Uses CET-based session_date
+- `event_hour`: Hour (0-23) in CET
+- `event_weekday`: Day name in CET
+- `event_weekday_num`: ISO day of week in CET
+- `searches_morning/afternoon/evening/night`: Based on CET hour
+
+**Example (Winter - CET):**
+```
+UTC timestamp:  2025-01-15 23:30:00.000  (late evening UTC)
+CET timestamp:  2025-01-16 00:30:00.000  (early morning CET - next day!)
+session_date:   2025-01-16               (CET date)
+event_hour:     0                        (midnight hour in CET)
+```
+
+**Example (Summer - CEST):**
+```
+UTC timestamp:  2025-07-15 22:30:00.000  (late evening UTC)
+CEST timestamp: 2025-07-16 00:30:00.000  (early morning CEST - next day!)
+session_date:   2025-07-16               (CEST date)
+event_hour:     0                        (midnight hour in CEST)
+```
+
+#### 4. Search Term Normalization
 Search terms are cleaned for consistent aggregation:
 
 ```sql
@@ -395,12 +434,14 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 
 | Column | Type | Description | Example |
 |--------|------|-------------|---------|
-| `timestamp` | Timestamp | Event timestamp (microsecond precision) | 2025-01-15 10:30:15.567123 |
+| `timestamp` | Timestamp | Event timestamp in UTC (microsecond precision) | 2025-01-15 10:30:15.567123 |
+| `timestamp_cet` | Timestamp | Event timestamp in CET/CEST (microsecond precision) | 2025-01-15 11:30:15.567123 |
+| `timestamp_cet_str` | String | CET timestamp as string for Power BI | 2025-01-15 11:30:15.567 |
 | `name` | String | Event type (normalized to uppercase) | SEARCH_RESULT_COUNT |
 | `user_id` | String | Anonymous user identifier | user_abc123 |
 | `session_id` | String | Session identifier | sess_xyz789 |
-| `session_key` | String | Composite key: date_user_session | 2025-01-15_user_abc123_sess_xyz789 |
-| `session_date` | Date | Date of the event | 2025-01-15 |
+| `session_key` | String | Composite key: date_user_session (CET date) | 2025-01-15_user_abc123_sess_xyz789 |
+| `session_date` | Date | Date of the event (CET-based) | 2025-01-15 |
 | `event_order` | Integer | Sequence number within session | 3 |
 | `prev_event` | String | Previous event type in session | SEARCH_COMPLETED |
 | `ms_since_prev_event` | Integer | Milliseconds since previous event | 333 |
@@ -432,8 +473,8 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `sec_search_to_result` | Float | Seconds: search to results | MIN(ms_search_to_result) / 1000 |
 | `sec_result_to_click` | Float | Seconds: results to click | MIN(ms_result_to_click) / 1000 |
 | `total_duration_sec` | Float | Session length in seconds | (MAX - MIN timestamp) / 1000 |
-| `first_event_hour` | Integer | Hour of first event (0-23) | MIN(event_hour) |
-| `last_event_hour` | Integer | Hour of last event (0-23) | MAX(event_hour) |
+| `first_event_hour` | Integer | Hour of first event (0-23 CET) | MIN(event_hour) |
+| `last_event_hour` | Integer | Hour of last event (0-23 CET) | MAX(event_hour) |
 | `general_clicks` | Integer | General tab clicks | COUNT(click_category='General') |
 | `all_tab_clicks` | Integer | All tab clicks | COUNT(click_category='All') |
 | `news_clicks` | Integer | News tab clicks | COUNT(click_category='News') |
@@ -499,10 +540,10 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `clicks_people` | Integer | People tab clicks | COUNT(click_category='People') |
 | `day_of_week` | String | Day name | DAYNAME(session_date) |
 | `day_of_week_num` | Integer | ISO day number (1=Mon) | ISODOW(session_date) |
-| `searches_morning` | Integer | Searches 6:00-12:00 | Hour-based filter |
-| `searches_afternoon` | Integer | Searches 12:00-18:00 | Hour-based filter |
-| `searches_evening` | Integer | Searches 18:00-24:00 | Hour-based filter |
-| `searches_night` | Integer | Searches 0:00-6:00 | Hour-based filter |
+| `searches_morning` | Integer | Searches 6:00-12:00 CET | Hour-based filter (CET) |
+| `searches_afternoon` | Integer | Searches 12:00-18:00 CET | Hour-based filter (CET) |
+| `searches_evening` | Integer | Searches 18:00-24:00 CET | Hour-based filter (CET) |
+| `searches_night` | Integer | Searches 0:00-6:00 CET | Hour-based filter (CET) |
 | `new_users` | Integer | First-time users today | Users where first_seen = today |
 | `returning_users` | Integer | Repeat users today | Users where first_seen < today |
 
@@ -533,10 +574,10 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `avg_sec_to_click` | Float | Avg decision time | AVG(ms_result_to_click) / 1000 |
 | `clicks_with_timing` | Integer | Clicks with timing data | COUNT(click after SEARCH_RESULT_COUNT) |
 | `sum_sec_to_click` | Float | Sum of click times | SUM(ms_result_to_click) / 1000 - for weighted avg in DAX |
-| `searches_morning` | Integer | Searches 6:00-12:00 | Hour-based filter |
-| `searches_afternoon` | Integer | Searches 12:00-18:00 | Hour-based filter |
-| `searches_evening` | Integer | Searches 18:00-24:00 | Hour-based filter |
-| `searches_night` | Integer | Searches 0:00-6:00 | Hour-based filter |
+| `searches_morning` | Integer | Searches 6:00-12:00 CET | Hour-based filter (CET) |
+| `searches_afternoon` | Integer | Searches 12:00-18:00 CET | Hour-based filter (CET) |
+| `searches_evening` | Integer | Searches 18:00-24:00 CET | Hour-based filter (CET) |
+| `searches_night` | Integer | Searches 0:00-6:00 CET | Hour-based filter (CET) |
 | `first_seen_date` | Date | First day term appeared | MIN(session_date) over all time |
 | `is_new_term` | Boolean | First appearance today | session_date = first_seen_date |
 
