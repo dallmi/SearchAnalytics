@@ -376,6 +376,10 @@ def add_calculated_columns(con):
     # Drop existing searches table
     con.execute("DROP TABLE IF EXISTS searches")
 
+    # Set timezone to UTC so DuckDB interprets naive timestamps as UTC
+    # This is required for AT TIME ZONE conversions to work correctly
+    con.execute("SET TIMEZONE='UTC'")
+
     # Get column list
     schema = con.execute("DESCRIBE searches_raw").df()
     col_names = schema['column_name'].tolist()
