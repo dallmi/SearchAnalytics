@@ -436,14 +436,24 @@ def add_calculated_columns(con):
                 WHEN name = 'SEARCH_RESULT_COUNT' THEN false
                 ELSE NULL
             END as is_clickable_result,
+            -- Click category: categorizes ALL click events for analysis
             CASE
-                WHEN name = 'SEARCH_TAB_CLICK' THEN 'General'
-                WHEN name = 'SEARCH_ALL_TAB_PAGE_CLICK' THEN 'All'
-                WHEN name = 'SEARCH_NEWS_TAB_PAGE_CLICK' THEN 'News'
-                WHEN name = 'SEARCH_GOTO_TAB_PAGE_CLICK' THEN 'GoTo'
+                WHEN name = 'SEARCH_RESULT_CLICK' THEN 'Result'
+                WHEN name = 'SEARCH_TRENDING_CLICKED' THEN 'Trending'
+                WHEN name = 'SEARCH_TAB_CLICK' THEN 'Tab'
+                WHEN name = 'SEARCH_ALL_TAB_PAGE_CLICK' THEN 'Pagination'
+                WHEN name = 'SEARCH_NEWS_TAB_PAGE_CLICK' THEN 'Pagination'
+                WHEN name = 'SEARCH_GOTO_TAB_PAGE_CLICK' THEN 'Pagination'
+                WHEN name = 'SEARCH_FILTER_CLICK' THEN 'Filter'
                 WHEN name LIKE '%PEOPLE%' OR name LIKE '%people%' THEN 'People'
                 ELSE NULL
-            END as click_category
+            END as click_category,
+            -- Success click: TRUE only for actual result clicks (not navigation/refinement)
+            CASE
+                WHEN name = 'SEARCH_RESULT_CLICK' THEN true
+                WHEN name = 'SEARCH_TRENDING_CLICKED' THEN true
+                ELSE false
+            END as is_success_click
         FROM searches_raw r
     """)
 
@@ -561,7 +571,7 @@ def export_parquet_files(con, output_dir):
                     session_key,
                     session_date,
                     MAX(CASE WHEN is_clickable_result = true THEN 1 ELSE 0 END) as had_results,
-                    MAX(CASE WHEN click_category IS NOT NULL THEN 1 ELSE 0 END) as had_clicks
+                    MAX(CASE WHEN is_success_click = true THEN 1 ELSE 0 END) as had_clicks
                 FROM searches
                 GROUP BY session_key, session_date
             ),
@@ -600,14 +610,15 @@ def export_parquet_files(con, output_dir):
                 COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' THEN 1 END) as search_starts,
                 COUNT(CASE WHEN s.name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_events,
                 COUNT(CASE WHEN s.click_category IS NOT NULL THEN 1 END) as click_events,
+                COUNT(CASE WHEN s.is_success_click = true THEN 1 END) as success_clicks,
                 SUM(CASE WHEN s.is_null_result = true THEN 1 ELSE 0 END) as null_results,
                 SUM(CASE WHEN s.is_clickable_result = true THEN 1 ELSE 0 END) as result_events_with_results,
                 -- Session-based metrics for accurate rate calculations
                 MAX(d.sessions_with_results) as sessions_with_results,
                 MAX(d.sessions_with_clicks) as sessions_with_clicks,
                 MAX(d.sessions_abandoned) as sessions_abandoned,
-                -- Rate metrics (event-based, can exceed 100% due to multiple clicks per search)
-                ROUND(100.0 * COUNT(CASE WHEN s.click_category IS NOT NULL THEN 1 END)
+                -- Rate metrics (success = actual result clicks, not navigation/filter clicks)
+                ROUND(100.0 * COUNT(CASE WHEN s.is_success_click = true THEN 1 END)
                     / NULLIF(COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' THEN 1 END), 0), 2) as click_rate_pct,
                 ROUND(100.0 * SUM(CASE WHEN s.is_null_result = true THEN 1 ELSE 0 END)
                     / NULLIF(COUNT(CASE WHEN s.name = 'SEARCH_RESULT_COUNT' THEN 1 END), 0), 2) as null_rate_pct,
@@ -626,11 +637,12 @@ def export_parquet_files(con, output_dir):
                 SUM(s.search_term_word_count) as sum_search_term_words,
                 COUNT(CASE WHEN s.search_term_length IS NOT NULL THEN 1 END) as search_term_count,
                 COUNT(CASE WHEN s.is_first_search_of_day = true THEN 1 END) as first_searches_of_day,
-                -- Click category breakdown
-                COUNT(CASE WHEN s.click_category = 'General' THEN 1 END) as clicks_general,
-                COUNT(CASE WHEN s.click_category = 'All' THEN 1 END) as clicks_all,
-                COUNT(CASE WHEN s.click_category = 'News' THEN 1 END) as clicks_news,
-                COUNT(CASE WHEN s.click_category = 'GoTo' THEN 1 END) as clicks_goto,
+                -- Click category breakdown (Result/Trending = success, others = navigation/refinement)
+                COUNT(CASE WHEN s.click_category = 'Result' THEN 1 END) as clicks_result,
+                COUNT(CASE WHEN s.click_category = 'Trending' THEN 1 END) as clicks_trending,
+                COUNT(CASE WHEN s.click_category = 'Tab' THEN 1 END) as clicks_tab,
+                COUNT(CASE WHEN s.click_category = 'Pagination' THEN 1 END) as clicks_pagination,
+                COUNT(CASE WHEN s.click_category = 'Filter' THEN 1 END) as clicks_filter,
                 COUNT(CASE WHEN s.click_category = 'People' THEN 1 END) as clicks_people,
                 -- Temporal patterns
                 DAYNAME(s.session_date) as day_of_week,
@@ -670,12 +682,13 @@ def export_parquet_files(con, output_dir):
                     -- Timing metrics (SEARCH_TRIGGERED to SEARCH_RESULT_COUNT = full user-perceived latency)
                     MIN(CASE WHEN name = 'SEARCH_RESULT_COUNT' AND last_search_started_ts IS NOT NULL
                         THEN DATEDIFF('millisecond', last_search_started_ts, timestamp) END) as ms_search_to_result,
-                    MIN(CASE WHEN click_category IS NOT NULL AND prev_event = 'SEARCH_RESULT_COUNT' THEN ms_since_prev_event END) as ms_result_to_click,
+                    MIN(CASE WHEN is_success_click = true AND prev_event = 'SEARCH_RESULT_COUNT' THEN ms_since_prev_event END) as ms_result_to_click,
                     DATEDIFF('millisecond', MIN(timestamp), MAX(timestamp)) as total_duration_ms,
                     -- Event counts
                     COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' THEN 1 END) as search_count_in_session,
                     COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_count,
                     COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_count,
+                    COUNT(CASE WHEN is_success_click = true THEN 1 END) as success_click_count,
                     COUNT(DISTINCT search_term_normalized) as unique_search_terms,
                     SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END) as null_result_count,
                     -- Result metrics
@@ -683,11 +696,12 @@ def export_parquet_files(con, output_dir):
                     -- Time of day
                     MIN(event_hour) as first_event_hour,
                     MAX(event_hour) as last_event_hour,
-                    -- Click breakdown
-                    COUNT(CASE WHEN click_category = 'General' THEN 1 END) as general_clicks,
-                    COUNT(CASE WHEN click_category = 'All' THEN 1 END) as all_tab_clicks,
-                    COUNT(CASE WHEN click_category = 'News' THEN 1 END) as news_clicks,
-                    COUNT(CASE WHEN click_category = 'GoTo' THEN 1 END) as goto_clicks,
+                    -- Click breakdown (Result/Trending = success, others = navigation)
+                    COUNT(CASE WHEN click_category = 'Result' THEN 1 END) as result_clicks,
+                    COUNT(CASE WHEN click_category = 'Trending' THEN 1 END) as trending_clicks,
+                    COUNT(CASE WHEN click_category = 'Tab' THEN 1 END) as tab_clicks,
+                    COUNT(CASE WHEN click_category = 'Pagination' THEN 1 END) as pagination_clicks,
+                    COUNT(CASE WHEN click_category = 'Filter' THEN 1 END) as filter_clicks,
                     COUNT(CASE WHEN click_category = 'People' THEN 1 END) as people_clicks,
                     MAX(CASE WHEN is_first_search_of_day = true THEN 1 ELSE 0 END) as includes_first_search_of_day,
                     -- Session flow: distinct click categories used
@@ -719,12 +733,14 @@ def export_parquet_files(con, output_dir):
                 -- Time of day
                 first_event_hour,
                 last_event_hour,
-                -- Click breakdown
-                general_clicks,
-                all_tab_clicks,
-                news_clicks,
-                goto_clicks,
+                -- Click breakdown (Result/Trending = success clicks, others = navigation)
+                result_clicks,
+                trending_clicks,
+                tab_clicks,
+                pagination_clicks,
+                filter_clicks,
                 people_clicks,
+                success_click_count,
                 CASE WHEN includes_first_search_of_day = 1 THEN true ELSE false END as includes_first_search_of_day,
                 -- Time buckets
                 CASE
@@ -752,11 +768,11 @@ def export_parquet_files(con, output_dir):
                     WHEN total_duration_ms < 300000 THEN '3-5 min'
                     ELSE '> 5 min (extended)'
                 END as session_duration_bucket,
-                -- Classifications
+                -- Classifications (success = actual result click, not navigation/filter clicks)
                 CASE
-                    WHEN click_count > 0 THEN 'Success'
-                    WHEN result_count > 0 AND null_result_count = result_count AND click_count = 0 THEN 'No Results'
-                    WHEN result_count > 0 AND click_count = 0 THEN 'Abandoned'
+                    WHEN success_click_count > 0 THEN 'Success'
+                    WHEN result_count > 0 AND null_result_count = result_count AND success_click_count = 0 THEN 'No Results'
+                    WHEN result_count > 0 AND success_click_count = 0 THEN 'Abandoned'
                     ELSE 'Unknown'
                 END as journey_outcome,
                 CASE WHEN unique_search_terms > 1 THEN true ELSE false END as had_reformulation,
@@ -793,9 +809,9 @@ def export_parquet_files(con, output_dir):
                     ELSE 6
                 END as session_duration_sort,
                 CASE
-                    WHEN click_count > 0 THEN 1
-                    WHEN result_count > 0 AND null_result_count = result_count AND click_count = 0 THEN 3
-                    WHEN result_count > 0 AND click_count = 0 THEN 2
+                    WHEN success_click_count > 0 THEN 1
+                    WHEN result_count > 0 AND null_result_count = result_count AND success_click_count = 0 THEN 3
+                    WHEN result_count > 0 AND success_click_count = 0 THEN 2
                     ELSE 4
                 END as journey_outcome_sort,
                 CASE
@@ -806,7 +822,7 @@ def export_parquet_files(con, output_dir):
                 END as session_complexity_sort,
                 -- Null result recovery analysis
                 CASE WHEN null_result_count > 0 THEN true ELSE false END as had_null_result,
-                CASE WHEN null_result_count > 0 AND click_count > 0 THEN true ELSE false END as recovered_from_null,
+                CASE WHEN null_result_count > 0 AND success_click_count > 0 THEN true ELSE false END as recovered_from_null,
                 -- User cohort analysis
                 user_session_number,
                 CASE WHEN user_session_number = 1 THEN true ELSE false END as is_users_first_session,
@@ -835,6 +851,7 @@ def export_parquet_files(con, output_dir):
                     name,
                     is_null_result,
                     click_category,
+                    is_success_click,
                     search_term_normalized,
                     prev_event,
                     ms_since_prev_event,
@@ -876,22 +893,24 @@ def export_parquet_files(con, output_dir):
                 SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END) as null_result_count,
                 -- Click metrics (clicks attributed to this search term)
                 COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_count,
-                COUNT(CASE WHEN click_category = 'General' THEN 1 END) as clicks_general,
-                COUNT(CASE WHEN click_category = 'All' THEN 1 END) as clicks_all,
-                COUNT(CASE WHEN click_category = 'News' THEN 1 END) as clicks_news,
-                COUNT(CASE WHEN click_category = 'GoTo' THEN 1 END) as clicks_goto,
+                COUNT(CASE WHEN is_success_click = true THEN 1 END) as success_click_count,
+                COUNT(CASE WHEN click_category = 'Result' THEN 1 END) as clicks_result,
+                COUNT(CASE WHEN click_category = 'Trending' THEN 1 END) as clicks_trending,
+                COUNT(CASE WHEN click_category = 'Tab' THEN 1 END) as clicks_tab,
+                COUNT(CASE WHEN click_category = 'Pagination' THEN 1 END) as clicks_pagination,
+                COUNT(CASE WHEN click_category = 'Filter' THEN 1 END) as clicks_filter,
                 COUNT(CASE WHEN click_category = 'People' THEN 1 END) as clicks_people,
-                -- Timing metrics (result to click time for this term)
+                -- Timing metrics (result to success click time for this term)
                 ROUND(AVG(CASE
-                    WHEN click_category IS NOT NULL AND prev_event = 'SEARCH_RESULT_COUNT'
+                    WHEN is_success_click = true AND prev_event = 'SEARCH_RESULT_COUNT'
                     THEN ms_since_prev_event / 1000.0
                 END), 2) as avg_sec_to_click,
                 COUNT(CASE
-                    WHEN click_category IS NOT NULL AND prev_event = 'SEARCH_RESULT_COUNT'
+                    WHEN is_success_click = true AND prev_event = 'SEARCH_RESULT_COUNT'
                     THEN 1
                 END) as clicks_with_timing,
                 SUM(CASE
-                    WHEN click_category IS NOT NULL AND prev_event = 'SEARCH_RESULT_COUNT'
+                    WHEN is_success_click = true AND prev_event = 'SEARCH_RESULT_COUNT'
                     THEN ms_since_prev_event / 1000.0
                     ELSE 0
                 END) as sum_sec_to_click,
@@ -936,12 +955,12 @@ def print_summary(con):
     if len(date_range) > 0 and date_range['first_date'][0] is not None:
         log(f"Date range: {date_range['first_date'][0]} to {date_range['last_date'][0]} ({date_range['days'][0]} days)")
 
-    # Journey outcomes
+    # Journey outcomes (success = actual result click, not navigation/filter clicks)
     outcomes = con.execute("""
         WITH session_summary AS (
             SELECT
                 session_key,
-                COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as clicks,
+                COUNT(CASE WHEN is_success_click = true THEN 1 END) as success_clicks,
                 SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END) as null_results,
                 COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as results
             FROM searches
@@ -949,9 +968,9 @@ def print_summary(con):
         )
         SELECT
             CASE
-                WHEN clicks > 0 THEN 'Success'
-                WHEN results > 0 AND null_results = results AND clicks = 0 THEN 'No Results'
-                WHEN results > 0 AND clicks = 0 THEN 'Abandoned'
+                WHEN success_clicks > 0 THEN 'Success'
+                WHEN results > 0 AND null_results = results AND success_clicks = 0 THEN 'No Results'
+                WHEN results > 0 AND success_clicks = 0 THEN 'Abandoned'
                 ELSE 'Unknown'
             END as outcome,
             COUNT(*) as sessions,
