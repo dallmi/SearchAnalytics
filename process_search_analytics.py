@@ -393,11 +393,12 @@ def add_calculated_columns(con):
             -- Timestamp as string for Power BI (Parquet connector loses precision) - UTC
             STRFTIME(timestamp, '%Y-%m-%d %H:%M:%S.%g') as timestamp_str,
             -- CET timestamp (convert UTC to Europe/Berlin which handles CET/CEST automatically)
-            (timestamp::TIMESTAMPTZ AT TIME ZONE 'Europe/Berlin')::TIMESTAMP as timestamp_cet,
-            STRFTIME(timestamp::TIMESTAMPTZ AT TIME ZONE 'Europe/Berlin', '%Y-%m-%d %H:%M:%S.%g') as timestamp_cet_str,
+            -- DuckDB requires: first mark as UTC, then convert to target timezone
+            ((timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Berlin')::TIMESTAMP as timestamp_cet,
+            STRFTIME((timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Berlin', '%Y-%m-%d %H:%M:%S.%g') as timestamp_cet_str,
             -- Session columns (CET-based)
-            DATE_TRUNC('day', timestamp::TIMESTAMPTZ AT TIME ZONE 'Europe/Berlin')::DATE as session_date,
-            COALESCE(CAST(DATE_TRUNC('day', timestamp::TIMESTAMPTZ AT TIME ZONE 'Europe/Berlin')::DATE AS VARCHAR), '') || '_' ||
+            DATE_TRUNC('day', (timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Berlin')::DATE as session_date,
+            COALESCE(CAST(DATE_TRUNC('day', (timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Berlin')::DATE AS VARCHAR), '') || '_' ||
                 COALESCE(user_id, '') || '_' ||
                 COALESCE(session_id, '') as session_key,
             -- Time interval columns (calculated via window functions below)
@@ -417,9 +418,9 @@ def add_calculated_columns(con):
                      LENGTH(REPLACE(LOWER(TRIM(COALESCE(CP_searchQuery, searchQuery, query))), ' ', '')) + 1
             END as search_term_word_count,
             -- Time extraction (CET-based)
-            EXTRACT(HOUR FROM timestamp::TIMESTAMPTZ AT TIME ZONE 'Europe/Berlin')::INTEGER as event_hour,
-            DAYNAME(timestamp::TIMESTAMPTZ AT TIME ZONE 'Europe/Berlin') as event_weekday,
-            ISODOW(timestamp::TIMESTAMPTZ AT TIME ZONE 'Europe/Berlin') as event_weekday_num,
+            EXTRACT(HOUR FROM (timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Berlin')::INTEGER as event_hour,
+            DAYNAME((timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Berlin') as event_weekday,
+            ISODOW((timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Berlin') as event_weekday_num,
             -- Flags
             CASE
                 WHEN name = 'SEARCH_RESULT_COUNT' AND CAST(CP_totalResultCount AS INTEGER) = 0 THEN true
