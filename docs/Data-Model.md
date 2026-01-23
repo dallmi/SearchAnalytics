@@ -18,40 +18,112 @@ This document explains how raw search analytics events are transformed into mean
 
 ## 1. Event Types & Sequence
 
-### Search Event Types
+### Initialization Events
 
-The search system generates these event types (stored in the `name` column):
+Events fired when the search interface loads (before any user search):
 
 | Event | Description | When Fired |
 |-------|-------------|------------|
-| `SEARCH_TRIGGERED` | User initiates a search | User types query and presses Enter |
-| `SEARCH_COMPLETED` | Search query submitted to backend | Query sent to search service |
-| `SEARCH_RESULT_COUNT` | Results returned to user | Search results displayed |
-| `SEARCH_TAB_CLICK` | User clicks a General result | Click on main search tab |
-| `SEARCH_ALL_TAB_PAGE_CLICK` | User clicks an All tab result | Click on All tab |
-| `SEARCH_NEWS_TAB_PAGE_CLICK` | User clicks a News result | Click on News tab |
-| `SEARCH_GOTO_TAB_PAGE_CLICK` | User clicks a GoTo result | Click on GoTo tab |
-| `SEARCH_PEOPLE_*` | User clicks a People result | Click on People tab |
+| `SEARCH_USER_LOGGED_IN_SUCCESS` | User authenticated | User successfully authenticated in goto/echo |
+| `SEARCH_USER_DETAILS_FETCHED` | User profile loaded | User details fetched from User Profile after authentication |
+| `SEARCH_USER_DETAILS_FETCHED_FROM_CACHE` | User profile from cache | User details fetched from local storage after authentication |
+| `SEARCH_USER_PHOTO_FETCHED` | Profile picture loaded | User profile pic retrieved from User Profile |
+| `SEARCH_DATA_FETCH_STARTED` | Suggestions request sent | Request to fetch suggestions and trending searches sent to backend |
+| `SEARCH_DATA_FETCH_COMPLETED` | Suggestions loaded | Suggestions and trending searches retrieved from backend |
 
-### Typical Event Sequence
+### Search Flow Events
+
+Core events in the search execution flow (stored in the `name` column):
+
+| Event | Description | When Fired |
+|-------|-------------|------------|
+| `SEARCH_TRIGGERED` | User initiates search | User clicks search button OR presses Enter key |
+| `SEARCH_STARTED` | Request sent to backend | Search request submitted to search service |
+| `SEARCH_COMPLETED` | Results returned | Search results returned to user |
+| `SEARCH_RESULT_COUNT` | Results displayed | Search completed and result count returned to user |
+| `SEARCH_FAILED` | Search error | Any error occurred during search |
+
+### Click Events
+
+Events fired when users interact with search results:
+
+| Event | Description | When Fired |
+|-------|-------------|------------|
+| `SEARCH_TAB_CLICK` | Tab clicked | Any tab (All, News, GOTO) is clicked |
+| `SEARCH_RESULT_CLICK` | Result clicked | Any item from search results is clicked |
+| `SEARCH_ALL_TAB_PAGE_CLICK` | All tab pagination | User on ALL tab clicks page in pagination |
+| `SEARCH_NEWS_TAB_PAGE_CLICK` | News tab pagination | User on NEWS tab clicks page in pagination |
+| `SEARCH_GOTO_TAB_PAGE_CLICK` | GoTo tab pagination | User on GOTO tab clicks page in pagination |
+| `SEARCH_PEOPLE_*` | People result clicked | User clicks a People tab result |
+| `SEARCH_TRENDING_CLICKED` | Trending item clicked | User clicks a trending search item |
+| `SEARCH_FILTER_CLICK` | Filter clicked | Date OR Relevance filter clicked on results page |
+
+### Full Event Sequence
+
+```
+[Initialization - happens once per session]
+    |
+    v
+SEARCH_USER_LOGGED_IN_SUCCESS
+    |
+    v
+SEARCH_USER_DETAILS_FETCHED (or SEARCH_USER_DETAILS_FETCHED_FROM_CACHE)
+    |
+    v
+SEARCH_USER_PHOTO_FETCHED
+    |
+    v
+SEARCH_DATA_FETCH_STARTED
+    |
+    v
+SEARCH_DATA_FETCH_COMPLETED
+    |
+    v
+[User ready to search]
+    |
+    v
+SEARCH_TRIGGERED  <-- User presses Enter or clicks search (10:30:15.123)
+    |
+    v
+SEARCH_STARTED    <-- Request sent to backend (10:30:15.150)
+    |
+    v
+SEARCH_COMPLETED  <-- Results returned (10:30:15.400)
+    |
+    v
+SEARCH_RESULT_COUNT  <-- Results displayed to user (10:30:15.567)
+    |
+    v
+[User interacts with results - independent events]
+    |
+    +-- SEARCH_TAB_CLICK / SEARCH_RESULT_CLICK
+    +-- SEARCH_ALL_TAB_PAGE_CLICK / SEARCH_NEWS_TAB_PAGE_CLICK / SEARCH_GOTO_TAB_PAGE_CLICK
+    +-- SEARCH_TRENDING_CLICKED
+    +-- SEARCH_FILTER_CLICK
+```
+
+### Typical Search Sequence (Simplified)
 
 ```
 User types "project budget" and presses Enter
     |
     v
-[SEARCH_TRIGGERED]  <-- timestamp: 10:30:15.123
+[SEARCH_TRIGGERED]    <-- timestamp: 10:30:15.123
     |
     v
-[SEARCH_COMPLETED]  <-- timestamp: 10:30:15.234  (111ms later)
+[SEARCH_STARTED]      <-- timestamp: 10:30:15.150  (27ms later)
     |
     v
-[SEARCH_RESULT_COUNT]  <-- timestamp: 10:30:15.567  (333ms after COMPLETED)
-    |                                               (444ms after STARTED)
+[SEARCH_COMPLETED]    <-- timestamp: 10:30:15.400  (250ms later)
+    |
+    v
+[SEARCH_RESULT_COUNT] <-- timestamp: 10:30:15.567  (167ms later, 444ms total)
+    |
     v
 User sees results, clicks one
     |
     v
-[SEARCH_TAB_CLICK]  <-- timestamp: 10:30:18.890  (3.3s after results shown)
+[SEARCH_TAB_CLICK]    <-- timestamp: 10:30:18.890  (3.3s after results shown)
 ```
 
 ### Example: Complete Session
@@ -59,14 +131,16 @@ User sees results, clicks one
 ```
 Session: 2025-01-15_user123_session456
 
-Event 1: SEARCH_TRIGGERED      @ 10:30:15.123   (search term: "budget report")
-Event 2: SEARCH_COMPLETED    @ 10:30:15.234
-Event 3: SEARCH_RESULT_COUNT @ 10:30:15.567   (15 results found)
-Event 4: SEARCH_TAB_CLICK    @ 10:30:18.890   (user clicked a result)
-Event 5: SEARCH_TRIGGERED      @ 10:30:45.000   (user searches again: "2024 budget")
-Event 6: SEARCH_COMPLETED    @ 10:30:45.100
-Event 7: SEARCH_RESULT_COUNT @ 10:30:45.400   (8 results found)
-Event 8: SEARCH_TAB_CLICK    @ 10:30:52.500   (user clicked another result)
+Event 1:  SEARCH_TRIGGERED      @ 10:30:15.123   (search term: "budget report")
+Event 2:  SEARCH_STARTED        @ 10:30:15.150   (request to backend)
+Event 3:  SEARCH_COMPLETED      @ 10:30:15.400   (results returned)
+Event 4:  SEARCH_RESULT_COUNT   @ 10:30:15.567   (15 results displayed)
+Event 5:  SEARCH_TAB_CLICK      @ 10:30:18.890   (user clicked a result)
+Event 6:  SEARCH_TRIGGERED      @ 10:30:45.000   (user searches again: "2024 budget")
+Event 7:  SEARCH_STARTED        @ 10:30:45.030
+Event 8:  SEARCH_COMPLETED      @ 10:30:45.280
+Event 9:  SEARCH_RESULT_COUNT   @ 10:30:45.400   (8 results displayed)
+Event 10: SEARCH_TAB_CLICK      @ 10:30:52.500   (user clicked another result)
 ```
 
 ---
@@ -790,3 +864,4 @@ timestamp,name,user_Id,session_Id,CP_searchQuery,CP_totalResultCount
 | 1.0 | 2025-01-15 | Initial documentation |
 | 1.1 | 2025-01-16 | Added missing parquet columns (click breakdowns, sort columns, timing aggregates), Power BI calculated columns section, Power BI measures section |
 | 1.2 | 2025-01-23 | Added CET timezone support: timestamp_cet columns, CET-based session_date/event_hour/event_weekday, updated time distribution documentation |
+| 1.3 | 2025-01-23 | Expanded event documentation: added initialization events, SEARCH_STARTED distinction, click event details (SEARCH_RESULT_CLICK, SEARCH_TRENDING_CLICKED, SEARCH_FILTER_CLICK, SEARCH_FAILED) |
