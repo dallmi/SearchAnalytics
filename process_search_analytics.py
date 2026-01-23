@@ -496,6 +496,26 @@ def add_calculated_columns(con):
     row_count = con.execute("SELECT COUNT(*) as n FROM searches").df()['n'][0]
     log(f"  Calculated columns added for {row_count:,} rows")
 
+    # Verify CET timezone conversion
+    cet_sample = con.execute("""
+        SELECT
+            timestamp as utc_timestamp,
+            timestamp_cet as cet_timestamp,
+            EXTRACT(HOUR FROM timestamp) as utc_hour,
+            event_hour as cet_hour,
+            session_date
+        FROM searches
+        ORDER BY timestamp
+        LIMIT 3
+    """).df()
+
+    if len(cet_sample) > 0:
+        log("  CET timezone conversion verification:")
+        for _, row in cet_sample.iterrows():
+            utc_ts = str(row['utc_timestamp'])[:23]
+            cet_ts = str(row['cet_timestamp'])[:23]
+            log(f"    UTC: {utc_ts} (hour {int(row['utc_hour']):02d}) → CET: {cet_ts} (hour {int(row['cet_hour']):02d}) | session_date: {row['session_date']}")
+
 
 def export_parquet_files(con, output_dir):
     """Export all Parquet files for Power BI."""
