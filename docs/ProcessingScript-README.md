@@ -23,7 +23,8 @@ SearchAnalytics/
 ├── output/                         # Parquet files for Power BI
 │   ├── searches_raw.parquet
 │   ├── searches_daily.parquet
-│   └── searches_journeys.parquet
+│   ├── searches_journeys.parquet
+│   └── searches_terms.parquet
 └── process_search_analytics.py
 ```
 
@@ -111,11 +112,13 @@ INSERT INTO searches_raw SELECT * FROM temp_import;
 
 The script creates a `searches` table with all calculated analytics columns:
 
-#### Session Identification
+#### Session Identification (CET-based)
 | Column | Description | Example |
 |--------|-------------|---------|
-| `session_date` | Date portion of timestamp | `2025-01-13` |
-| `session_key` | Unique session identifier | `2025-01-13_user123_sess456` |
+| `session_date` | Date portion of timestamp (CET timezone) | `2025-01-13` |
+| `session_key` | Unique session identifier (uses CET date) | `2025-01-13_user123_sess456` |
+
+> **Note:** Session dates use CET timezone. An event at 23:30 UTC becomes 00:30 CET the next day.
 
 #### Event Sequencing (Window Functions)
 | Column | Description |
@@ -134,12 +137,20 @@ The script creates a `searches` table with all calculated analytics columns:
 | `search_term_length` | Character count of search term |
 | `search_term_word_count` | Word count of search term |
 
-#### Time Extraction
+#### CET Timestamp
 | Column | Description |
 |--------|-------------|
-| `event_hour` | Hour of day (0-23) |
-| `event_weekday` | Day name (`Monday`, `Tuesday`, etc.) |
-| `event_weekday_num` | ISO weekday (1=Monday, 7=Sunday) |
+| `timestamp_cet` | Event timestamp converted to CET/CEST (Europe/Berlin) |
+| `timestamp_cet_str` | CET timestamp as string for Power BI compatibility |
+
+#### Time Extraction (CET-based)
+| Column | Description |
+|--------|-------------|
+| `event_hour` | Hour of day (0-23) in CET timezone |
+| `event_weekday` | Day name (`Monday`, `Tuesday`, etc.) in CET |
+| `event_weekday_num` | ISO weekday (1=Monday, 7=Sunday) in CET |
+
+> **Note:** All time-derived columns use CET (Central European Time) / CEST (summer time). The original `timestamp` remains in UTC for precise timing calculations.
 
 #### Behavioral Flags
 | Column | Description |
@@ -151,7 +162,7 @@ The script creates a `searches` table with all calculated analytics columns:
 
 ### Step 5: Export Parquet Files
 
-Four Parquet files are generated for Power BI:
+Four Parquet files are generated for Power BI (plus one for search term analysis):
 
 #### 1. `searches_raw.parquet`
 - **Content**: All event-level data with calculated columns
@@ -175,6 +186,9 @@ Four Parquet files are generated for Power BI:
     - `search_term_count` - Count of search terms (denominator for weighted avg)
   - `first_searches_of_day`
   - Click breakdowns by category (`clicks_general`, `clicks_all`, `clicks_news`, `clicks_goto`, `clicks_people`)
+  - **Time distribution (CET-based)**:
+    - `searches_morning` (6-12 CET), `searches_afternoon` (12-18 CET)
+    - `searches_evening` (18-24 CET), `searches_night` (0-6 CET)
 
 #### 3. `searches_journeys.parquet`
 - **Content**: Session-level data with timing metrics (consolidated)
@@ -192,6 +206,21 @@ Four Parquet files are generated for Power BI:
   - `had_reformulation` (user modified search query)
   - `session_complexity` (`Single Event`, `Simple`, `Medium`, `Complex`)
 - **Click breakdown**: `general_clicks`, `all_tab_clicks`, `news_clicks`, etc.
+
+#### 4. `searches_terms.parquet`
+- **Content**: Search term analysis aggregated by term and day
+- **Volume metrics**:
+  - `search_count`, `unique_users`, `unique_sessions`
+- **Result metrics**:
+  - `result_events`, `null_result_count`
+- **Click metrics**:
+  - `click_count`, `clicks_general`, `clicks_all`, `clicks_news`, `clicks_goto`, `clicks_people`
+- **Timing metrics**:
+  - `avg_sec_to_click` - Average time to click for this term
+- **Time distribution (CET-based)**:
+  - `searches_morning`, `searches_afternoon`, `searches_evening`, `searches_night`
+- **Trend detection**:
+  - `first_seen_date`, `is_new_term`
 
 ---
 
@@ -232,7 +261,8 @@ Four Parquet files are generated for Power BI:
 │  STEP 4: Export Parquet Files                                    │
 │  ├── searches_raw.parquet       (event-level)                   │
 │  ├── searches_daily.parquet     (daily aggregates)              │
-│  └── searches_journeys.parquet  (session data with timing)      │
+│  ├── searches_journeys.parquet  (session data with timing)      │
+│  └── searches_terms.parquet     (search term analysis)          │
 └─────────────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -314,25 +344,34 @@ If Power BI can't read the Parquet files:
 
 ## Event Types and Counting Logic
 
-### Search Events
-The telemetry captures two search initiation events that can overlap:
-- `SEARCH_TRIGGERED` - User initiates a search (presses enter, clicks button)
-- `SEARCH_TRIGGERED` - System begins processing the search
+### Search Flow Events
+The telemetry captures these events in the search flow:
 
-**Important:** To avoid double-counting, search counts use only `SEARCH_TRIGGERED` events. This applies to:
+| Event | Description | When Fired |
+|-------|-------------|------------|
+| `SEARCH_TRIGGERED` | User initiates a search | User clicks search button or presses Enter |
+| `SEARCH_STARTED` | Request sent to backend | Search request submitted to search service |
+| `SEARCH_COMPLETED` | Results returned | Search results returned from backend |
+| `SEARCH_RESULT_COUNT` | Results displayed | Search results displayed to user |
+| `SEARCH_FAILED` | Search error | Any error occurred during search |
+
+**Important:** Search counts use `SEARCH_TRIGGERED` events (user action), not `SEARCH_STARTED` (backend request). This applies to:
 - `search_starts` in daily parquet
 - `search_count_in_session` in journeys parquet
 - Click-through rate calculations
 - Average searches per session
+- Time distribution (morning/afternoon/evening/night)
 
-### Other Event Types
+### Click Events
 | Event | Description |
 |-------|-------------|
-| `SEARCH_RESULT_COUNT` | Results are displayed to user |
-| `SEARCH_TAB_CLICK` | Click on general result |
-| `SEARCH_ALL_TAB_PAGE_CLICK` | Click on "All" tab result |
-| `SEARCH_NEWS_TAB_PAGE_CLICK` | Click on news result |
-| `SEARCH_GOTO_TAB_PAGE_CLICK` | Click on "Go To" result |
+| `SEARCH_TAB_CLICK` | Click on any tab (All, News, GOTO) |
+| `SEARCH_RESULT_CLICK` | Click on any search result item |
+| `SEARCH_ALL_TAB_PAGE_CLICK` | Click on "All" tab pagination |
+| `SEARCH_NEWS_TAB_PAGE_CLICK` | Click on "News" tab pagination |
+| `SEARCH_GOTO_TAB_PAGE_CLICK` | Click on "GoTo" tab pagination |
+| `SEARCH_TRENDING_CLICKED` | Click on trending search item |
+| `SEARCH_FILTER_CLICK` | Click on Date or Relevance filter |
 
 ---
 
