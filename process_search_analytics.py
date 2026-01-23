@@ -441,9 +441,9 @@ def add_calculated_columns(con):
                 WHEN name = 'SEARCH_RESULT_CLICK' THEN 'Result'
                 WHEN name = 'SEARCH_TRENDING_CLICKED' THEN 'Trending'
                 WHEN name = 'SEARCH_TAB_CLICK' THEN 'Tab'
-                WHEN name = 'SEARCH_ALL_TAB_PAGE_CLICK' THEN 'Pagination'
-                WHEN name = 'SEARCH_NEWS_TAB_PAGE_CLICK' THEN 'Pagination'
-                WHEN name = 'SEARCH_GOTO_TAB_PAGE_CLICK' THEN 'Pagination'
+                WHEN name = 'SEARCH_ALL_TAB_PAGE_CLICK' THEN 'Pagination_All'
+                WHEN name = 'SEARCH_NEWS_TAB_PAGE_CLICK' THEN 'Pagination_News'
+                WHEN name = 'SEARCH_GOTO_TAB_PAGE_CLICK' THEN 'Pagination_GoTo'
                 WHEN name = 'SEARCH_FILTER_CLICK' THEN 'Filter'
                 WHEN name LIKE '%PEOPLE%' OR name LIKE '%people%' THEN 'People'
                 ELSE NULL
@@ -641,7 +641,10 @@ def export_parquet_files(con, output_dir):
                 COUNT(CASE WHEN s.click_category = 'Result' THEN 1 END) as clicks_result,
                 COUNT(CASE WHEN s.click_category = 'Trending' THEN 1 END) as clicks_trending,
                 COUNT(CASE WHEN s.click_category = 'Tab' THEN 1 END) as clicks_tab,
-                COUNT(CASE WHEN s.click_category = 'Pagination' THEN 1 END) as clicks_pagination,
+                COUNT(CASE WHEN s.click_category LIKE 'Pagination%' THEN 1 END) as clicks_pagination,
+                COUNT(CASE WHEN s.click_category = 'Pagination_All' THEN 1 END) as clicks_pagination_all,
+                COUNT(CASE WHEN s.click_category = 'Pagination_News' THEN 1 END) as clicks_pagination_news,
+                COUNT(CASE WHEN s.click_category = 'Pagination_GoTo' THEN 1 END) as clicks_pagination_goto,
                 COUNT(CASE WHEN s.click_category = 'Filter' THEN 1 END) as clicks_filter,
                 COUNT(CASE WHEN s.click_category = 'People' THEN 1 END) as clicks_people,
                 -- Temporal patterns
@@ -700,7 +703,10 @@ def export_parquet_files(con, output_dir):
                     COUNT(CASE WHEN click_category = 'Result' THEN 1 END) as result_clicks,
                     COUNT(CASE WHEN click_category = 'Trending' THEN 1 END) as trending_clicks,
                     COUNT(CASE WHEN click_category = 'Tab' THEN 1 END) as tab_clicks,
-                    COUNT(CASE WHEN click_category = 'Pagination' THEN 1 END) as pagination_clicks,
+                    COUNT(CASE WHEN click_category LIKE 'Pagination%' THEN 1 END) as pagination_clicks,
+                    COUNT(CASE WHEN click_category = 'Pagination_All' THEN 1 END) as pagination_all_clicks,
+                    COUNT(CASE WHEN click_category = 'Pagination_News' THEN 1 END) as pagination_news_clicks,
+                    COUNT(CASE WHEN click_category = 'Pagination_GoTo' THEN 1 END) as pagination_goto_clicks,
                     COUNT(CASE WHEN click_category = 'Filter' THEN 1 END) as filter_clicks,
                     COUNT(CASE WHEN click_category = 'People' THEN 1 END) as people_clicks,
                     MAX(CASE WHEN is_first_search_of_day = true THEN 1 ELSE 0 END) as includes_first_search_of_day,
@@ -738,6 +744,9 @@ def export_parquet_files(con, output_dir):
                 trending_clicks,
                 tab_clicks,
                 pagination_clicks,
+                pagination_all_clicks,
+                pagination_news_clicks,
+                pagination_goto_clicks,
                 filter_clicks,
                 people_clicks,
                 success_click_count,
@@ -897,7 +906,10 @@ def export_parquet_files(con, output_dir):
                 COUNT(CASE WHEN click_category = 'Result' THEN 1 END) as clicks_result,
                 COUNT(CASE WHEN click_category = 'Trending' THEN 1 END) as clicks_trending,
                 COUNT(CASE WHEN click_category = 'Tab' THEN 1 END) as clicks_tab,
-                COUNT(CASE WHEN click_category = 'Pagination' THEN 1 END) as clicks_pagination,
+                COUNT(CASE WHEN click_category LIKE 'Pagination%' THEN 1 END) as clicks_pagination,
+                COUNT(CASE WHEN click_category = 'Pagination_All' THEN 1 END) as clicks_pagination_all,
+                COUNT(CASE WHEN click_category = 'Pagination_News' THEN 1 END) as clicks_pagination_news,
+                COUNT(CASE WHEN click_category = 'Pagination_GoTo' THEN 1 END) as clicks_pagination_goto,
                 COUNT(CASE WHEN click_category = 'Filter' THEN 1 END) as clicks_filter,
                 COUNT(CASE WHEN click_category = 'People' THEN 1 END) as clicks_people,
                 -- Timing metrics (result to success click time for this term)
