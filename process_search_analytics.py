@@ -665,6 +665,7 @@ def export_parquet_files(con, output_dir):
                     session_date,
                     user_id,
                     MIN(timestamp) as session_start,
+                    MIN(timestamp_cet) as session_start_cet,
                     COUNT(*) as total_events,
                     -- Timing metrics (SEARCH_TRIGGERED to SEARCH_RESULT_COUNT = full user-perceived latency)
                     MIN(CASE WHEN name = 'SEARCH_RESULT_COUNT' AND last_search_started_ts IS NOT NULL
@@ -702,8 +703,8 @@ def export_parquet_files(con, output_dir):
             )
             SELECT
                 session_date,
-                session_start,
-                STRFTIME(session_start, '%Y-%m-%d %H:%M:%S.%g') as session_start_str,
+                session_start_cet,
+                STRFTIME(session_start_cet, '%Y-%m-%d %H:%M:%S.%g') as session_start_str,
                 total_events,
                 search_count_in_session,
                 result_count,
