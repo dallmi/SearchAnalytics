@@ -27,7 +27,7 @@ The following updates were made to reflect changes in the data model. Look for �
 
 | Column | Table(s) | Description |
 |--------|----------|-------------|
-| `success_clicks` | daily | Count of actual result clicks (SEARCH_RESULT_CLICK + SEARCH_TRENDING_CLICKED) |
+| `success_clicks` | daily | Count of actual result clicks (SEARCH_RESULT_CLICK only) |
 | `success_click_count` | journeys, terms | Success clicks per session/term |
 | `clicks_trending` | daily, journeys, terms | SEARCH_TRENDING_CLICKED events |
 | `clicks_pagination` | daily, journeys, terms | Aggregate of all pagination clicks |
@@ -46,10 +46,11 @@ The following updates were made to reflect changes in the data model. Look for �
 
 ### Key Concept: Success Clicks vs All Clicks
 
-- **Success Clicks** = User found content (SEARCH_RESULT_CLICK, SEARCH_TRENDING_CLICKED)
-- **All Clicks** = Any interaction (includes tabs, pagination, filters)
-- Use **success clicks** for measuring search effectiveness
-- Use **all clicks** for measuring overall user engagement
+- **Success Clicks** = User found content (SEARCH_RESULT_CLICK only)
+- **Trending Clicks** = User initiated search via suggestion (SEARCH_TRENDING_CLICKED) - tracked separately
+- **All Clicks** = Any interaction (includes tabs, pagination, filters, trending)
+- Use **success clicks** for measuring search effectiveness (actual content discovery)
+- Use **trending clicks** to measure suggestion feature usage
 
 ---
 
@@ -97,7 +98,7 @@ Instead of using the pre-calculated columns, create DAX measures that recalculat
 
 ```dax
 // ⚠️ UPDATED: Success Click Rate (actual result clicks per search)
-// Uses success_clicks which only counts SEARCH_RESULT_CLICK and SEARCH_TRENDING_CLICKED
+// Uses success_clicks which only counts SEARCH_RESULT_CLICK (not trending)
 // Can exceed 100% if users click multiple results per search
 Success Click Rate % =
 DIVIDE(
@@ -146,8 +147,9 @@ DIVIDE(
 ```
 
 **Note on Click Types:**
-- **Success clicks** (`success_clicks`): Only actual result clicks (`SEARCH_RESULT_CLICK`, `SEARCH_TRENDING_CLICKED`)
-- **All clicks** (`click_events`): Includes navigation (tabs, pagination, filters)
+- **Success clicks** (`success_clicks`): Only actual result clicks (`SEARCH_RESULT_CLICK`)
+- **Trending clicks** (`clicks_trending`): Search initiation via suggestion (`SEARCH_TRENDING_CLICKED`) - tracked separately
+- **All clicks** (`click_events`): Includes navigation (tabs, pagination, filters, trending)
 - `Session Success Rate %` is session-based and always 0-100% (did the session have any success clicks?)
 - Use **Session Success/Abandonment rates** for executive KPIs
 
@@ -195,8 +197,9 @@ DIVIDE(
 | Avg Search Term Words | `sum_search_term_words` | `search_term_count` |
 
 **Click Column Types (⚠️ UPDATED):**
-- `success_clicks` = Result clicks + Trending clicks (user found content)
-- `click_events` = All clicks including navigation (tabs, pagination, filters)
+- `success_clicks` = Result clicks only (SEARCH_RESULT_CLICK - user found content)
+- `clicks_trending` = Trending suggestion clicks (search initiation, not content discovery)
+- `click_events` = All clicks including navigation (tabs, pagination, filters, trending)
 
 ### User Cohort Columns (Daily File)
 
@@ -286,7 +289,7 @@ DIVIDE(
 ) * 100
 
 // ⚠️ UPDATED: Success Click Rate (actual result clicks only)
-// Uses success_clicks (SEARCH_RESULT_CLICK + SEARCH_TRENDING_CLICKED)
+// Uses success_clicks (SEARCH_RESULT_CLICK only, not trending)
 Success Click Rate % =
 DIVIDE(
     SUM(searches_daily[success_clicks]),
@@ -391,7 +394,7 @@ The `searches_journeys.parquet` file contains **one row per session**. Each row 
 | `search_count_in_session` | Integer | Number of searches in this session |
 | `result_count` | Integer | Number of SEARCH_RESULT_COUNT events |
 | `click_count` | Integer | Number of ALL clicks (including navigation) |
-| `success_click_count` | Integer | Number of SUCCESS clicks only ⚠️ |
+| `success_click_count` | Integer | Number of SUCCESS clicks (SEARCH_RESULT_CLICK only) ⚠️ |
 | `null_result_count` | Integer | Number of searches with 0 results |
 | `had_reformulation` | Boolean | Did user search multiple different terms? |
 | `session_complexity` | String | Single Event, Simple, Medium, Complex |
@@ -743,7 +746,7 @@ The `searches_terms.parquet` file contains **one row per search term per day**. 
 | `result_events` | Integer | Result count events for this term |
 | `null_result_count` | Integer | Searches returning 0 results |
 | `click_count` | Integer | ALL clicks attributed to this term |
-| `success_click_count` | Integer | SUCCESS clicks only (result + trending) ⚠️ |
+| `success_click_count` | Integer | SUCCESS clicks only (SEARCH_RESULT_CLICK) ⚠️ |
 | `avg_sec_to_click` | Float | Average seconds from result to click |
 | `clicks_with_timing` | Integer | Clicks with timing data (for weighting) |
 | `sum_sec_to_click` | Float | Sum of seconds to click (for weighted avg) |
@@ -774,7 +777,7 @@ The `searches_terms.parquet` file contains **one row per search term per day**. 
 Total Term Searches = SUM(searches_terms[search_count])
 
 // ⚠️ UPDATED: Term Success CTR (actual result clicks only)
-// Uses success_click_count (SEARCH_RESULT_CLICK + SEARCH_TRENDING_CLICKED)
+// Uses success_click_count (SEARCH_RESULT_CLICK only, not trending)
 Term Success CTR % =
 DIVIDE(
     SUM(searches_terms[success_click_count]),

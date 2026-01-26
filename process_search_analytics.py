@@ -432,10 +432,10 @@ def add_calculated_columns(con):
                 WHEN name = 'SEARCH_FILTER_CLICK' THEN 'Filter'
                 ELSE NULL
             END as click_category,
-            -- Success click: TRUE only for actual result clicks (not navigation/refinement)
+            -- Success click: TRUE only for actual result clicks (content found)
+            -- Note: SEARCH_TRENDING_CLICKED is NOT a success - it's a search initiation via suggestion
             CASE
                 WHEN name = 'SEARCH_RESULT_CLICK' THEN true
-                WHEN name = 'SEARCH_TRENDING_CLICKED' THEN true
                 ELSE false
             END as is_success_click
         FROM searches_raw r

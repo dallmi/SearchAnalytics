@@ -383,40 +383,58 @@ Event: SEARCH_RESULT_COUNT with CP_totalResultCount = 15
 
 ### click_category
 
-**Definition:** Categorizes click events by which tab/section was clicked.
+**Definition:** Categorizes click events by type of interaction.
 
 ```sql
 click_category = CASE
-    WHEN name = 'SEARCH_TAB_CLICK' THEN 'General'
-    WHEN name = 'SEARCH_ALL_TAB_PAGE_CLICK' THEN 'All'
-    WHEN name = 'SEARCH_NEWS_TAB_PAGE_CLICK' THEN 'News'
-    WHEN name = 'SEARCH_GOTO_TAB_PAGE_CLICK' THEN 'GoTo'
-    WHEN name LIKE '%PEOPLE%' THEN 'People'
+    WHEN name = 'SEARCH_RESULT_CLICK' THEN 'Result'
+    WHEN name = 'SEARCH_TRENDING_CLICKED' THEN 'Trending'
+    WHEN name = 'SEARCH_TAB_CLICK' THEN 'Tab'
+    WHEN name = 'SEARCH_ALL_TAB_PAGE_CLICK' THEN 'Pagination_All'
+    WHEN name = 'SEARCH_NEWS_TAB_PAGE_CLICK' THEN 'Pagination_News'
+    WHEN name = 'SEARCH_GOTO_TAB_PAGE_CLICK' THEN 'Pagination_GoTo'
+    WHEN name = 'SEARCH_FILTER_CLICK' THEN 'Filter'
     ELSE NULL  -- Not a click event
 END
 ```
 
+### is_success_click
+
+**Definition:** True only for clicks that indicate the user found content.
+
+```sql
+is_success_click = CASE
+    WHEN name = 'SEARCH_RESULT_CLICK' THEN true
+    ELSE false
+END
+```
+
+**Note:** `SEARCH_TRENDING_CLICKED` is NOT a success click - it's a search initiation via suggestion (the user hasn't found content yet, they've just started a search journey).
+
 ### journey_outcome (Session-Level)
 
-**Definition:** Classifies how a search session ended.
+**Definition:** Classifies how a search session ended based on **success clicks** (actual result clicks, not navigation).
 
 ```sql
 journey_outcome = CASE
-    WHEN click_count > 0 THEN 'Success'
-    WHEN result_count > 0 AND null_result_count = result_count AND click_count = 0
+    WHEN success_click_count > 0 THEN 'Success'
+    WHEN result_count > 0 AND null_result_count = result_count AND success_click_count = 0
         THEN 'No Results'
-    WHEN result_count > 0 AND click_count = 0 THEN 'Abandoned'
+    WHEN result_count > 0 AND success_click_count = 0 THEN 'Abandoned'
     ELSE 'Unknown'
 END
 ```
 
+**Note:** Uses `success_click_count` (SEARCH_RESULT_CLICK only), not `click_count` (all clicks including navigation).
+
 **Example scenarios:**
 
-| Scenario | click_count | result_count | null_result_count | Outcome |
-|----------|-------------|--------------|-------------------|---------|
+| Scenario | success_click_count | result_count | null_result_count | Outcome |
+|----------|---------------------|--------------|-------------------|---------|
 | User searched, clicked a result | 1 | 1 | 0 | **Success** |
 | User searched, got 0 results | 0 | 1 | 1 | **No Results** |
 | User searched, saw results but didn't click | 0 | 1 | 0 | **Abandoned** |
+| User clicked tabs/pagination only | 0 | 1 | 0 | **Abandoned** |
 | Incomplete session data | 0 | 0 | 0 | **Unknown** |
 
 ### session_complexity
@@ -549,11 +567,15 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `total_duration_sec` | Float | Session length in seconds | (MAX - MIN timestamp) / 1000 |
 | `first_event_hour` | Integer | Hour of first event (0-23 CET) | MIN(event_hour) |
 | `last_event_hour` | Integer | Hour of last event (0-23 CET) | MAX(event_hour) |
-| `general_clicks` | Integer | General tab clicks | COUNT(click_category='General') |
-| `all_tab_clicks` | Integer | All tab clicks | COUNT(click_category='All') |
-| `news_clicks` | Integer | News tab clicks | COUNT(click_category='News') |
-| `goto_clicks` | Integer | GoTo tab clicks | COUNT(click_category='GoTo') |
-| `people_clicks` | Integer | People tab clicks | COUNT(click_category='People') |
+| `result_clicks` | Integer | SEARCH_RESULT_CLICK events | COUNT(click_category='Result') |
+| `trending_clicks` | Integer | SEARCH_TRENDING_CLICKED events | COUNT(click_category='Trending') |
+| `tab_clicks` | Integer | SEARCH_TAB_CLICK events | COUNT(click_category='Tab') |
+| `pagination_clicks` | Integer | All pagination clicks | COUNT(click_category LIKE 'Pagination%') |
+| `pagination_all_clicks` | Integer | All tab pagination | COUNT(click_category='Pagination_All') |
+| `pagination_news_clicks` | Integer | News tab pagination | COUNT(click_category='Pagination_News') |
+| `pagination_goto_clicks` | Integer | GoTo tab pagination | COUNT(click_category='Pagination_GoTo') |
+| `filter_clicks` | Integer | SEARCH_FILTER_CLICK events | COUNT(click_category='Filter') |
+| `success_click_count` | Integer | Success clicks (SEARCH_RESULT_CLICK only) | COUNT(is_success_click=true) |
 | `includes_first_search_of_day` | Boolean | Session has day's first search | MAX(is_first_search_of_day) |
 | `search_to_result_bucket` | String | Latency category | See Time Buckets |
 | `result_to_click_bucket` | String | Decision time category | See Time Buckets |
@@ -607,17 +629,21 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `sum_search_term_words` | Integer | Sum of word counts | SUM(search_term_word_count) - for weighted avg in DAX |
 | `search_term_count` | Integer | Count of queries | COUNT(search_term_length IS NOT NULL) |
 | `first_searches_of_day` | Integer | First searches of day | COUNT(is_first_search_of_day) |
-| `clicks_general` | Integer | General tab clicks | COUNT(click_category='General') |
-| `clicks_all` | Integer | All tab clicks | COUNT(click_category='All') |
-| `clicks_news` | Integer | News tab clicks | COUNT(click_category='News') |
-| `clicks_goto` | Integer | GoTo tab clicks | COUNT(click_category='GoTo') |
-| `clicks_people` | Integer | People tab clicks | COUNT(click_category='People') |
+| `success_clicks` | Integer | Success clicks (SEARCH_RESULT_CLICK only) | COUNT(is_success_click=true) |
+| `clicks_result` | Integer | SEARCH_RESULT_CLICK events | COUNT(click_category='Result') |
+| `clicks_trending` | Integer | SEARCH_TRENDING_CLICKED events | COUNT(click_category='Trending') |
+| `clicks_tab` | Integer | SEARCH_TAB_CLICK events | COUNT(click_category='Tab') |
+| `clicks_pagination` | Integer | All pagination clicks | COUNT(click_category LIKE 'Pagination%') |
+| `clicks_pagination_all` | Integer | All tab pagination | COUNT(click_category='Pagination_All') |
+| `clicks_pagination_news` | Integer | News tab pagination | COUNT(click_category='Pagination_News') |
+| `clicks_pagination_goto` | Integer | GoTo tab pagination | COUNT(click_category='Pagination_GoTo') |
+| `clicks_filter` | Integer | SEARCH_FILTER_CLICK events | COUNT(click_category='Filter') |
 | `day_of_week` | String | Day name | DAYNAME(session_date) |
 | `day_of_week_num` | Integer | ISO day number (1=Mon) | ISODOW(session_date) |
-| `searches_morning` | Integer | Searches 6:00-12:00 CET | Hour-based filter (CET) |
-| `searches_afternoon` | Integer | Searches 12:00-18:00 CET | Hour-based filter (CET) |
-| `searches_evening` | Integer | Searches 18:00-24:00 CET | Hour-based filter (CET) |
-| `searches_night` | Integer | Searches 0:00-6:00 CET | Hour-based filter (CET) |
+| `searches_night` | Integer | Searches 0:00-8:00 CET (APAC peak) | Hour-based filter (CET) |
+| `searches_morning` | Integer | Searches 8:00-12:00 CET (EMEA peak) | Hour-based filter (CET) |
+| `searches_afternoon` | Integer | Searches 12:00-18:00 CET (EMEA+Americas) | Hour-based filter (CET) |
+| `searches_evening` | Integer | Searches 18:00-24:00 CET (Americas peak) | Hour-based filter (CET) |
 | `new_users` | Integer | First-time users today | Users where first_seen = today |
 | `returning_users` | Integer | Repeat users today | Users where first_seen < today |
 
@@ -639,19 +665,23 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `unique_sessions` | Integer | Sessions with this term | COUNT(DISTINCT session_key) |
 | `result_events` | Integer | Result events for term | COUNT(SEARCH_RESULT_COUNT) |
 | `null_result_count` | Integer | Zero-result count | SUM(is_null_result) |
-| `click_count` | Integer | Clicks from this term | COUNT(click_category) |
-| `clicks_general` | Integer | General tab clicks | COUNT(click_category='General') |
-| `clicks_all` | Integer | All tab clicks | COUNT(click_category='All') |
-| `clicks_news` | Integer | News tab clicks | COUNT(click_category='News') |
-| `clicks_goto` | Integer | GoTo tab clicks | COUNT(click_category='GoTo') |
-| `clicks_people` | Integer | People tab clicks | COUNT(click_category='People') |
-| `avg_sec_to_click` | Float | Avg decision time | AVG(ms_result_to_click) / 1000 |
+| `click_count` | Integer | All clicks from this term | COUNT(click_category) |
+| `success_click_count` | Integer | Success clicks (SEARCH_RESULT_CLICK only) | COUNT(is_success_click=true) |
+| `clicks_result` | Integer | SEARCH_RESULT_CLICK events | COUNT(click_category='Result') |
+| `clicks_trending` | Integer | SEARCH_TRENDING_CLICKED events | COUNT(click_category='Trending') |
+| `clicks_tab` | Integer | SEARCH_TAB_CLICK events | COUNT(click_category='Tab') |
+| `clicks_pagination` | Integer | All pagination clicks | COUNT(click_category LIKE 'Pagination%') |
+| `clicks_pagination_all` | Integer | All tab pagination | COUNT(click_category='Pagination_All') |
+| `clicks_pagination_news` | Integer | News tab pagination | COUNT(click_category='Pagination_News') |
+| `clicks_pagination_goto` | Integer | GoTo tab pagination | COUNT(click_category='Pagination_GoTo') |
+| `clicks_filter` | Integer | SEARCH_FILTER_CLICK events | COUNT(click_category='Filter') |
+| `avg_sec_to_click` | Float | Avg decision time (success clicks only) | AVG(ms_result_to_click) / 1000 |
 | `clicks_with_timing` | Integer | Clicks with timing data | COUNT(click after SEARCH_RESULT_COUNT) |
 | `sum_sec_to_click` | Float | Sum of click times | SUM(ms_result_to_click) / 1000 - for weighted avg in DAX |
-| `searches_morning` | Integer | Searches 6:00-12:00 CET | Hour-based filter (CET) |
-| `searches_afternoon` | Integer | Searches 12:00-18:00 CET | Hour-based filter (CET) |
-| `searches_evening` | Integer | Searches 18:00-24:00 CET | Hour-based filter (CET) |
-| `searches_night` | Integer | Searches 0:00-6:00 CET | Hour-based filter (CET) |
+| `searches_night` | Integer | Searches 0:00-8:00 CET (APAC peak) | Hour-based filter (CET) |
+| `searches_morning` | Integer | Searches 8:00-12:00 CET (EMEA peak) | Hour-based filter (CET) |
+| `searches_afternoon` | Integer | Searches 12:00-18:00 CET (EMEA+Americas) | Hour-based filter (CET) |
+| `searches_evening` | Integer | Searches 18:00-24:00 CET (Americas peak) | Hour-based filter (CET) |
 | `first_seen_date` | Date | First day term appeared | MIN(session_date) over all time |
 | `is_new_term` | Boolean | First appearance today | session_date = first_seen_date |
 
@@ -696,12 +726,12 @@ SWITCH(
 ```
 
 #### Term_Outcome
-Classifies search term performance into actionable categories.
+Classifies search term performance into actionable categories based on **success clicks** (content discovery).
 
 ```dax
 Term_Outcome =
 VAR nullRate = DIVIDE([null_result_count], [result_events], 0)
-VAR ctr = DIVIDE([click_count], [search_count], 0)
+VAR ctr = DIVIDE([success_click_count], [search_count], 0)
 RETURN
 SWITCH(
     TRUE(),
@@ -712,6 +742,8 @@ SWITCH(
     "Success"
 )
 ```
+
+**Note:** Uses `success_click_count` (SEARCH_RESULT_CLICK only), not `click_count` (all clicks).
 
 | Category | Meaning | Action |
 |----------|---------|--------|
@@ -741,27 +773,42 @@ These measures are created in Power BI for aggregated calculations.
 
 ### Search Effectiveness Score
 
-Combined metric considering both CTR and null rate. Higher is better.
+Combined metric considering both success CTR and null rate. Higher is better.
 
 ```dax
 Search Effectiveness Score =
-VAR ctr = DIVIDE(SUM(searches_terms[click_count]), SUM(searches_terms[search_count]), 0)
+VAR ctr = DIVIDE(SUM(searches_terms[success_click_count]), SUM(searches_terms[search_count]), 0)
 VAR nullRate = DIVIDE(SUM(searches_terms[null_result_count]), SUM(searches_terms[result_events]), 0)
 RETURN
 (ctr * 100) - (nullRate * 50)
 ```
+
+**Note:** Uses `success_click_count` (SEARCH_RESULT_CLICK only) for accurate content discovery measurement.
 
 **Score interpretation:**
 - Positive scores: Good performance (CTR outweighs null rate penalty)
 - Near zero: Balanced but could improve
 - Negative scores: High null rates hurting performance
 
-### Term CTR %
+### Term Success CTR %
 
-Click-through rate for search terms.
+Success click-through rate for search terms (actual content clicks only).
 
 ```dax
-Term CTR % =
+Term Success CTR % =
+DIVIDE(
+    SUM(searches_terms[success_click_count]),
+    SUM(searches_terms[search_count]),
+    0
+) * 100
+```
+
+### Term All Clicks Rate %
+
+All clicks rate including navigation (tabs, pagination, filters).
+
+```dax
+Term All Clicks Rate % =
 DIVIDE(
     SUM(searches_terms[click_count]),
     SUM(searches_terms[search_count]),
@@ -865,3 +912,4 @@ timestamp,name,user_Id,session_Id,CP_searchQuery,CP_totalResultCount
 | 1.1 | 2025-01-16 | Added missing parquet columns (click breakdowns, sort columns, timing aggregates), Power BI calculated columns section, Power BI measures section |
 | 1.2 | 2025-01-23 | Added CET timezone support: timestamp_cet columns, CET-based session_date/event_hour/event_weekday, updated time distribution documentation |
 | 1.3 | 2025-01-23 | Expanded event documentation: added initialization events, SEARCH_STARTED distinction, click event details (SEARCH_RESULT_CLICK, SEARCH_TRENDING_CLICKED, SEARCH_FILTER_CLICK, SEARCH_FAILED) |
+| 1.4 | 2025-01-26 | Updated click categories (Result, Trending, Tab, Pagination_*, Filter). Added is_success_click (SEARCH_RESULT_CLICK only - trending clicks are search initiation, not content discovery). Updated journey_outcome to use success_click_count. Changed time distribution to regional alignment (0-8 APAC, 8-12 EMEA, 12-18 overlap, 18-24 Americas). |
