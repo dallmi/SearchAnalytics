@@ -561,16 +561,24 @@ Journey_Type =
 VAR searches = [search_count_in_session]
 VAR results = [result_count]
 VAR clicks = [click_count]
+VAR success_clicks = [success_click_count]
 VAR nulls = [null_result_count]
 RETURN
 SWITCH(
     TRUE(),
-    searches > 0 && results > 0 && clicks > 0,
-        searches & " Search → " & results & " Result → " & clicks & " Click",
+    // Success: User clicked on actual search result content
+    searches > 0 && results > 0 && success_clicks > 0,
+        searches & " Search → " & results & " Result → " & success_clicks & " Click",
+    // Engaged: User interacted (tabs/pagination/filters) but didn't click content
+    searches > 0 && results > 0 && clicks > 0 && success_clicks = 0,
+        searches & " Search → " & results & " Result → Engaged (" & clicks & " nav)",
+    // No Results: All results were null
     searches > 0 && results > 0 && nulls > 0 && clicks = 0,
         searches & " Search → " & results & " Result (incl. " & nulls & " null) → No Click",
+    // Abandoned: Had results but no interaction at all
     searches > 0 && results > 0 && clicks = 0,
         searches & " Search → " & results & " Result → Abandoned",
+    // No Result: Search returned nothing
     searches > 0 && results = 0,
         searches & " Search → No Result",
     "Other"
@@ -605,11 +613,12 @@ DIVIDE(
 
 | Journey_Type | Sessions | % |
 |--------------|----------|---|
-| 1 Search → 1 Result → 1 Click | 1,245 | 45.2% |
-| 1 Search → 1 Result → Abandoned | 532 | 19.3% |
-| 2 Search → 2 Result → 1 Click | 289 | 10.5% |
-| 1 Search → 1 Result (incl. 1 null) → No Click | 156 | 5.7% |
-| 1 Search → No Result | 98 | 3.6% |
+| 1 Search → 1 Result → 1 Click | 1,245 | 42.1% |
+| 1 Search → 1 Result → Abandoned | 532 | 18.0% |
+| 2 Search → 2 Result → 1 Click | 289 | 9.8% |
+| 1 Search → 1 Result → Engaged (2 nav) | 245 | 8.3% |
+| 1 Search → 1 Result (incl. 1 null) → No Click | 156 | 5.3% |
+| 1 Search → No Result | 98 | 3.3% |
 
 **What this tells you:**
 - **Ideal pattern**: "1 Search → 1 Result → 1 Click" (user found what they needed immediately)
