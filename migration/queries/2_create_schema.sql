@@ -329,12 +329,14 @@ CREATE TABLE searches_journeys_daily_agg (
 
     -- Journey outcome counts
     sessions_success        INTEGER,
+    sessions_engaged        INTEGER,
     sessions_abandoned      INTEGER,
     sessions_no_results     INTEGER,
     sessions_unknown        INTEGER,
 
     -- Pre-calculated rates
     success_rate_pct            NUMERIC(5,2),
+    engaged_rate_pct            NUMERIC(5,2),
     abandonment_rate_pct        NUMERIC(5,2),
     no_results_rate_pct         NUMERIC(5,2),
 

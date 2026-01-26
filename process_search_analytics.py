@@ -747,10 +747,12 @@ def export_parquet_files(con, output_dir):
                     ELSE '> 5 min (extended)'
                 END as session_duration_bucket,
                 -- Classifications (success = actual result click, not navigation/filter clicks)
+                -- Engaged = user interacted (tabs/pagination/filters) but didn't click actual content
                 CASE
                     WHEN success_click_count > 0 THEN 'Success'
-                    WHEN result_count > 0 AND null_result_count = result_count AND success_click_count = 0 THEN 'No Results'
-                    WHEN result_count > 0 AND success_click_count = 0 THEN 'Abandoned'
+                    WHEN click_count > 0 AND success_click_count = 0 THEN 'Engaged'
+                    WHEN result_count > 0 AND null_result_count = result_count THEN 'No Results'
+                    WHEN result_count > 0 AND click_count = 0 THEN 'Abandoned'
                     ELSE 'Unknown'
                 END as journey_outcome,
                 CASE WHEN unique_search_terms > 1 THEN true ELSE false END as had_reformulation,
@@ -788,9 +790,10 @@ def export_parquet_files(con, output_dir):
                 END as session_duration_sort,
                 CASE
                     WHEN success_click_count > 0 THEN 1
-                    WHEN result_count > 0 AND null_result_count = result_count AND success_click_count = 0 THEN 3
-                    WHEN result_count > 0 AND success_click_count = 0 THEN 2
-                    ELSE 4
+                    WHEN click_count > 0 AND success_click_count = 0 THEN 2
+                    WHEN result_count > 0 AND null_result_count = result_count THEN 4
+                    WHEN result_count > 0 AND click_count = 0 THEN 3
+                    ELSE 5
                 END as journey_outcome_sort,
                 CASE
                     WHEN total_events = 1 THEN 1

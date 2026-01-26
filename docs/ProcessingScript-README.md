@@ -202,7 +202,7 @@ Four Parquet files are generated for Power BI (plus one for search term analysis
 - **Time buckets**: Pre-categorized performance tiers
   - `search_to_result_bucket`, `result_to_click_bucket`, `session_duration_bucket`
 - **Classifications**:
-  - `journey_outcome` (`Success`, `No Results`, `Abandoned`, `Unknown`)
+  - `journey_outcome` (`Success`, `Engaged`, `Abandoned`, `No Results`, `Unknown`)
   - `had_reformulation` (user modified search query)
   - `session_complexity` (`Single Event`, `Simple`, `Medium`, `Complex`)
 - **Click breakdown**: `general_clicks`, `all_tab_clicks`, `news_clicks`, etc.

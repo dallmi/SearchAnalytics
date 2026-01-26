@@ -65,12 +65,14 @@ BEGIN
 
         -- Journey outcome counts
         SUM(CASE WHEN journey_outcome = 'Success' THEN 1 ELSE 0 END) as sessions_success,
+        SUM(CASE WHEN journey_outcome = 'Engaged' THEN 1 ELSE 0 END) as sessions_engaged,
         SUM(CASE WHEN journey_outcome = 'Abandoned' THEN 1 ELSE 0 END) as sessions_abandoned,
         SUM(CASE WHEN journey_outcome = 'No Results' THEN 1 ELSE 0 END) as sessions_no_results,
         SUM(CASE WHEN journey_outcome = 'Unknown' THEN 1 ELSE 0 END) as sessions_unknown,
 
         -- Pre-calculated rates
         ROUND(100.0 * SUM(CASE WHEN journey_outcome = 'Success' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2) as success_rate_pct,
+        ROUND(100.0 * SUM(CASE WHEN journey_outcome = 'Engaged' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2) as engaged_rate_pct,
         ROUND(100.0 * SUM(CASE WHEN journey_outcome = 'Abandoned' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2) as abandonment_rate_pct,
         ROUND(100.0 * SUM(CASE WHEN journey_outcome = 'No Results' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2) as no_results_rate_pct,
 
@@ -130,10 +132,12 @@ BEGIN
         total_clicks = EXCLUDED.total_clicks,
         total_null_results = EXCLUDED.total_null_results,
         sessions_success = EXCLUDED.sessions_success,
+        sessions_engaged = EXCLUDED.sessions_engaged,
         sessions_abandoned = EXCLUDED.sessions_abandoned,
         sessions_no_results = EXCLUDED.sessions_no_results,
         sessions_unknown = EXCLUDED.sessions_unknown,
         success_rate_pct = EXCLUDED.success_rate_pct,
+        engaged_rate_pct = EXCLUDED.engaged_rate_pct,
         abandonment_rate_pct = EXCLUDED.abandonment_rate_pct,
         no_results_rate_pct = EXCLUDED.no_results_rate_pct,
         sessions_single_event = EXCLUDED.sessions_single_event,

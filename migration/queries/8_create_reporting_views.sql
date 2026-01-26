@@ -383,12 +383,15 @@ SELECT
 
     -- Journey outcomes
     SUM(CASE WHEN journey_outcome = 'Success' THEN 1 ELSE 0 END) as sessions_success,
+    SUM(CASE WHEN journey_outcome = 'Engaged' THEN 1 ELSE 0 END) as sessions_engaged,
     SUM(CASE WHEN journey_outcome = 'Abandoned' THEN 1 ELSE 0 END) as sessions_abandoned,
     SUM(CASE WHEN journey_outcome = 'No Results' THEN 1 ELSE 0 END) as sessions_no_results,
 
     -- Rates
     ROUND(100.0 * SUM(CASE WHEN journey_outcome = 'Success' THEN 1 ELSE 0 END)
         / NULLIF(COUNT(*), 0), 2) as success_rate_pct,
+    ROUND(100.0 * SUM(CASE WHEN journey_outcome = 'Engaged' THEN 1 ELSE 0 END)
+        / NULLIF(COUNT(*), 0), 2) as engaged_rate_pct,
     ROUND(100.0 * SUM(CASE WHEN journey_outcome = 'Abandoned' THEN 1 ELSE 0 END)
         / NULLIF(COUNT(*), 0), 2) as abandonment_rate_pct,
     ROUND(100.0 * SUM(CASE WHEN journey_outcome = 'No Results' THEN 1 ELSE 0 END)

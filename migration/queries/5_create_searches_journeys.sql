@@ -123,15 +123,20 @@ BEGIN
         -- Flags
         CASE WHEN s.includes_first_search_of_day = 1 THEN true ELSE false END as includes_first_search_of_day,
         CASE WHEN s.null_result_count > 0 THEN true ELSE false END as had_null_result,
-        CASE WHEN s.null_result_count > 0 AND s.click_count > 0 THEN true ELSE false END as recovered_from_null,
+        CASE WHEN s.null_result_count > 0 AND s.success_click_count > 0 THEN true ELSE false END as recovered_from_null,
         CASE WHEN s.unique_search_terms > 1 THEN true ELSE false END as had_reformulation,
         CASE WHEN s.distinct_click_categories > 1 THEN true ELSE false END as had_tab_switch,
         CASE WHEN s.user_session_number = 1 THEN true ELSE false END as is_users_first_session,
 
         -- Journey outcome classification
+        -- Success = found content (clicked on result)
+        -- Engaged = interacted (tabs/pagination/filters) but didn't click content
+        -- Abandoned = had results but no interaction at all
+        -- No Results = all searches returned 0 results
         CASE
-            WHEN s.click_count > 0 THEN 'Success'
-            WHEN s.result_count > 0 AND s.null_result_count = s.result_count AND s.click_count = 0 THEN 'No Results'
+            WHEN s.success_click_count > 0 THEN 'Success'
+            WHEN s.click_count > 0 AND s.success_click_count = 0 THEN 'Engaged'
+            WHEN s.result_count > 0 AND s.null_result_count = s.result_count THEN 'No Results'
             WHEN s.result_count > 0 AND s.click_count = 0 THEN 'Abandoned'
             ELSE 'Unknown'
         END as journey_outcome,
@@ -175,10 +180,11 @@ BEGIN
 
         -- Sort order columns (for Power BI)
         CASE
-            WHEN s.click_count > 0 THEN 1
-            WHEN s.result_count > 0 AND s.null_result_count = s.result_count AND s.click_count = 0 THEN 3
-            WHEN s.result_count > 0 AND s.click_count = 0 THEN 2
-            ELSE 4
+            WHEN s.success_click_count > 0 THEN 1
+            WHEN s.click_count > 0 AND s.success_click_count = 0 THEN 2
+            WHEN s.result_count > 0 AND s.null_result_count = s.result_count THEN 4
+            WHEN s.result_count > 0 AND s.click_count = 0 THEN 3
+            ELSE 5
         END as journey_outcome_sort,
 
         CASE

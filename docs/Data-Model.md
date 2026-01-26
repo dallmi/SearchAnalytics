@@ -413,29 +413,36 @@ END
 
 ### journey_outcome (Session-Level)
 
-**Definition:** Classifies how a search session ended based on **success clicks** (actual result clicks, not navigation).
+**Definition:** Classifies how a search session ended based on user engagement level.
 
 ```sql
 journey_outcome = CASE
     WHEN success_click_count > 0 THEN 'Success'
-    WHEN result_count > 0 AND null_result_count = result_count AND success_click_count = 0
-        THEN 'No Results'
-    WHEN result_count > 0 AND success_click_count = 0 THEN 'Abandoned'
+    WHEN click_count > 0 AND success_click_count = 0 THEN 'Engaged'
+    WHEN result_count > 0 AND null_result_count = result_count THEN 'No Results'
+    WHEN result_count > 0 AND click_count = 0 THEN 'Abandoned'
     ELSE 'Unknown'
 END
 ```
 
-**Note:** Uses `success_click_count` (SEARCH_RESULT_CLICK only), not `click_count` (all clicks including navigation).
+**Categories explained:**
+- **Success**: User clicked on an actual search result (found content)
+- **Engaged**: User interacted with tabs, pagination, or filters but didn't click a result (browsed but didn't find)
+- **No Results**: All search attempts returned 0 results
+- **Abandoned**: Had results displayed but no interaction at all
+- **Unknown**: Incomplete session data
+
+**Note:** Uses `success_click_count` (SEARCH_RESULT_CLICK only) for Success, and `click_count` (all clicks) for Engaged.
 
 **Example scenarios:**
 
-| Scenario | success_click_count | result_count | null_result_count | Outcome |
-|----------|---------------------|--------------|-------------------|---------|
-| User searched, clicked a result | 1 | 1 | 0 | **Success** |
-| User searched, got 0 results | 0 | 1 | 1 | **No Results** |
-| User searched, saw results but didn't click | 0 | 1 | 0 | **Abandoned** |
-| User clicked tabs/pagination only | 0 | 1 | 0 | **Abandoned** |
-| Incomplete session data | 0 | 0 | 0 | **Unknown** |
+| Scenario | success_click_count | click_count | result_count | null_result_count | Outcome |
+|----------|---------------------|-------------|--------------|-------------------|---------|
+| User searched, clicked a result | 1 | 1 | 1 | 0 | **Success** |
+| User clicked tabs/pagination only | 0 | 2 | 1 | 0 | **Engaged** |
+| User searched, got 0 results | 0 | 0 | 1 | 1 | **No Results** |
+| User searched, saw results but didn't click | 0 | 0 | 1 | 0 | **Abandoned** |
+| Incomplete session data | 0 | 0 | 0 | 0 | **Unknown** |
 
 ### session_complexity
 
@@ -471,21 +478,23 @@ Session with searches: "budget", "2024 budget", "budget report Q4"
 
 ### recovered_from_null
 
-**Definition:** Did the user eventually find something despite getting zero results initially?
+**Definition:** Did the user eventually find content (click on a result) despite getting zero results initially?
 
 ```sql
 recovered_from_null = CASE
-    WHEN null_result_count > 0 AND click_count > 0 THEN true
+    WHEN null_result_count > 0 AND success_click_count > 0 THEN true
     ELSE false
 END
 ```
+
+**Note:** Uses `success_click_count` (SEARCH_RESULT_CLICK only), not `click_count`. Navigating tabs/pagination after a null result is not considered "recovery" - only clicking actual content counts.
 
 **Example:**
 
 ```
 Session: Search "bugdet" (typo) --> 0 results
-         Search "budget" --> 15 results --> Click
---> null_result_count = 1, click_count = 1
+         Search "budget" --> 15 results --> Click on result
+--> null_result_count = 1, success_click_count = 1
 --> recovered_from_null = true
 ```
 
@@ -580,16 +589,16 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `search_to_result_bucket` | String | Latency category | See Time Buckets |
 | `result_to_click_bucket` | String | Decision time category | See Time Buckets |
 | `session_duration_bucket` | String | Session length category | < 5s, 5-30s, 30-60s, 1-3 min, etc. |
-| `journey_outcome` | String | Session result | Success/No Results/Abandoned |
+| `journey_outcome` | String | Session result | Success/Engaged/Abandoned/No Results |
 | `had_reformulation` | Boolean | User changed query | unique_search_terms > 1 |
 | `session_complexity` | String | Session size category | Based on total_events |
 | `search_to_result_sort` | Integer | Sort order for latency bucket | 1-6 for Power BI sorting |
 | `result_to_click_sort` | Integer | Sort order for click time bucket | 1-7 for Power BI sorting |
 | `session_duration_sort` | Integer | Sort order for duration bucket | 1-6 for Power BI sorting |
-| `journey_outcome_sort` | Integer | Sort order for outcome | 1=Success, 2=Abandoned, 3=No Results |
+| `journey_outcome_sort` | Integer | Sort order for outcome | 1=Success, 2=Engaged, 3=Abandoned, 4=No Results |
 | `session_complexity_sort` | Integer | Sort order for complexity | 1-4 for Power BI sorting |
 | `had_null_result` | Boolean | Had zero-result search | null_result_count > 0 |
-| `recovered_from_null` | Boolean | Success despite null result | null_result > 0 AND click > 0 |
+| `recovered_from_null` | Boolean | Success despite null result | null_result > 0 AND success_click > 0 |
 | `user_session_number` | Integer | User's session sequence | ROW_NUMBER per user |
 | `is_users_first_session` | Boolean | First time user | user_session_number = 1 |
 | `distinct_click_categories` | Integer | Tab types clicked | COUNT(DISTINCT click_category) |
@@ -913,3 +922,4 @@ timestamp,name,user_Id,session_Id,CP_searchQuery,CP_totalResultCount
 | 1.2 | 2025-01-23 | Added CET timezone support: timestamp_cet columns, CET-based session_date/event_hour/event_weekday, updated time distribution documentation |
 | 1.3 | 2025-01-23 | Expanded event documentation: added initialization events, SEARCH_STARTED distinction, click event details (SEARCH_RESULT_CLICK, SEARCH_TRENDING_CLICKED, SEARCH_FILTER_CLICK, SEARCH_FAILED) |
 | 1.4 | 2025-01-26 | Updated click categories (Result, Trending, Tab, Pagination_*, Filter). Added is_success_click (SEARCH_RESULT_CLICK only - trending clicks are search initiation, not content discovery). Updated journey_outcome to use success_click_count. Changed time distribution to regional alignment (0-8 APAC, 8-12 EMEA, 12-18 overlap, 18-24 Americas). |
+| 1.5 | 2025-01-26 | Added "Engaged" journey_outcome category for sessions with navigation clicks but no result clicks. Updated recovered_from_null to use success_click_count. Sort order: 1=Success, 2=Engaged, 3=Abandoned, 4=No Results. |

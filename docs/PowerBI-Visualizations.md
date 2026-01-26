@@ -390,7 +390,7 @@ The `searches_journeys.parquet` file contains **one row per session**. Each row 
 | Column | Type | Description |
 |--------|------|-------------|
 | `session_date` | Date | Date of the session |
-| `journey_outcome` | String | Success, Abandoned, No Results, Unknown |
+| `journey_outcome` | String | Success, Engaged, Abandoned, No Results, Unknown |
 | `search_count_in_session` | Integer | Number of searches in this session |
 | `result_count` | Integer | Number of SEARCH_RESULT_COUNT events |
 | `click_count` | Integer | Number of ALL clicks (including navigation) |
@@ -444,6 +444,12 @@ CALCULATE(
     searches_journeys[journey_outcome] = "Success"
 )
 
+Engaged Sessions =
+CALCULATE(
+    COUNTROWS(searches_journeys),
+    searches_journeys[journey_outcome] = "Engaged"
+)
+
 Abandoned Sessions =
 CALCULATE(
     COUNTROWS(searches_journeys),
@@ -460,6 +466,13 @@ CALCULATE(
 Success Rate % =
 DIVIDE(
     CALCULATE(COUNTROWS(searches_journeys), searches_journeys[journey_outcome] = "Success"),
+    COUNTROWS(searches_journeys),
+    0
+) * 100
+
+Engaged Rate % =
+DIVIDE(
+    CALCULATE(COUNTROWS(searches_journeys), searches_journeys[journey_outcome] = "Engaged"),
     COUNTROWS(searches_journeys),
     0
 ) * 100
