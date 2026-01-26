@@ -40,6 +40,7 @@ BEGIN
             name,
             is_null_result,
             click_category,
+            is_success_click,
             search_term_normalized,
             prev_event,
             ms_since_prev_event,
@@ -92,34 +93,38 @@ BEGIN
 
         -- Click metrics (clicks attributed to this search term)
         COUNT(CASE WHEN stc.click_category IS NOT NULL THEN 1 END)::INTEGER as click_count,
-        COUNT(CASE WHEN stc.click_category = 'General' THEN 1 END)::INTEGER as clicks_general,
-        COUNT(CASE WHEN stc.click_category = 'All' THEN 1 END)::INTEGER as clicks_all,
-        COUNT(CASE WHEN stc.click_category = 'News' THEN 1 END)::INTEGER as clicks_news,
-        COUNT(CASE WHEN stc.click_category = 'GoTo' THEN 1 END)::INTEGER as clicks_goto,
-        COUNT(CASE WHEN stc.click_category = 'People' THEN 1 END)::INTEGER as clicks_people,
+        COUNT(CASE WHEN stc.click_category = 'Result' THEN 1 END)::INTEGER as clicks_result,
+        COUNT(CASE WHEN stc.click_category = 'Trending' THEN 1 END)::INTEGER as clicks_trending,
+        COUNT(CASE WHEN stc.click_category = 'Tab' THEN 1 END)::INTEGER as clicks_tab,
+        COUNT(CASE WHEN stc.click_category LIKE 'Pagination%' THEN 1 END)::INTEGER as clicks_pagination,
+        COUNT(CASE WHEN stc.click_category = 'Pagination_All' THEN 1 END)::INTEGER as clicks_pagination_all,
+        COUNT(CASE WHEN stc.click_category = 'Pagination_News' THEN 1 END)::INTEGER as clicks_pagination_news,
+        COUNT(CASE WHEN stc.click_category = 'Pagination_GoTo' THEN 1 END)::INTEGER as clicks_pagination_goto,
+        COUNT(CASE WHEN stc.click_category = 'Filter' THEN 1 END)::INTEGER as clicks_filter,
+        COUNT(CASE WHEN stc.is_success_click = true THEN 1 END)::INTEGER as success_click_count,
 
-        -- Timing metrics (result to click time for this term)
+        -- Timing metrics (result to success click time for this term)
         ROUND(AVG(CASE
-            WHEN stc.click_category IS NOT NULL AND stc.prev_event = 'SEARCH_RESULT_COUNT'
+            WHEN stc.is_success_click = true AND stc.prev_event = 'SEARCH_RESULT_COUNT'
             THEN stc.ms_since_prev_event / 1000.0
         END)::NUMERIC, 2) as avg_sec_to_click,
 
         COUNT(CASE
-            WHEN stc.click_category IS NOT NULL AND stc.prev_event = 'SEARCH_RESULT_COUNT'
+            WHEN stc.is_success_click = true AND stc.prev_event = 'SEARCH_RESULT_COUNT'
             THEN 1
         END)::INTEGER as clicks_with_timing,
 
         SUM(CASE
-            WHEN stc.click_category IS NOT NULL AND stc.prev_event = 'SEARCH_RESULT_COUNT'
+            WHEN stc.is_success_click = true AND stc.prev_event = 'SEARCH_RESULT_COUNT'
             THEN stc.ms_since_prev_event / 1000.0
             ELSE 0
         END)::NUMERIC(12,2) as sum_sec_to_click,
 
-        -- Time distribution (CET-based hours)
-        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 6 AND stc.event_hour < 12 THEN 1 END)::INTEGER as searches_morning,   -- 6-12 CET
-        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 12 AND stc.event_hour < 18 THEN 1 END)::INTEGER as searches_afternoon, -- 12-18 CET
-        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 18 AND stc.event_hour < 24 THEN 1 END)::INTEGER as searches_evening,   -- 18-24 CET
-        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 0 AND stc.event_hour < 6 THEN 1 END)::INTEGER as searches_night,       -- 0-6 CET
+        -- Time distribution (CET-based hours, regional alignment)
+        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 0 AND stc.event_hour < 8 THEN 1 END)::INTEGER as searches_night,       -- 0-8 CET (APAC evening)
+        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 8 AND stc.event_hour < 12 THEN 1 END)::INTEGER as searches_morning,    -- 8-12 CET (EMEA morning)
+        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 12 AND stc.event_hour < 18 THEN 1 END)::INTEGER as searches_afternoon, -- 12-18 CET (EMEA/Americas overlap)
+        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 18 AND stc.event_hour < 24 THEN 1 END)::INTEGER as searches_evening,   -- 18-24 CET (Americas afternoon)
 
         -- Trend detection columns
         MAX(tfs.first_seen_date) as first_seen_date,
@@ -165,7 +170,7 @@ BEGIN
     WITH search_terms_with_context AS (
         SELECT
             session_date, session_key, user_id, name,
-            is_null_result, click_category, search_term_normalized,
+            is_null_result, click_category, is_success_click, search_term_normalized,
             prev_event, ms_since_prev_event, event_hour, timestamp,
             (
                 SELECT sub.search_term_normalized
@@ -198,20 +203,24 @@ BEGIN
         COUNT(CASE WHEN stc.name = 'SEARCH_RESULT_COUNT' THEN 1 END)::INTEGER,
         SUM(CASE WHEN stc.is_null_result = true THEN 1 ELSE 0 END)::INTEGER,
         COUNT(CASE WHEN stc.click_category IS NOT NULL THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN stc.click_category = 'General' THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN stc.click_category = 'All' THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN stc.click_category = 'News' THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN stc.click_category = 'GoTo' THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN stc.click_category = 'People' THEN 1 END)::INTEGER,
-        ROUND(AVG(CASE WHEN stc.click_category IS NOT NULL AND stc.prev_event = 'SEARCH_RESULT_COUNT'
+        COUNT(CASE WHEN stc.click_category = 'Result' THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN stc.click_category = 'Trending' THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN stc.click_category = 'Tab' THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN stc.click_category LIKE 'Pagination%' THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN stc.click_category = 'Pagination_All' THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN stc.click_category = 'Pagination_News' THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN stc.click_category = 'Pagination_GoTo' THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN stc.click_category = 'Filter' THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN stc.is_success_click = true THEN 1 END)::INTEGER,
+        ROUND(AVG(CASE WHEN stc.is_success_click = true AND stc.prev_event = 'SEARCH_RESULT_COUNT'
             THEN stc.ms_since_prev_event / 1000.0 END)::NUMERIC, 2),
-        COUNT(CASE WHEN stc.click_category IS NOT NULL AND stc.prev_event = 'SEARCH_RESULT_COUNT' THEN 1 END)::INTEGER,
-        SUM(CASE WHEN stc.click_category IS NOT NULL AND stc.prev_event = 'SEARCH_RESULT_COUNT'
+        COUNT(CASE WHEN stc.is_success_click = true AND stc.prev_event = 'SEARCH_RESULT_COUNT' THEN 1 END)::INTEGER,
+        SUM(CASE WHEN stc.is_success_click = true AND stc.prev_event = 'SEARCH_RESULT_COUNT'
             THEN stc.ms_since_prev_event / 1000.0 ELSE 0 END)::NUMERIC(12,2),
-        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 6 AND stc.event_hour < 12 THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 0 AND stc.event_hour < 8 THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 8 AND stc.event_hour < 12 THEN 1 END)::INTEGER,
         COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 12 AND stc.event_hour < 18 THEN 1 END)::INTEGER,
         COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 18 AND stc.event_hour < 24 THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 0 AND stc.event_hour < 6 THEN 1 END)::INTEGER,
         MAX(tfs.first_seen_date),
         CASE WHEN stc.session_date = MAX(tfs.first_seen_date) THEN true ELSE false END
     FROM search_terms_with_context stc

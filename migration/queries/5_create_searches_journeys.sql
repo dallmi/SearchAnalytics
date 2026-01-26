@@ -65,12 +65,18 @@ BEGIN
             MIN(event_hour) as first_event_hour,
             MAX(event_hour) as last_event_hour,
 
-            -- Click breakdown
-            COUNT(CASE WHEN click_category = 'General' THEN 1 END) as general_clicks,
-            COUNT(CASE WHEN click_category = 'All' THEN 1 END) as all_tab_clicks,
-            COUNT(CASE WHEN click_category = 'News' THEN 1 END) as news_clicks,
-            COUNT(CASE WHEN click_category = 'GoTo' THEN 1 END) as goto_clicks,
-            COUNT(CASE WHEN click_category = 'People' THEN 1 END) as people_clicks,
+            -- Click breakdown (new categories)
+            COUNT(CASE WHEN click_category = 'Result' THEN 1 END) as result_clicks,
+            COUNT(CASE WHEN click_category = 'Trending' THEN 1 END) as trending_clicks,
+            COUNT(CASE WHEN click_category = 'Tab' THEN 1 END) as tab_clicks,
+            COUNT(CASE WHEN click_category LIKE 'Pagination%' THEN 1 END) as pagination_clicks,
+            COUNT(CASE WHEN click_category = 'Pagination_All' THEN 1 END) as pagination_all_clicks,
+            COUNT(CASE WHEN click_category = 'Pagination_News' THEN 1 END) as pagination_news_clicks,
+            COUNT(CASE WHEN click_category = 'Pagination_GoTo' THEN 1 END) as pagination_goto_clicks,
+            COUNT(CASE WHEN click_category = 'Filter' THEN 1 END) as filter_clicks,
+
+            -- Success clicks (SEARCH_RESULT_CLICK only - actual content found)
+            COUNT(CASE WHEN is_success_click = true THEN 1 END) as success_click_count,
 
             -- Flags
             MAX(CASE WHEN is_first_search_of_day = true THEN 1 ELSE 0 END) as includes_first_search_of_day,
@@ -113,12 +119,16 @@ BEGIN
         s.first_event_hour,
         s.last_event_hour,
 
-        -- Click breakdown
-        s.general_clicks,
-        s.all_tab_clicks,
-        s.news_clicks,
-        s.goto_clicks,
-        s.people_clicks,
+        -- Click breakdown (new categories)
+        s.result_clicks,
+        s.trending_clicks,
+        s.tab_clicks,
+        s.pagination_clicks,
+        s.pagination_all_clicks,
+        s.pagination_news_clicks,
+        s.pagination_goto_clicks,
+        s.filter_clicks,
+        s.success_click_count,
 
         -- Flags
         CASE WHEN s.includes_first_search_of_day = 1 THEN true ELSE false END as includes_first_search_of_day,
@@ -129,10 +139,10 @@ BEGIN
         CASE WHEN s.user_session_number = 1 THEN true ELSE false END as is_users_first_session,
 
         -- Journey outcome classification
-        -- Success = found content (clicked on result)
+        -- Success = found content (clicked on actual result)
         -- Engaged = interacted (tabs/pagination/filters) but didn't click content
-        -- Abandoned = had results but no interaction at all
         -- No Results = all searches returned 0 results
+        -- Abandoned = had results but no interaction at all
         CASE
             WHEN s.success_click_count > 0 THEN 'Success'
             WHEN s.click_count > 0 AND s.success_click_count = 0 THEN 'Engaged'
@@ -141,11 +151,11 @@ BEGIN
             ELSE 'Unknown'
         END as journey_outcome,
 
-        -- Session complexity
+        -- Session complexity based on USER ACTIONS (searches + clicks), not all telemetry events
         CASE
-            WHEN s.total_events = 1 THEN 'Single Event'
-            WHEN s.total_events <= 3 THEN 'Simple'
-            WHEN s.total_events <= 10 THEN 'Medium'
+            WHEN (s.search_count_in_session + s.click_count) = 1 THEN 'Single Action'
+            WHEN (s.search_count_in_session + s.click_count) <= 3 THEN 'Simple'
+            WHEN (s.search_count_in_session + s.click_count) <= 10 THEN 'Medium'
             ELSE 'Complex'
         END as session_complexity,
 
@@ -179,6 +189,7 @@ BEGIN
         END as session_duration_bucket,
 
         -- Sort order columns (for Power BI)
+        -- journey_outcome_sort: 1=Success, 2=Engaged, 3=Abandoned, 4=No Results, 5=Unknown
         CASE
             WHEN s.success_click_count > 0 THEN 1
             WHEN s.click_count > 0 AND s.success_click_count = 0 THEN 2
@@ -187,10 +198,11 @@ BEGIN
             ELSE 5
         END as journey_outcome_sort,
 
+        -- session_complexity_sort based on user actions
         CASE
-            WHEN s.total_events = 1 THEN 1
-            WHEN s.total_events <= 3 THEN 2
-            WHEN s.total_events <= 10 THEN 3
+            WHEN (s.search_count_in_session + s.click_count) = 1 THEN 1
+            WHEN (s.search_count_in_session + s.click_count) <= 3 THEN 2
+            WHEN (s.search_count_in_session + s.click_count) <= 10 THEN 3
             ELSE 4
         END as session_complexity_sort,
 
@@ -279,11 +291,15 @@ BEGIN
             MAX(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN cp_total_result_count END) as max_total_results,
             MIN(event_hour) as first_event_hour,
             MAX(event_hour) as last_event_hour,
-            COUNT(CASE WHEN click_category = 'General' THEN 1 END) as general_clicks,
-            COUNT(CASE WHEN click_category = 'All' THEN 1 END) as all_tab_clicks,
-            COUNT(CASE WHEN click_category = 'News' THEN 1 END) as news_clicks,
-            COUNT(CASE WHEN click_category = 'GoTo' THEN 1 END) as goto_clicks,
-            COUNT(CASE WHEN click_category = 'People' THEN 1 END) as people_clicks,
+            COUNT(CASE WHEN click_category = 'Result' THEN 1 END) as result_clicks,
+            COUNT(CASE WHEN click_category = 'Trending' THEN 1 END) as trending_clicks,
+            COUNT(CASE WHEN click_category = 'Tab' THEN 1 END) as tab_clicks,
+            COUNT(CASE WHEN click_category LIKE 'Pagination%' THEN 1 END) as pagination_clicks,
+            COUNT(CASE WHEN click_category = 'Pagination_All' THEN 1 END) as pagination_all_clicks,
+            COUNT(CASE WHEN click_category = 'Pagination_News' THEN 1 END) as pagination_news_clicks,
+            COUNT(CASE WHEN click_category = 'Pagination_GoTo' THEN 1 END) as pagination_goto_clicks,
+            COUNT(CASE WHEN click_category = 'Filter' THEN 1 END) as filter_clicks,
+            COUNT(CASE WHEN is_success_click = true THEN 1 END) as success_click_count,
             MAX(CASE WHEN is_first_search_of_day = true THEN 1 ELSE 0 END) as includes_first_search_of_day,
             COUNT(DISTINCT click_category) as distinct_click_categories
         FROM searches
@@ -304,20 +320,23 @@ BEGIN
         ROUND(s.ms_result_to_click / 1000.0, 2),
         ROUND(s.total_duration_ms / 1000.0, 2),
         s.first_event_hour, s.last_event_hour,
-        s.general_clicks, s.all_tab_clicks, s.news_clicks, s.goto_clicks, s.people_clicks,
+        s.result_clicks, s.trending_clicks, s.tab_clicks, s.pagination_clicks,
+        s.pagination_all_clicks, s.pagination_news_clicks, s.pagination_goto_clicks,
+        s.filter_clicks, s.success_click_count,
         CASE WHEN s.includes_first_search_of_day = 1 THEN true ELSE false END,
         CASE WHEN s.null_result_count > 0 THEN true ELSE false END,
-        CASE WHEN s.null_result_count > 0 AND s.click_count > 0 THEN true ELSE false END,
+        CASE WHEN s.null_result_count > 0 AND s.success_click_count > 0 THEN true ELSE false END,
         CASE WHEN s.unique_search_terms > 1 THEN true ELSE false END,
         CASE WHEN s.distinct_click_categories > 1 THEN true ELSE false END,
         CASE WHEN s.user_session_number = 1 THEN true ELSE false END,
-        CASE WHEN s.click_count > 0 THEN 'Success'
+        CASE WHEN s.success_click_count > 0 THEN 'Success'
+             WHEN s.click_count > 0 AND s.success_click_count = 0 THEN 'Engaged'
              WHEN s.result_count > 0 AND s.null_result_count = s.result_count THEN 'No Results'
              WHEN s.result_count > 0 AND s.click_count = 0 THEN 'Abandoned'
              ELSE 'Unknown' END,
-        CASE WHEN s.total_events = 1 THEN 'Single Event'
-             WHEN s.total_events <= 3 THEN 'Simple'
-             WHEN s.total_events <= 10 THEN 'Medium'
+        CASE WHEN (s.search_count_in_session + s.click_count) = 1 THEN 'Single Action'
+             WHEN (s.search_count_in_session + s.click_count) <= 3 THEN 'Simple'
+             WHEN (s.search_count_in_session + s.click_count) <= 10 THEN 'Medium'
              ELSE 'Complex' END,
         CASE WHEN s.ms_search_to_result IS NULL THEN 'No Result'
              WHEN s.ms_search_to_result < 500 THEN '< 0.5s'
@@ -338,12 +357,15 @@ BEGIN
              WHEN s.total_duration_ms < 180000 THEN '1-3 min'
              WHEN s.total_duration_ms < 300000 THEN '3-5 min'
              ELSE '> 5 min (extended)' END,
-        CASE WHEN s.click_count > 0 THEN 1
-             WHEN s.result_count > 0 AND s.null_result_count = s.result_count THEN 3
-             WHEN s.result_count > 0 AND s.click_count = 0 THEN 2
+        CASE WHEN s.success_click_count > 0 THEN 1
+             WHEN s.click_count > 0 AND s.success_click_count = 0 THEN 2
+             WHEN s.result_count > 0 AND s.null_result_count = s.result_count THEN 4
+             WHEN s.result_count > 0 AND s.click_count = 0 THEN 3
+             ELSE 5 END,
+        CASE WHEN (s.search_count_in_session + s.click_count) = 1 THEN 1
+             WHEN (s.search_count_in_session + s.click_count) <= 3 THEN 2
+             WHEN (s.search_count_in_session + s.click_count) <= 10 THEN 3
              ELSE 4 END,
-        CASE WHEN s.total_events = 1 THEN 1 WHEN s.total_events <= 3 THEN 2
-             WHEN s.total_events <= 10 THEN 3 ELSE 4 END,
         CASE WHEN s.ms_search_to_result IS NULL THEN 6 WHEN s.ms_search_to_result < 500 THEN 1
              WHEN s.ms_search_to_result < 1000 THEN 2 WHEN s.ms_search_to_result < 2000 THEN 3
              WHEN s.ms_search_to_result < 5000 THEN 4 ELSE 5 END,

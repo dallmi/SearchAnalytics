@@ -111,21 +111,25 @@ BEGIN
         COUNT(CASE WHEN s.is_first_search_of_day = true THEN 1 END)::INTEGER as first_searches_of_day,
 
         -- Click breakdown by category
-        COUNT(CASE WHEN s.click_category = 'General' THEN 1 END)::INTEGER as clicks_general,
-        COUNT(CASE WHEN s.click_category = 'All' THEN 1 END)::INTEGER as clicks_all,
-        COUNT(CASE WHEN s.click_category = 'News' THEN 1 END)::INTEGER as clicks_news,
-        COUNT(CASE WHEN s.click_category = 'GoTo' THEN 1 END)::INTEGER as clicks_goto,
-        COUNT(CASE WHEN s.click_category = 'People' THEN 1 END)::INTEGER as clicks_people,
+        COUNT(CASE WHEN s.click_category = 'Result' THEN 1 END)::INTEGER as clicks_result,
+        COUNT(CASE WHEN s.click_category = 'Trending' THEN 1 END)::INTEGER as clicks_trending,
+        COUNT(CASE WHEN s.click_category = 'Tab' THEN 1 END)::INTEGER as clicks_tab,
+        COUNT(CASE WHEN s.click_category LIKE 'Pagination%' THEN 1 END)::INTEGER as clicks_pagination,
+        COUNT(CASE WHEN s.click_category = 'Pagination_All' THEN 1 END)::INTEGER as clicks_pagination_all,
+        COUNT(CASE WHEN s.click_category = 'Pagination_News' THEN 1 END)::INTEGER as clicks_pagination_news,
+        COUNT(CASE WHEN s.click_category = 'Pagination_GoTo' THEN 1 END)::INTEGER as clicks_pagination_goto,
+        COUNT(CASE WHEN s.click_category = 'Filter' THEN 1 END)::INTEGER as clicks_filter,
+        COUNT(CASE WHEN s.is_success_click = true THEN 1 END)::INTEGER as success_clicks,
 
         -- Temporal
         TRIM(TO_CHAR(s.session_date, 'Day')) as day_of_week,
         EXTRACT(ISODOW FROM s.session_date)::INTEGER as day_of_week_num,
 
-        -- Time distribution (CET-based hours)
-        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 6 AND s.event_hour < 12 THEN 1 END)::INTEGER as searches_morning,   -- 6-12 CET
-        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 12 AND s.event_hour < 18 THEN 1 END)::INTEGER as searches_afternoon, -- 12-18 CET
-        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 18 AND s.event_hour < 24 THEN 1 END)::INTEGER as searches_evening,   -- 18-24 CET
-        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 0 AND s.event_hour < 6 THEN 1 END)::INTEGER as searches_night,       -- 0-6 CET
+        -- Time distribution (CET-based hours, regional alignment)
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 0 AND s.event_hour < 8 THEN 1 END)::INTEGER as searches_night,       -- 0-8 CET (APAC evening)
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 8 AND s.event_hour < 12 THEN 1 END)::INTEGER as searches_morning,    -- 8-12 CET (EMEA morning)
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 12 AND s.event_hour < 18 THEN 1 END)::INTEGER as searches_afternoon, -- 12-18 CET (EMEA/Americas overlap)
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 18 AND s.event_hour < 24 THEN 1 END)::INTEGER as searches_evening,   -- 18-24 CET (Americas afternoon)
 
         -- User cohort metrics
         MAX(uc.new_users)::INTEGER as new_users,
@@ -226,17 +230,21 @@ BEGIN
         SUM(s.search_term_word_count)::INTEGER,
         COUNT(CASE WHEN s.search_term_length IS NOT NULL THEN 1 END)::INTEGER,
         COUNT(CASE WHEN s.is_first_search_of_day = true THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN s.click_category = 'General' THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN s.click_category = 'All' THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN s.click_category = 'News' THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN s.click_category = 'GoTo' THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN s.click_category = 'People' THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.click_category = 'Result' THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.click_category = 'Trending' THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.click_category = 'Tab' THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.click_category LIKE 'Pagination%' THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.click_category = 'Pagination_All' THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.click_category = 'Pagination_News' THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.click_category = 'Pagination_GoTo' THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.click_category = 'Filter' THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.is_success_click = true THEN 1 END)::INTEGER,
         TRIM(TO_CHAR(s.session_date, 'Day')),
         EXTRACT(ISODOW FROM s.session_date)::INTEGER,
-        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 6 AND s.event_hour < 12 THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 0 AND s.event_hour < 8 THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 8 AND s.event_hour < 12 THEN 1 END)::INTEGER,
         COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 12 AND s.event_hour < 18 THEN 1 END)::INTEGER,
         COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 18 AND s.event_hour < 24 THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 0 AND s.event_hour < 6 THEN 1 END)::INTEGER,
         MAX(uc.new_users)::INTEGER,
         MAX(uc.returning_users)::INTEGER
     FROM searches s

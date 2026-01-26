@@ -81,13 +81,22 @@ BEGIN
 
         -- Click category based on event name
         CASE
-            WHEN UPPER(r.name) = 'SEARCH_TAB_CLICK' THEN 'General'
-            WHEN UPPER(r.name) = 'SEARCH_ALL_TAB_PAGE_CLICK' THEN 'All'
-            WHEN UPPER(r.name) = 'SEARCH_NEWS_TAB_PAGE_CLICK' THEN 'News'
-            WHEN UPPER(r.name) = 'SEARCH_GOTO_TAB_PAGE_CLICK' THEN 'GoTo'
-            WHEN UPPER(r.name) LIKE '%PEOPLE%' THEN 'People'
+            WHEN UPPER(r.name) = 'SEARCH_RESULT_CLICK' THEN 'Result'
+            WHEN UPPER(r.name) = 'SEARCH_TRENDING_CLICKED' THEN 'Trending'
+            WHEN UPPER(r.name) = 'SEARCH_TAB_CLICK' THEN 'Tab'
+            WHEN UPPER(r.name) = 'SEARCH_ALL_TAB_PAGE_CLICK' THEN 'Pagination_All'
+            WHEN UPPER(r.name) = 'SEARCH_NEWS_TAB_PAGE_CLICK' THEN 'Pagination_News'
+            WHEN UPPER(r.name) = 'SEARCH_GOTO_TAB_PAGE_CLICK' THEN 'Pagination_GoTo'
+            WHEN UPPER(r.name) = 'SEARCH_FILTER_CLICK' THEN 'Filter'
             ELSE NULL
-        END as click_category
+        END as click_category,
+
+        -- Success click: TRUE only for actual result clicks (content found)
+        -- Note: SEARCH_TRENDING_CLICKED is NOT a success - it's a search initiation via suggestion
+        CASE
+            WHEN UPPER(r.name) = 'SEARCH_RESULT_CLICK' THEN true
+            ELSE false
+        END as is_success_click
 
     FROM raw_events r;
 
@@ -214,6 +223,7 @@ BEGIN
         f.is_null_result,
         f.is_clickable_result,
         f.click_category,
+        f.is_success_click,
         -- is_first_search_of_day
         CASE
             WHEN f.name = 'SEARCH_TRIGGERED' AND
@@ -292,13 +302,19 @@ BEGIN
             TO_CHAR(r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin', 'Day') as event_weekday,
             EXTRACT(ISODOW FROM r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin')::INTEGER as event_weekday_num,
             CASE
-                WHEN UPPER(r.name) = 'SEARCH_TAB_CLICK' THEN 'General'
-                WHEN UPPER(r.name) = 'SEARCH_ALL_TAB_PAGE_CLICK' THEN 'All'
-                WHEN UPPER(r.name) = 'SEARCH_NEWS_TAB_PAGE_CLICK' THEN 'News'
-                WHEN UPPER(r.name) = 'SEARCH_GOTO_TAB_PAGE_CLICK' THEN 'GoTo'
-                WHEN UPPER(r.name) LIKE '%PEOPLE%' THEN 'People'
+                WHEN UPPER(r.name) = 'SEARCH_RESULT_CLICK' THEN 'Result'
+                WHEN UPPER(r.name) = 'SEARCH_TRENDING_CLICKED' THEN 'Trending'
+                WHEN UPPER(r.name) = 'SEARCH_TAB_CLICK' THEN 'Tab'
+                WHEN UPPER(r.name) = 'SEARCH_ALL_TAB_PAGE_CLICK' THEN 'Pagination_All'
+                WHEN UPPER(r.name) = 'SEARCH_NEWS_TAB_PAGE_CLICK' THEN 'Pagination_News'
+                WHEN UPPER(r.name) = 'SEARCH_GOTO_TAB_PAGE_CLICK' THEN 'Pagination_GoTo'
+                WHEN UPPER(r.name) = 'SEARCH_FILTER_CLICK' THEN 'Filter'
                 ELSE NULL
-            END as click_category
+            END as click_category,
+            CASE
+                WHEN UPPER(r.name) = 'SEARCH_RESULT_CLICK' THEN true
+                ELSE false
+            END as is_success_click
         FROM raw_events r
         WHERE DATE(r.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Berlin') >= p_start_date
     ),
@@ -361,7 +377,7 @@ BEGIN
         t.last_search_started_ts,
         t.search_term_normalized, t.search_term_length, t.search_term_word_count,
         t.event_hour, t.event_weekday, t.event_weekday_num,
-        t.is_null_result, t.is_clickable_result, t.click_category,
+        t.is_null_result, t.is_clickable_result, t.click_category, t.is_success_click,
         CASE
             WHEN t.name = 'SEARCH_TRIGGERED' AND
                  ROW_NUMBER() OVER (PARTITION BY t.user_id, t.session_date ORDER BY t.timestamp) = 1

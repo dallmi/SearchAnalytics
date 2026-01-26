@@ -219,6 +219,7 @@ CREATE TABLE searches (
     is_null_result          BOOLEAN,
     is_clickable_result     BOOLEAN,
     click_category          VARCHAR(20),
+    is_success_click        BOOLEAN,
     is_first_search_of_day  BOOLEAN,
 
     -- Primary key
@@ -269,11 +270,15 @@ CREATE TABLE searches_journeys (
     last_event_hour         INTEGER,
 
     -- Click breakdown
-    general_clicks          INTEGER,
-    all_tab_clicks          INTEGER,
-    news_clicks             INTEGER,
-    goto_clicks             INTEGER,
-    people_clicks           INTEGER,
+    result_clicks               INTEGER,
+    trending_clicks             INTEGER,
+    tab_clicks                  INTEGER,
+    pagination_clicks           INTEGER,
+    pagination_all_clicks       INTEGER,
+    pagination_news_clicks      INTEGER,
+    pagination_goto_clicks      INTEGER,
+    filter_clicks               INTEGER,
+    success_click_count         INTEGER,
 
     -- Flags
     includes_first_search_of_day    BOOLEAN,
@@ -341,7 +346,7 @@ CREATE TABLE searches_journeys_daily_agg (
     no_results_rate_pct         NUMERIC(5,2),
 
     -- Session complexity distribution
-    sessions_single_event       INTEGER,
+    sessions_single_action      INTEGER,
     sessions_simple             INTEGER,
     sessions_medium             INTEGER,
     sessions_complex            INTEGER,
@@ -368,10 +373,12 @@ CREATE TABLE searches_journeys_daily_agg (
     timing_bucket_no_result     INTEGER,  -- No result
 
     -- Click breakdown
-    total_general_clicks        INTEGER,
-    total_news_clicks           INTEGER,
-    total_goto_clicks           INTEGER,
-    total_people_clicks         INTEGER,
+    total_result_clicks         INTEGER,
+    total_trending_clicks       INTEGER,
+    total_tab_clicks            INTEGER,
+    total_pagination_clicks     INTEGER,
+    total_filter_clicks         INTEGER,
+    total_success_clicks        INTEGER,
 
     -- Behavioral flags aggregates
     sessions_with_reformulation INTEGER,
@@ -435,11 +442,15 @@ CREATE TABLE searches_daily (
     first_searches_of_day       INTEGER,
 
     -- Click breakdown
-    clicks_general          INTEGER,
-    clicks_all              INTEGER,
-    clicks_news             INTEGER,
-    clicks_goto             INTEGER,
-    clicks_people           INTEGER,
+    clicks_result               INTEGER,
+    clicks_trending             INTEGER,
+    clicks_tab                  INTEGER,
+    clicks_pagination           INTEGER,
+    clicks_pagination_all       INTEGER,
+    clicks_pagination_news      INTEGER,
+    clicks_pagination_goto      INTEGER,
+    clicks_filter               INTEGER,
+    success_clicks              INTEGER,
 
     -- Temporal
     day_of_week             VARCHAR(10),
@@ -483,12 +494,16 @@ CREATE TABLE searches_terms (
     null_result_count       INTEGER,
 
     -- Click metrics
-    click_count             INTEGER,
-    clicks_general          INTEGER,
-    clicks_all              INTEGER,
-    clicks_news             INTEGER,
-    clicks_goto             INTEGER,
-    clicks_people           INTEGER,
+    click_count                 INTEGER,
+    clicks_result               INTEGER,
+    clicks_trending             INTEGER,
+    clicks_tab                  INTEGER,
+    clicks_pagination           INTEGER,
+    clicks_pagination_all       INTEGER,
+    clicks_pagination_news      INTEGER,
+    clicks_pagination_goto      INTEGER,
+    clicks_filter               INTEGER,
+    success_click_count         INTEGER,
 
     -- Timing
     avg_sec_to_click        NUMERIC(10,2),

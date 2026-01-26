@@ -340,20 +340,47 @@ SEARCH_TRIGGERED → SEARCH_COMPLETED → SEARCH_RESULT_COUNT → [CLICK]
 
 | Outcome | Condition |
 |---------|-----------|
-| **Success** | `click_count > 0` |
-| **Abandoned** | `result_count > 0 AND click_count = 0 AND null_result_count < result_count` |
+| **Success** | `success_click_count > 0` (user clicked on actual search result) |
+| **Engaged** | `click_count > 0 AND success_click_count = 0` (navigation clicks only) |
+| **Abandoned** | `result_count > 0 AND click_count = 0` (had results but no interaction) |
 | **No Results** | `result_count > 0 AND null_result_count = result_count` |
 | **Unknown** | Other cases |
 
 ### Click Categories
 
-| Event Name | Category |
-|------------|----------|
-| `SEARCH_TAB_CLICK` | General |
-| `SEARCH_ALL_TAB_PAGE_CLICK` | All |
-| `SEARCH_NEWS_TAB_PAGE_CLICK` | News |
-| `SEARCH_GOTO_TAB_PAGE_CLICK` | GoTo |
-| Events containing `PEOPLE` | People |
+| Event Name | Category | is_success_click |
+|------------|----------|------------------|
+| `SEARCH_RESULT_CLICK` | Result | TRUE |
+| `SEARCH_TRENDING_CLICKED` | Trending | FALSE |
+| `SEARCH_TAB_CLICK` | Tab | FALSE |
+| `SEARCH_ALL_TAB_PAGE_CLICK` | Pagination_All | FALSE |
+| `SEARCH_NEWS_TAB_PAGE_CLICK` | Pagination_News | FALSE |
+| `SEARCH_GOTO_TAB_PAGE_CLICK` | Pagination_GoTo | FALSE |
+| `SEARCH_FILTER_CLICK` | Filter | FALSE |
+
+**Note:** `is_success_click = TRUE` only for `SEARCH_RESULT_CLICK` events, indicating the user found and clicked on actual content. All other click types are navigation/UI interactions.
+
+### Session Complexity
+
+Session complexity is based on **user actions** (searches + clicks), not total events:
+
+| Complexity | Condition |
+|------------|-----------|
+| **Single Action** | `(search_count + click_count) = 1` |
+| **Simple** | `(search_count + click_count) <= 3` |
+| **Medium** | `(search_count + click_count) <= 10` |
+| **Complex** | `(search_count + click_count) > 10` |
+
+### Time Distribution (Regional Alignment)
+
+Time buckets are based on CET hours and aligned with global regions:
+
+| Bucket | CET Hours | Regional Context |
+|--------|-----------|------------------|
+| Night | 0-8 CET | APAC evening |
+| Morning | 8-12 CET | EMEA morning |
+| Afternoon | 12-18 CET | EMEA/Americas overlap |
+| Evening | 18-24 CET | Americas afternoon |
 
 ---
 
