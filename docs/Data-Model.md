@@ -446,16 +446,31 @@ END
 
 ### session_complexity
 
-**Definition:** Categorizes sessions by number of events.
+**Definition:** Categorizes sessions by number of **user actions** (searches + clicks).
+
+This counts only user-initiated events:
+- **Searches**: `SEARCH_TRIGGERED` events (user pressed Enter or clicked search)
+- **Clicks**: All click events (`SEARCH_RESULT_CLICK`, `SEARCH_TAB_CLICK`, `SEARCH_TRENDING_CLICKED`, pagination clicks, `SEARCH_FILTER_CLICK`)
+
+It excludes backend telemetry events like `SEARCH_STARTED`, `SEARCH_COMPLETED`, `SEARCH_RESULT_COUNT` which inflate counts without representing user engagement.
 
 ```sql
+user_actions = search_count_in_session + click_count
+
 session_complexity = CASE
-    WHEN total_events = 1 THEN 'Single Event'
-    WHEN total_events <= 3 THEN 'Simple'
-    WHEN total_events <= 10 THEN 'Medium'
+    WHEN user_actions = 1 THEN 'Single Action'
+    WHEN user_actions <= 3 THEN 'Simple'
+    WHEN user_actions <= 10 THEN 'Medium'
     ELSE 'Complex'
 END
 ```
+
+| Complexity | User Actions | Typical Scenario |
+|------------|--------------|------------------|
+| Single Action | 1 | Quick search, no click |
+| Simple | 2-3 | Search + click, or 2 searches |
+| Medium | 4-10 | Multiple searches and/or clicks |
+| Complex | >10 | Extended research session |
 
 ### had_reformulation
 
@@ -591,7 +606,7 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `session_duration_bucket` | String | Session length category | < 5s, 5-30s, 30-60s, 1-3 min, etc. |
 | `journey_outcome` | String | Session result | Success/Engaged/Abandoned/No Results |
 | `had_reformulation` | Boolean | User changed query | unique_search_terms > 1 |
-| `session_complexity` | String | Session size category | Based on total_events |
+| `session_complexity` | String | Session size category | Based on user actions (searches + clicks) |
 | `search_to_result_sort` | Integer | Sort order for latency bucket | 1-6 for Power BI sorting |
 | `result_to_click_sort` | Integer | Sort order for click time bucket | 1-7 for Power BI sorting |
 | `session_duration_sort` | Integer | Sort order for duration bucket | 1-6 for Power BI sorting |
@@ -923,3 +938,4 @@ timestamp,name,user_Id,session_Id,CP_searchQuery,CP_totalResultCount
 | 1.3 | 2025-01-23 | Expanded event documentation: added initialization events, SEARCH_STARTED distinction, click event details (SEARCH_RESULT_CLICK, SEARCH_TRENDING_CLICKED, SEARCH_FILTER_CLICK, SEARCH_FAILED) |
 | 1.4 | 2025-01-26 | Updated click categories (Result, Trending, Tab, Pagination_*, Filter). Added is_success_click (SEARCH_RESULT_CLICK only - trending clicks are search initiation, not content discovery). Updated journey_outcome to use success_click_count. Changed time distribution to regional alignment (0-8 APAC, 8-12 EMEA, 12-18 overlap, 18-24 Americas). |
 | 1.5 | 2025-01-26 | Added "Engaged" journey_outcome category for sessions with navigation clicks but no result clicks. Updated recovered_from_null to use success_click_count. Sort order: 1=Success, 2=Engaged, 3=Abandoned, 4=No Results. |
+| 1.6 | 2025-01-26 | Changed session_complexity to use user actions (searches + clicks) instead of all telemetry events. Renamed "Single Event" to "Single Action". |

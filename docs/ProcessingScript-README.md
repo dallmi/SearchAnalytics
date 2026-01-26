@@ -204,7 +204,7 @@ Four Parquet files are generated for Power BI (plus one for search term analysis
 - **Classifications**:
   - `journey_outcome` (`Success`, `Engaged`, `Abandoned`, `No Results`, `Unknown`)
   - `had_reformulation` (user modified search query)
-  - `session_complexity` (`Single Event`, `Simple`, `Medium`, `Complex`)
+  - `session_complexity` (`Single Action`, `Simple`, `Medium`, `Complex`) - based on user actions (searches + clicks)
 - **Click breakdown**: `general_clicks`, `all_tab_clicks`, `news_clicks`, etc.
 
 #### 4. `searches_terms.parquet`

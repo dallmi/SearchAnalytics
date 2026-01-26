@@ -397,7 +397,7 @@ The `searches_journeys.parquet` file contains **one row per session**. Each row 
 | `success_click_count` | Integer | Number of SUCCESS clicks (SEARCH_RESULT_CLICK only) ⚠️ |
 | `null_result_count` | Integer | Number of searches with 0 results |
 | `had_reformulation` | Boolean | Did user search multiple different terms? |
-| `session_complexity` | String | Single Event, Simple, Medium, Complex |
+| `session_complexity` | String | Single Action, Simple, Medium, Complex (based on user actions: searches + clicks) |
 | `search_to_result_bucket` | String | Time bucket for search-to-result |
 | `result_to_click_bucket` | String | Time bucket for result-to-click |
 | `session_duration_bucket` | String | Time bucket for total session duration |

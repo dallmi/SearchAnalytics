@@ -756,10 +756,12 @@ def export_parquet_files(con, output_dir):
                     ELSE 'Unknown'
                 END as journey_outcome,
                 CASE WHEN unique_search_terms > 1 THEN true ELSE false END as had_reformulation,
+                -- Session complexity based on USER ACTIONS (searches + clicks), not all telemetry events
+                -- This reflects actual user engagement, not backend event noise
                 CASE
-                    WHEN total_events = 1 THEN 'Single Event'
-                    WHEN total_events <= 3 THEN 'Simple'
-                    WHEN total_events <= 10 THEN 'Medium'
+                    WHEN (search_count_in_session + click_count) = 1 THEN 'Single Action'
+                    WHEN (search_count_in_session + click_count) <= 3 THEN 'Simple'
+                    WHEN (search_count_in_session + click_count) <= 10 THEN 'Medium'
                     ELSE 'Complex'
                 END as session_complexity,
                 -- Sort order columns for Power BI
@@ -796,9 +798,9 @@ def export_parquet_files(con, output_dir):
                     ELSE 5
                 END as journey_outcome_sort,
                 CASE
-                    WHEN total_events = 1 THEN 1
-                    WHEN total_events <= 3 THEN 2
-                    WHEN total_events <= 10 THEN 3
+                    WHEN (search_count_in_session + click_count) = 1 THEN 1
+                    WHEN (search_count_in_session + click_count) <= 3 THEN 2
+                    WHEN (search_count_in_session + click_count) <= 10 THEN 3
                     ELSE 4
                 END as session_complexity_sort,
                 -- Null result recovery analysis
