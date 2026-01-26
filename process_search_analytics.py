@@ -143,17 +143,6 @@ def load_file_to_temp_table(con, input_path, temp_table='temp_import'):
             dtype_dict = {col: str for col in timestamp_cols}
             df = pd.read_excel(input_path, dtype=dtype_dict)
             log(f"  Reading timestamp columns as strings: {timestamp_cols}")
-
-            # Debug: show actual timestamp values from Excel
-            for col in timestamp_cols:
-                non_null = df[col].dropna()
-                if len(non_null) > 0:
-                    sample_val = non_null.iloc[0]
-                    log(f"  DEBUG: Excel '{col}' sample: '{sample_val}' (type: {type(sample_val).__name__})")
-                    # Check if it looks like a datetime object (precision lost) vs string
-                    if hasattr(sample_val, 'strftime'):
-                        log(f"  WARNING: Excel stored '{col}' as datetime, precision may be lost!")
-                        log(f"           Consider exporting from App Insights as CSV instead.")
         else:
             df = pd.read_excel(input_path)
 
@@ -188,10 +177,6 @@ def load_file_to_temp_table(con, input_path, temp_table='temp_import'):
         if len(sample) > 0:
             val = str(sample.iloc[0, 0])
             fmt = None
-
-            # Debug: Log timestamp column values for troubleshooting
-            if 'timestamp' in col.lower():
-                log(f"  DEBUG: Column '{col}' sample value: '{val}'")
 
             # Format: dd/MM/yyyy HH:mm:ss.fffffff (App Insights export with microseconds)
             # Note: strptime %f only supports 6 digits, so we truncate longer fractional seconds
@@ -545,18 +530,6 @@ def export_parquet_files(con, output_dir):
     raw_count = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{raw_file}')").df()['n'][0]
     raw_size = os.path.getsize(raw_file) / (1024 * 1024)
     log(f"  searches_raw.parquet ({raw_count:,} rows, {raw_size:.1f} MB)")
-
-    # Verify timestamp precision in parquet
-    ts_sample = con.execute(f"""
-        SELECT timestamp,
-               EXTRACT(second FROM timestamp) as secs,
-               EXTRACT(microsecond FROM timestamp) as microsecs
-        FROM read_parquet('{raw_file}')
-        WHERE timestamp IS NOT NULL
-        LIMIT 3
-    """).df()
-    for _, row in ts_sample.iterrows():
-        log(f"  DEBUG Parquet timestamp: {row['timestamp']} (sec={row['secs']}, microsec={row['microsecs']})")
 
     # Daily aggregation
     daily_file = output_dir / 'searches_daily.parquet'
