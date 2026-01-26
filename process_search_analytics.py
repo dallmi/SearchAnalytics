@@ -445,7 +445,6 @@ def add_calculated_columns(con):
                 WHEN name = 'SEARCH_NEWS_TAB_PAGE_CLICK' THEN 'Pagination_News'
                 WHEN name = 'SEARCH_GOTO_TAB_PAGE_CLICK' THEN 'Pagination_GoTo'
                 WHEN name = 'SEARCH_FILTER_CLICK' THEN 'Filter'
-                WHEN name LIKE '%PEOPLE%' OR name LIKE '%people%' THEN 'People'
                 ELSE NULL
             END as click_category,
             -- Success click: TRUE only for actual result clicks (not navigation/refinement)
@@ -646,7 +645,6 @@ def export_parquet_files(con, output_dir):
                 COUNT(CASE WHEN s.click_category = 'Pagination_News' THEN 1 END) as clicks_pagination_news,
                 COUNT(CASE WHEN s.click_category = 'Pagination_GoTo' THEN 1 END) as clicks_pagination_goto,
                 COUNT(CASE WHEN s.click_category = 'Filter' THEN 1 END) as clicks_filter,
-                COUNT(CASE WHEN s.click_category = 'People' THEN 1 END) as clicks_people,
                 -- Temporal patterns
                 DAYNAME(s.session_date) as day_of_week,
                 ISODOW(s.session_date) as day_of_week_num,
@@ -708,7 +706,6 @@ def export_parquet_files(con, output_dir):
                     COUNT(CASE WHEN click_category = 'Pagination_News' THEN 1 END) as pagination_news_clicks,
                     COUNT(CASE WHEN click_category = 'Pagination_GoTo' THEN 1 END) as pagination_goto_clicks,
                     COUNT(CASE WHEN click_category = 'Filter' THEN 1 END) as filter_clicks,
-                    COUNT(CASE WHEN click_category = 'People' THEN 1 END) as people_clicks,
                     MAX(CASE WHEN is_first_search_of_day = true THEN 1 ELSE 0 END) as includes_first_search_of_day,
                     -- Session flow: distinct click categories used
                     COUNT(DISTINCT click_category) as distinct_click_categories
@@ -748,7 +745,6 @@ def export_parquet_files(con, output_dir):
                 pagination_news_clicks,
                 pagination_goto_clicks,
                 filter_clicks,
-                people_clicks,
                 success_click_count,
                 CASE WHEN includes_first_search_of_day = 1 THEN true ELSE false END as includes_first_search_of_day,
                 -- Time buckets
@@ -911,7 +907,6 @@ def export_parquet_files(con, output_dir):
                 COUNT(CASE WHEN click_category = 'Pagination_News' THEN 1 END) as clicks_pagination_news,
                 COUNT(CASE WHEN click_category = 'Pagination_GoTo' THEN 1 END) as clicks_pagination_goto,
                 COUNT(CASE WHEN click_category = 'Filter' THEN 1 END) as clicks_filter,
-                COUNT(CASE WHEN click_category = 'People' THEN 1 END) as clicks_people,
                 -- Timing metrics (result to success click time for this term)
                 ROUND(AVG(CASE
                     WHEN is_success_click = true AND prev_event = 'SEARCH_RESULT_COUNT'
