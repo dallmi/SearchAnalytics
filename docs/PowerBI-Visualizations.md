@@ -40,9 +40,9 @@ The following updates were made to reflect changes in the data model. Look for �
 |-------------|-------------|--------|
 | `Click Rate %` | `Success Click Rate %` | Use `success_clicks` instead of `click_events` |
 | `Term CTR %` | `Term Success CTR %` | Use `success_click_count` instead of `click_count` |
-| `Term Abandonment Rate %` | *updated* | Use `success_click_count` in calculation |
-| `Term_Outcome` column | *updated* | Use `success_click_count` for CTR calculation |
-| `Search Effectiveness Score` | *updated* | Use `success_click_count` for CTR calculation |
+| `Term Abandonment Rate %` | *updated* | Use `success_click_count` instead of `click_count` |
+| `Term_Outcome` column | *updated* | Use `success_click_count` instead of `click_count` |
+| `Search Effectiveness Score` | *updated* | Use `success_click_count` instead of `click_count` |
 
 ### Key Concept: Success Clicks vs All Clicks
 
@@ -125,7 +125,8 @@ DIVIDE(
 
 // Session Success Rate (sessions with at least one SUCCESS click / sessions with results)
 // Always 0-100% - recommended for KPIs
-// ⚠️ UPDATED: Now based on success clicks (result/trending), not navigation clicks
+// ⚠️ NOTE: sessions_with_clicks is pre-calculated in the parquet using is_success_click
+// (only counts SEARCH_RESULT_CLICK and SEARCH_TRENDING_CLICKED, not navigation clicks)
 Session Success Rate % =
 DIVIDE(
     SUM(searches_daily[sessions_with_clicks]),
@@ -135,6 +136,7 @@ DIVIDE(
 
 // Session Abandonment Rate (sessions with results but no SUCCESS clicks / sessions with results)
 // Always 0-100% - recommended for KPIs
+// ⚠️ NOTE: sessions_abandoned is pre-calculated using is_success_click
 Session Abandonment Rate % =
 DIVIDE(
     SUM(searches_daily[sessions_abandoned]),
