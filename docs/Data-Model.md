@@ -513,6 +513,31 @@ Session: Search "bugdet" (typo) --> 0 results
 --> recovered_from_null = true
 ```
 
+### AppInsights Identifiers: user_id and session_id
+
+The `user_id` and `session_id` values come from Azure Application Insights telemetry. Understanding their behavior is important for interpreting user cohort and session metrics.
+
+**user_id (Cookie-based)**
+- AppInsights uses a browser cookie to generate and persist the `user_id`
+- The same user will have the same `user_id` across sessions as long as the cookie exists
+- A **new** `user_id` will be generated if:
+  - The user clears their cookies
+  - The user switches to a different browser
+  - The user uses incognito/private browsing mode
+  - The cookie expires
+
+**Implication for "Returning Users":** The `returning_users` metric may undercount actual returning users if they clear cookies or switch browsers. It may also overcount if multiple people share the same browser.
+
+**session_id (Activity-based)**
+- A `session_id` persists for the duration of a user's active session
+- A session is defined as a **period of activity separated by less than 30 minutes of inactivity**
+- After **30 minutes of inactivity**, a new `session_id` is generated for the next activity
+- Closing the browser typically ends the session (new session on return)
+
+**Implication for Session Metrics:** Users who take long breaks (>30 min) during research will appear as multiple sessions. Quick tab-switching between searches will remain in the same session.
+
+---
+
 ### User Cohort: is_users_first_session
 
 **Definition:** Is this the first time we've seen this user search?
@@ -939,3 +964,4 @@ timestamp,name,user_Id,session_Id,CP_searchQuery,CP_totalResultCount
 | 1.4 | 2025-01-26 | Updated click categories (Result, Trending, Tab, Pagination_*, Filter). Added is_success_click (SEARCH_RESULT_CLICK only - trending clicks are search initiation, not content discovery). Updated journey_outcome to use success_click_count. Changed time distribution to regional alignment (0-8 APAC, 8-12 EMEA, 12-18 overlap, 18-24 Americas). |
 | 1.5 | 2025-01-26 | Added "Engaged" journey_outcome category for sessions with navigation clicks but no result clicks. Updated recovered_from_null to use success_click_count. Sort order: 1=Success, 2=Engaged, 3=Abandoned, 4=No Results. |
 | 1.6 | 2025-01-26 | Changed session_complexity to use user actions (searches + clicks) instead of all telemetry events. Renamed "Single Event" to "Single Action". |
+| 1.7 | 2025-01-26 | Added AppInsights Identifiers section explaining user_id (cookie-based) and session_id (30-min inactivity timeout) behavior and implications for metrics. |
