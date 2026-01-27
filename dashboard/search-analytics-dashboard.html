@@ -703,23 +703,32 @@
         }
 
         async function loadParquetFiles() {
-            // Try multiple path patterns to find parquet files
-            const pathsToTry = ['../output/', '/output/', 'output/', './output/'];
+            // DuckDB-WASM requires full HTTP URLs for remote file access
+            // Build absolute URL based on current page location
+            const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '');
+            const pathsToTry = [
+                `${baseUrl}/../output/`,
+                `${window.location.origin}/output/`,
+                `${baseUrl}/output/`
+            ];
 
             async function loadWithFallback(viewName, fileName, statusText) {
                 for (const basePath of pathsToTry) {
                     try {
+                        const fullPath = basePath + fileName;
+                        console.log(`Trying to load ${fileName} from ${fullPath}`);
                         await conn.query(`
                             CREATE VIEW ${viewName} AS
-                            SELECT * FROM read_parquet('${basePath}${fileName}')
+                            SELECT * FROM read_parquet('${fullPath}')
                         `);
                         setLoadingText(statusText);
+                        console.log(`Successfully loaded ${fileName} from ${fullPath}`);
                         return;
                     } catch (e) {
-                        console.warn(`Could not load ${fileName} from ${basePath}, trying next path...`);
+                        console.warn(`Could not load ${fileName} from ${basePath}: ${e.message}`);
                     }
                 }
-                throw new Error(`Could not find ${fileName} in any of the expected locations`);
+                throw new Error(`Could not find ${fileName} in any of the expected locations. Make sure the parquet files exist in the output/ folder and you're running an HTTP server from the SearchAnalytics directory.`);
             }
 
             await loadWithFallback('daily', 'searches_daily.parquet', 'Loaded daily data...');
