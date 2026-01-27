@@ -734,6 +734,20 @@
             await loadWithFallback('daily', 'searches_daily.parquet', 'Loaded daily data...');
             await loadWithFallback('journeys', 'searches_journeys.parquet', 'Loaded journeys data...');
             await loadWithFallback('terms', 'searches_terms.parquet', 'Loaded terms data...');
+
+            // Debug: Show summary of daily data
+            const debugResult = await conn.query(`
+                SELECT
+                    COUNT(*) as total_rows,
+                    MIN(date) as min_date,
+                    MAX(date) as max_date,
+                    SUM(search_starts) as sum_search_starts,
+                    SUM(unique_sessions) as sum_unique_sessions,
+                    AVG(search_starts) as avg_daily_searches,
+                    AVG(unique_sessions) as avg_daily_sessions
+                FROM daily
+            `);
+            console.log('Daily parquet summary:', debugResult.toArray()[0]);
         }
 
         async function setInitialDateRange() {
@@ -819,6 +833,7 @@
             `);
 
             const row = result.toArray()[0];
+            console.log('KPI raw row from parquet:', row);
 
             // Convert BigInt values to Numbers for calculations
             const data = {
@@ -832,6 +847,7 @@
                 sessions_with_results: Number(row.sessions_with_results || 0),
                 sessions_abandoned: Number(row.sessions_abandoned || 0)
             };
+            console.log('KPI converted data:', data);
 
             const successRate = data.sessions_with_results > 0
                 ? (data.sessions_with_clicks / data.sessions_with_results * 100).toFixed(1)
