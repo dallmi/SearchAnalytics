@@ -5,12 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Search Analytics Dashboard</title>
 
-    <!-- DuckDB WASM -->
-    <script src="https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/dist/duckdb-browser-mvp.js"></script>
-
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+    <!-- DuckDB WASM - loaded as ES module -->
+    <script type="module">
+        import * as duckdb from 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/+esm';
+        window.duckdb = duckdb;
+        window.dispatchEvent(new Event('duckdb-ready'));
+    </script>
 
     <style>
         :root {
@@ -640,17 +644,26 @@
         // Initialize
         async function init() {
             try {
+                updateStatus('loading', 'Waiting for DuckDB...');
+
+                // Wait for DuckDB module to be ready
+                if (!window.duckdb) {
+                    await new Promise(resolve => {
+                        window.addEventListener('duckdb-ready', resolve, { once: true });
+                    });
+                }
+
                 updateStatus('loading', 'Initializing DuckDB...');
 
-                // Initialize DuckDB
-                const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
-                const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES);
+                const duckdbModule = window.duckdb;
+                const JSDELIVR_BUNDLES = duckdbModule.getJsDelivrBundles();
+                const bundle = await duckdbModule.selectBundle(JSDELIVR_BUNDLES);
                 const worker_url = URL.createObjectURL(
                     new Blob([`importScripts("${bundle.mainWorker}");`], { type: 'text/javascript' })
                 );
                 const worker = new Worker(worker_url);
-                const logger = new duckdb.ConsoleLogger();
-                db = new duckdb.AsyncDuckDB(logger, worker);
+                const logger = new duckdbModule.ConsoleLogger();
+                db = new duckdbModule.AsyncDuckDB(logger, worker);
                 await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
                 URL.revokeObjectURL(worker_url);
 
