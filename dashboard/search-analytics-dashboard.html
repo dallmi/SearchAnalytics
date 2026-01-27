@@ -703,48 +703,28 @@
         }
 
         async function loadParquetFiles() {
-            const basePath = '../output/';
+            // Try multiple path patterns to find parquet files
+            const pathsToTry = ['../output/', '/output/', 'output/', './output/'];
 
-            // Register parquet files
-            try {
-                await conn.query(`
-                    CREATE VIEW daily AS
-                    SELECT * FROM read_parquet('${basePath}searches_daily.parquet')
-                `);
-                setLoadingText('Loaded daily data...');
-            } catch (e) {
-                console.warn('Could not load daily parquet, trying alternative path');
-                await conn.query(`
-                    CREATE VIEW daily AS
-                    SELECT * FROM read_parquet('output/searches_daily.parquet')
-                `);
+            async function loadWithFallback(viewName, fileName, statusText) {
+                for (const basePath of pathsToTry) {
+                    try {
+                        await conn.query(`
+                            CREATE VIEW ${viewName} AS
+                            SELECT * FROM read_parquet('${basePath}${fileName}')
+                        `);
+                        setLoadingText(statusText);
+                        return;
+                    } catch (e) {
+                        console.warn(`Could not load ${fileName} from ${basePath}, trying next path...`);
+                    }
+                }
+                throw new Error(`Could not find ${fileName} in any of the expected locations`);
             }
 
-            try {
-                await conn.query(`
-                    CREATE VIEW journeys AS
-                    SELECT * FROM read_parquet('${basePath}searches_journeys.parquet')
-                `);
-                setLoadingText('Loaded journeys data...');
-            } catch (e) {
-                await conn.query(`
-                    CREATE VIEW journeys AS
-                    SELECT * FROM read_parquet('output/searches_journeys.parquet')
-                `);
-            }
-
-            try {
-                await conn.query(`
-                    CREATE VIEW terms AS
-                    SELECT * FROM read_parquet('${basePath}searches_terms.parquet')
-                `);
-                setLoadingText('Loaded terms data...');
-            } catch (e) {
-                await conn.query(`
-                    CREATE VIEW terms AS
-                    SELECT * FROM read_parquet('output/searches_terms.parquet')
-                `);
-            }
+            await loadWithFallback('daily', 'searches_daily.parquet', 'Loaded daily data...');
+            await loadWithFallback('journeys', 'searches_journeys.parquet', 'Loaded journeys data...');
+            await loadWithFallback('terms', 'searches_terms.parquet', 'Loaded terms data...');
         }
 
         async function setInitialDateRange() {
