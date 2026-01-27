@@ -908,6 +908,7 @@
                 <button class="nav-tab" data-nav="terms">Search Terms</button>
                 <button class="nav-tab" data-nav="journeys">User Journeys</button>
                 <button class="nav-tab" data-nav="performance">Performance</button>
+                <button class="nav-tab" data-nav="patterns">Patterns</button>
             </div>
 
             <!-- Overview Tab -->
@@ -1208,6 +1209,111 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Patterns Tab -->
+            <div class="nav-content" id="navPatterns">
+                <!-- Time of Day Section -->
+                <div class="chart-card full-width" style="margin-bottom: 1rem;">
+                    <div class="chart-title">Time-of-Day Analysis</div>
+                    <p style="font-size: 0.8rem; color: var(--medium-gray); margin-bottom: 0.75rem;">
+                        Search volume by time period (CET). Helps identify regional usage patterns.
+                    </p>
+                    <div class="charts-grid">
+                        <div style="flex: 1;">
+                            <div class="chart-container">
+                                <canvas id="timeOfDayChart"></canvas>
+                            </div>
+                        </div>
+                        <div style="flex: 1;">
+                            <div class="chart-container">
+                                <canvas id="regionalDistChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Terms by Time of Day -->
+                <div class="chart-card full-width" style="margin-bottom: 1rem;">
+                    <div class="chart-title">Top Terms by Peak Time Period</div>
+                    <p style="font-size: 0.8rem; color: var(--medium-gray); margin-bottom: 0.75rem;">
+                        Terms grouped by when they are most frequently searched. High concentration (>40%) indicates regional-specific terms.
+                    </p>
+                    <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Term</th>
+                                    <th class="text-right">Searches</th>
+                                    <th class="text-right">Peak Period</th>
+                                    <th class="text-right">Concentration</th>
+                                    <th class="text-right">Night (0-8)</th>
+                                    <th class="text-right">Morning (8-12)</th>
+                                    <th class="text-right">Afternoon (12-18)</th>
+                                    <th class="text-right">Evening (18-24)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="timeOfDayTermsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Seasonality Section -->
+                <div class="chart-card full-width" style="margin-bottom: 1rem;">
+                    <div class="chart-title">Monthly Seasonality</div>
+                    <p style="font-size: 0.8rem; color: var(--medium-gray); margin-bottom: 0.75rem;">
+                        Search volume by month. Identifies seasonal patterns and recurring trends.
+                    </p>
+                    <div class="chart-container tall">
+                        <canvas id="monthlySeasonalityChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Seasonal Terms Table -->
+                <div class="chart-card full-width">
+                    <div class="chart-title">Seasonal Search Terms</div>
+                    <p style="font-size: 0.8rem; color: var(--medium-gray); margin-bottom: 0.75rem;">
+                        Terms that spike in specific months. Concentration ratio >2.0 indicates seasonal behavior (e.g., "performance review" in Nov/Dec).
+                    </p>
+                    <div class="table-controls" style="margin-bottom: 0.75rem;">
+                        <select class="filter-select" id="seasonalMonthFilter">
+                            <option value="">All Peak Months</option>
+                            <option value="1">January</option>
+                            <option value="2">February</option>
+                            <option value="3">March</option>
+                            <option value="4">April</option>
+                            <option value="5">May</option>
+                            <option value="6">June</option>
+                            <option value="7">July</option>
+                            <option value="8">August</option>
+                            <option value="9">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
+                        </select>
+                        <select class="filter-select" id="seasonalTypeFilter">
+                            <option value="">All Types</option>
+                            <option value="high">Highly Seasonal (>3x)</option>
+                            <option value="moderate">Moderately Seasonal (2-3x)</option>
+                            <option value="slight">Slightly Seasonal (1.5-2x)</option>
+                        </select>
+                    </div>
+                    <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Term</th>
+                                    <th class="text-right">Total Searches</th>
+                                    <th class="text-right">Peak Month</th>
+                                    <th class="text-right">Concentration</th>
+                                    <th class="text-right">Type</th>
+                                    <th class="text-right">Months Active</th>
+                                </tr>
+                            </thead>
+                            <tbody id="seasonalTermsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 
@@ -1397,7 +1503,9 @@
                     renderSearchLatency(),
                     renderTimeToClick(),
                     renderLatencyTrend(),
-                    renderPerformanceMetrics()
+                    renderPerformanceMetrics(),
+                    renderTimeOfDay(),
+                    renderSeasonality()
                 ]);
 
                 updateStatus('success', `Last updated: ${new Date().toLocaleTimeString()}`);
@@ -2373,6 +2481,307 @@
                     <div class="metric-label">Avg Session Duration</div>
                 </div>
             `;
+        }
+
+        // Time of Day Analysis
+        async function renderTimeOfDay() {
+            // Overall time distribution
+            const timeResult = await conn.query(`
+                SELECT
+                    SUM(CAST(searches_night AS DOUBLE)) as night,
+                    SUM(CAST(searches_morning AS DOUBLE)) as morning,
+                    SUM(CAST(searches_afternoon AS DOUBLE)) as afternoon,
+                    SUM(CAST(searches_evening AS DOUBLE)) as evening
+                FROM terms WHERE ${getDateWhereClause('session_date')}
+            `);
+
+            const timeData = timeResult.toArray()[0];
+            const total = Number(timeData.night || 0) + Number(timeData.morning || 0) +
+                         Number(timeData.afternoon || 0) + Number(timeData.evening || 0);
+
+            // Time of Day bar chart
+            if (charts.timeOfDay) charts.timeOfDay.destroy();
+            const timeCtx = document.getElementById('timeOfDayChart');
+            if (timeCtx) {
+                charts.timeOfDay = new Chart(timeCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Night (0-8 CET)', 'Morning (8-12 CET)', 'Afternoon (12-18 CET)', 'Evening (18-24 CET)'],
+                        datasets: [{
+                            label: 'Searches',
+                            data: [
+                                Number(timeData.night || 0),
+                                Number(timeData.morning || 0),
+                                Number(timeData.afternoon || 0),
+                                Number(timeData.evening || 0)
+                            ],
+                            backgroundColor: [COLORS.info, COLORS.success, COLORS.warning, COLORS.primary]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: (ctx) => {
+                                        const pct = total > 0 ? (ctx.raw / total * 100).toFixed(1) : 0;
+                                        return `${formatNumber(ctx.raw)} searches (${pct}%)`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            }
+
+            // Regional distribution pie chart
+            if (charts.regionalDist) charts.regionalDist.destroy();
+            const regCtx = document.getElementById('regionalDistChart');
+            if (regCtx) {
+                // Infer regional distribution based on time patterns
+                const apac = Number(timeData.night || 0); // Night CET = APAC business hours
+                const emea = Number(timeData.morning || 0) + Number(timeData.afternoon || 0) * 0.5;
+                const americas = Number(timeData.evening || 0) + Number(timeData.afternoon || 0) * 0.5;
+
+                charts.regionalDist = new Chart(regCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['APAC (Night CET)', 'EMEA (Morning/Afternoon)', 'Americas (Afternoon/Evening)'],
+                        datasets: [{
+                            data: [apac, emea, americas],
+                            backgroundColor: [COLORS.info, COLORS.success, COLORS.primary]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom' },
+                            tooltip: {
+                                callbacks: {
+                                    label: (ctx) => {
+                                        const pct = total > 0 ? (ctx.raw / total * 100).toFixed(1) : 0;
+                                        return `${ctx.label}: ${pct}%`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Terms by time of day table
+            const termsResult = await conn.query(`
+                SELECT
+                    search_term,
+                    SUM(CAST(search_count AS DOUBLE)) as searches,
+                    SUM(CAST(searches_night AS DOUBLE)) as night,
+                    SUM(CAST(searches_morning AS DOUBLE)) as morning,
+                    SUM(CAST(searches_afternoon AS DOUBLE)) as afternoon,
+                    SUM(CAST(searches_evening AS DOUBLE)) as evening
+                FROM terms WHERE ${getDateWhereClause('session_date')}
+                GROUP BY search_term
+                HAVING SUM(CAST(search_count AS DOUBLE)) >= 5
+                ORDER BY SUM(CAST(search_count AS DOUBLE)) DESC
+                LIMIT 50
+            `);
+
+            const termsData = termsResult.toArray();
+
+            document.getElementById('timeOfDayTermsBody').innerHTML = termsData.map(d => {
+                const termTotal = Number(d.night || 0) + Number(d.morning || 0) +
+                                 Number(d.afternoon || 0) + Number(d.evening || 0);
+
+                const nightPct = termTotal > 0 ? (Number(d.night || 0) / termTotal * 100) : 0;
+                const morningPct = termTotal > 0 ? (Number(d.morning || 0) / termTotal * 100) : 0;
+                const afternoonPct = termTotal > 0 ? (Number(d.afternoon || 0) / termTotal * 100) : 0;
+                const eveningPct = termTotal > 0 ? (Number(d.evening || 0) / termTotal * 100) : 0;
+
+                const maxPct = Math.max(nightPct, morningPct, afternoonPct, eveningPct);
+                let peakPeriod = 'Afternoon';
+                let peakColor = COLORS.warning;
+                if (nightPct === maxPct) { peakPeriod = 'Night'; peakColor = COLORS.info; }
+                else if (morningPct === maxPct) { peakPeriod = 'Morning'; peakColor = COLORS.success; }
+                else if (eveningPct === maxPct) { peakPeriod = 'Evening'; peakColor = COLORS.primary; }
+
+                const concentration = maxPct;
+                const concentrationClass = concentration > 40 ? 'danger' : concentration > 30 ? 'warning' : '';
+
+                return `
+                    <tr>
+                        <td><a href="#" onclick="showTermDetail('${d.search_term.replace(/'/g, "\\'")}'); return false;">${d.search_term}</a></td>
+                        <td class="text-right">${formatNumber(d.searches)}</td>
+                        <td class="text-right"><span style="color: ${peakColor}; font-weight: 500;">${peakPeriod}</span></td>
+                        <td class="text-right ${concentrationClass}">${concentration.toFixed(0)}%</td>
+                        <td class="text-right">${nightPct.toFixed(0)}%</td>
+                        <td class="text-right">${morningPct.toFixed(0)}%</td>
+                        <td class="text-right">${afternoonPct.toFixed(0)}%</td>
+                        <td class="text-right">${eveningPct.toFixed(0)}%</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Seasonality Analysis
+        async function renderSeasonality() {
+            // Monthly distribution chart
+            const monthlyResult = await conn.query(`
+                SELECT
+                    month_num,
+                    SUM(CAST(search_count AS DOUBLE)) as searches
+                FROM terms WHERE ${getDateWhereClause('session_date')}
+                GROUP BY month_num
+                ORDER BY month_num
+            `);
+
+            const monthlyData = monthlyResult.toArray();
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+            // Fill in missing months with 0
+            const monthlySearches = new Array(12).fill(0);
+            monthlyData.forEach(d => {
+                if (d.month_num >= 1 && d.month_num <= 12) {
+                    monthlySearches[d.month_num - 1] = Number(d.searches || 0);
+                }
+            });
+
+            if (charts.monthlySeasonality) charts.monthlySeasonality.destroy();
+            const monthCtx = document.getElementById('monthlySeasonalityChart');
+            if (monthCtx) {
+                charts.monthlySeasonality = new Chart(monthCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: monthNames,
+                        datasets: [{
+                            label: 'Searches',
+                            data: monthlySearches,
+                            backgroundColor: monthlySearches.map((v, i) => {
+                                // Highlight Q4 (Oct-Dec) in different color
+                                return i >= 9 ? COLORS.primary : COLORS.info;
+                            })
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: (ctx) => `${formatNumber(ctx.raw)} searches`
+                                }
+                            }
+                        },
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            }
+
+            // Seasonal terms table
+            await renderSeasonalTermsTable();
+
+            // Add filter event listeners
+            document.getElementById('seasonalMonthFilter').addEventListener('change', renderSeasonalTermsTable);
+            document.getElementById('seasonalTypeFilter').addEventListener('change', renderSeasonalTermsTable);
+        }
+
+        async function renderSeasonalTermsTable() {
+            const monthFilter = document.getElementById('seasonalMonthFilter').value;
+            const typeFilter = document.getElementById('seasonalTypeFilter').value;
+
+            // Calculate seasonality for each term
+            const termsResult = await conn.query(`
+                WITH term_monthly AS (
+                    SELECT
+                        search_term,
+                        month_num,
+                        SUM(CAST(search_count AS DOUBLE)) as monthly_searches
+                    FROM terms WHERE ${getDateWhereClause('session_date')}
+                    GROUP BY search_term, month_num
+                ),
+                term_stats AS (
+                    SELECT
+                        search_term,
+                        SUM(monthly_searches) as total_searches,
+                        MAX(monthly_searches) as peak_volume,
+                        AVG(monthly_searches) as avg_volume,
+                        COUNT(DISTINCT month_num) as months_active
+                    FROM term_monthly
+                    GROUP BY search_term
+                    HAVING SUM(monthly_searches) >= 10
+                ),
+                term_peak AS (
+                    SELECT DISTINCT ON (tm.search_term)
+                        tm.search_term,
+                        tm.month_num as peak_month
+                    FROM term_monthly tm
+                    JOIN term_stats ts ON tm.search_term = ts.search_term
+                    WHERE tm.monthly_searches = ts.peak_volume
+                )
+                SELECT
+                    ts.search_term,
+                    ts.total_searches,
+                    tp.peak_month,
+                    ts.peak_volume,
+                    ts.avg_volume,
+                    CASE WHEN ts.avg_volume > 0 THEN ts.peak_volume / ts.avg_volume ELSE 1 END as concentration,
+                    ts.months_active
+                FROM term_stats ts
+                JOIN term_peak tp ON ts.search_term = tp.search_term
+                ORDER BY concentration DESC
+                LIMIT 100
+            `);
+
+            const termsData = termsResult.toArray();
+            const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June',
+                               'July', 'August', 'September', 'October', 'November', 'December'];
+
+            const filtered = termsData.filter(d => {
+                const concentration = Number(d.concentration || 1);
+
+                // Month filter
+                if (monthFilter && Number(d.peak_month) !== Number(monthFilter)) return false;
+
+                // Type filter
+                if (typeFilter === 'high' && concentration < 3) return false;
+                if (typeFilter === 'moderate' && (concentration < 2 || concentration >= 3)) return false;
+                if (typeFilter === 'slight' && (concentration < 1.5 || concentration >= 2)) return false;
+
+                return true;
+            });
+
+            document.getElementById('seasonalTermsBody').innerHTML = filtered.slice(0, 50).map(d => {
+                const concentration = Number(d.concentration || 1);
+                let typeLabel = 'Consistent';
+                let typeClass = '';
+                if (concentration >= 3) { typeLabel = 'Highly Seasonal'; typeClass = 'danger'; }
+                else if (concentration >= 2) { typeLabel = 'Moderately Seasonal'; typeClass = 'warning'; }
+                else if (concentration >= 1.5) { typeLabel = 'Slightly Seasonal'; typeClass = 'info'; }
+
+                const peakMonth = monthNames[Number(d.peak_month) || 0] || 'Unknown';
+
+                return `
+                    <tr>
+                        <td><a href="#" onclick="showTermDetail('${d.search_term.replace(/'/g, "\\'")}'); return false;">${d.search_term}</a></td>
+                        <td class="text-right">${formatNumber(d.total_searches)}</td>
+                        <td class="text-right"><strong>${peakMonth}</strong></td>
+                        <td class="text-right">${concentration.toFixed(1)}x</td>
+                        <td class="text-right ${typeClass}">${typeLabel}</td>
+                        <td class="text-right">${d.months_active}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            if (filtered.length === 0) {
+                document.getElementById('seasonalTermsBody').innerHTML = `
+                    <tr><td colspan="6" style="text-align: center; color: var(--medium-gray); padding: 2rem;">
+                        No seasonal terms found matching the selected filters.
+                    </td></tr>
+                `;
+            }
         }
 
         // Term detail modal

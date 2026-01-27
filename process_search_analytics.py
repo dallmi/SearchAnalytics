@@ -531,7 +531,7 @@ def export_parquet_files(con, output_dir):
     raw_file = output_dir / 'searches_raw.parquet'
     if raw_file.exists():
         raw_file.unlink()
-    con.execute(f"COPY searches TO '{raw_file}' (FORMAT PARQUET)")
+    con.execute(f"COPY searches TO '{raw_file}' (FORMAT PARQUET, COMPRESSION SNAPPY)")
     raw_count = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{raw_file}')").df()['n'][0]
     raw_size = os.path.getsize(raw_file) / (1024 * 1024)
     log(f"  searches_raw.parquet ({raw_count:,} rows, {raw_size:.1f} MB)")
@@ -639,7 +639,7 @@ def export_parquet_files(con, output_dir):
             JOIN daily_user_cohorts uc ON s.session_date = uc.session_date
             GROUP BY 1
             ORDER BY 1
-        ) TO '{daily_file}' (FORMAT PARQUET)
+        ) TO '{daily_file}' (FORMAT PARQUET, COMPRESSION SNAPPY)
     """)
     daily_count = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{daily_file}')").df()['n'][0]
     log(f"  searches_daily.parquet ({daily_count} days)")
@@ -819,7 +819,7 @@ def export_parquet_files(con, output_dir):
                 CASE WHEN distinct_click_categories > 1 THEN true ELSE false END as had_tab_switch
             FROM session_with_user_rank
             ORDER BY session_date, session_start
-        ) TO '{journeys_file}' (FORMAT PARQUET)
+        ) TO '{journeys_file}' (FORMAT PARQUET, COMPRESSION SNAPPY)
     """)
     journeys_count = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{journeys_file}')").df()['n'][0]
     log(f"  searches_journeys.parquet ({journeys_count:,} sessions)")
@@ -926,7 +926,7 @@ def export_parquet_files(con, output_dir):
             SELECT t.*
             FROM term_aggregates t
             ORDER BY t.session_date, t.search_count DESC
-        ) TO '{terms_file}' (FORMAT PARQUET)
+        ) TO '{terms_file}' (FORMAT PARQUET, COMPRESSION SNAPPY)
     """)
     terms_count = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{terms_file}')").df()['n'][0]
     log(f"  searches_terms.parquet ({terms_count:,} term-day combinations)")
