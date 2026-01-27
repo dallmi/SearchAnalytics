@@ -733,6 +733,7 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `searches_evening` | Integer | Searches 18:00-24:00 CET (Americas peak) | Hour-based filter (CET) |
 | `first_seen_date` | Date | First day term appeared | MIN(session_date) over all time |
 | `is_new_term` | Boolean | First appearance today | session_date = first_seen_date |
+| `month_num` | Integer | Month number (1-12) | For seasonality analysis |
 
 ---
 

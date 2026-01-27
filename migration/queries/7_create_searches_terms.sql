@@ -129,7 +129,10 @@ BEGIN
 
             -- Trend detection columns
             MAX(tfs.first_seen_date) as first_seen_date,
-            CASE WHEN stc.session_date = MAX(tfs.first_seen_date) THEN true ELSE false END as is_new_term
+            CASE WHEN stc.session_date = MAX(tfs.first_seen_date) THEN true ELSE false END as is_new_term,
+
+            -- Seasonality (for monthly pattern analysis)
+            EXTRACT(MONTH FROM stc.session_date)::INTEGER as month_num
 
         FROM search_terms_with_context stc
         LEFT JOIN term_first_seen tfs ON stc.active_search_term = tfs.search_term_normalized
@@ -164,7 +167,8 @@ BEGIN
         t.searches_evening,
         t.searches_night,
         t.first_seen_date,
-        t.is_new_term
+        t.is_new_term,
+        t.month_num
     FROM term_aggregates t
     ORDER BY t.session_date, t.search_count DESC;
 
@@ -254,7 +258,8 @@ BEGIN
             COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 12 AND stc.event_hour < 18 THEN 1 END)::INTEGER as searches_afternoon,
             COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 18 AND stc.event_hour < 24 THEN 1 END)::INTEGER as searches_evening,
             MAX(tfs.first_seen_date) as first_seen_date,
-            CASE WHEN stc.session_date = MAX(tfs.first_seen_date) THEN true ELSE false END as is_new_term
+            CASE WHEN stc.session_date = MAX(tfs.first_seen_date) THEN true ELSE false END as is_new_term,
+            EXTRACT(MONTH FROM stc.session_date)::INTEGER as month_num
         FROM search_terms_with_context stc
         LEFT JOIN term_first_seen tfs ON stc.active_search_term = tfs.search_term_normalized
         WHERE stc.active_search_term IS NOT NULL AND stc.active_search_term != ''
@@ -287,7 +292,8 @@ BEGIN
         t.searches_evening,
         t.searches_night,
         t.first_seen_date,
-        t.is_new_term
+        t.is_new_term,
+        t.month_num
     FROM term_aggregates t
     ORDER BY t.session_date, t.search_count DESC;
 
@@ -380,6 +386,92 @@ FROM searches_terms
 GROUP BY search_term
 ORDER BY total_searches DESC;
 
+-- Term seasonality analysis (monthly patterns for recurring terms)
+-- Identifies terms that spike in specific months (e.g., "performance review" in Nov/Dec)
+CREATE OR REPLACE VIEW v_term_seasonality AS
+WITH monthly_volumes AS (
+    -- Aggregate searches by term and month
+    SELECT
+        search_term,
+        month_num,
+        EXTRACT(YEAR FROM session_date)::INTEGER as year_num,
+        SUM(search_count) as monthly_searches,
+        COUNT(DISTINCT session_date) as days_in_month
+    FROM searches_terms
+    GROUP BY search_term, month_num, EXTRACT(YEAR FROM session_date)
+),
+term_monthly_avg AS (
+    -- Average volume per month across all years
+    SELECT
+        search_term,
+        month_num,
+        AVG(monthly_searches) as avg_monthly_volume,
+        COUNT(DISTINCT year_num) as years_with_activity
+    FROM monthly_volumes
+    GROUP BY search_term, month_num
+),
+term_totals AS (
+    -- Overall term statistics
+    SELECT
+        search_term,
+        SUM(search_count) as total_searches,
+        COUNT(DISTINCT session_date) as total_days_active,
+        COUNT(DISTINCT month_num) as months_active,
+        MIN(session_date) as first_seen,
+        MAX(session_date) as last_seen,
+        -- Activity density: days active / total span
+        ROUND(100.0 * COUNT(DISTINCT session_date) /
+            NULLIF(DATE_PART('day', MAX(session_date) - MIN(session_date)) + 1, 0), 1) as activity_density_pct
+    FROM searches_terms
+    GROUP BY search_term
+),
+peak_months AS (
+    -- Find peak month for each term
+    SELECT DISTINCT ON (search_term)
+        search_term,
+        month_num as peak_month,
+        avg_monthly_volume as peak_volume
+    FROM term_monthly_avg
+    ORDER BY search_term, avg_monthly_volume DESC
+),
+monthly_concentration AS (
+    -- Calculate concentration: peak month volume / average monthly volume
+    SELECT
+        tma.search_term,
+        ROUND(MAX(tma.avg_monthly_volume) / NULLIF(AVG(tma.avg_monthly_volume), 0), 2) as concentration_ratio
+    FROM term_monthly_avg tma
+    GROUP BY tma.search_term
+)
+SELECT
+    tt.search_term,
+    tt.total_searches,
+    tt.total_days_active,
+    tt.months_active,
+    tt.activity_density_pct,
+    tt.first_seen,
+    tt.last_seen,
+    pm.peak_month,
+    TO_CHAR(TO_DATE(pm.peak_month::TEXT, 'MM'), 'Mon') as peak_month_name,
+    ROUND(pm.peak_volume, 0) as peak_month_avg_volume,
+    mc.concentration_ratio,
+    -- Seasonality classification
+    CASE
+        WHEN mc.concentration_ratio >= 3.0 THEN 'Highly Seasonal'
+        WHEN mc.concentration_ratio >= 2.0 THEN 'Moderately Seasonal'
+        WHEN mc.concentration_ratio >= 1.5 THEN 'Slightly Seasonal'
+        ELSE 'Consistent'
+    END as seasonality_type,
+    -- Recurrence: appeared in peak month across multiple years
+    (SELECT COUNT(DISTINCT year_num) FROM monthly_volumes mv
+     WHERE mv.search_term = tt.search_term AND mv.month_num = pm.peak_month) as years_in_peak_month
+FROM term_totals tt
+JOIN peak_months pm ON tt.search_term = pm.search_term
+JOIN monthly_concentration mc ON tt.search_term = mc.search_term
+WHERE tt.total_searches >= 10  -- Filter low-volume terms
+ORDER BY mc.concentration_ratio DESC, tt.total_searches DESC;
+
+COMMENT ON VIEW v_term_seasonality IS 'Identifies seasonal search patterns - terms that spike in specific months. Use concentration_ratio > 2 to find seasonal terms.';
+
 -- =============================================================================
 -- Usage
 -- =============================================================================
@@ -398,4 +490,13 @@ SELECT * FROM v_trending_terms LIMIT 20;
 
 -- Terms with high null rates (content gaps):
 SELECT * FROM v_zero_result_terms WHERE null_rate_pct > 50 LIMIT 20;
+
+-- Seasonal terms (spike in specific months):
+SELECT * FROM v_term_seasonality WHERE seasonality_type IN ('Highly Seasonal', 'Moderately Seasonal') LIMIT 20;
+
+-- Terms that peak in Q4 (Oct-Dec) - likely HR/year-end related:
+SELECT * FROM v_term_seasonality WHERE peak_month >= 10 AND concentration_ratio >= 2.0 ORDER BY total_searches DESC;
+
+-- Recurring terms (same month across multiple years):
+SELECT * FROM v_term_seasonality WHERE years_in_peak_month >= 2 ORDER BY concentration_ratio DESC;
 */

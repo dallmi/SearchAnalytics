@@ -991,6 +991,242 @@ RETURN
 - **Seasonal terms**: Reappear periodically after being "Mature"
 - **Core vocabulary**: Consistently high volume in "Mature" bucket
 
+### Term Seasonality Analysis
+
+Detect recurring seasonal patterns in search terms (e.g., "performance review" spiking every November/December).
+
+#### Data Preparation
+
+The `searches_terms` table includes a `month_num` column (1-12) for monthly pattern analysis. Create a month name column for display:
+
+```dax
+// Calculated Column: Month Name (Model view → searches_terms → New Column)
+Month_Name =
+FORMAT(DATE(2024, searches_terms[month_num], 1), "MMM")
+
+// Calculated Column: Month Sort (for proper ordering)
+Month_Sort = searches_terms[month_num]
+```
+
+#### Core Seasonality Measures
+
+```dax
+// Monthly Searches - for the selected term(s)
+Monthly Searches =
+SUM(searches_terms[search_count])
+
+// Peak Month Volume - highest monthly average for a term
+Peak Month Volume =
+VAR TermFilter = SELECTEDVALUE(searches_terms[search_term])
+VAR MonthlyAvg =
+    ADDCOLUMNS(
+        VALUES(searches_terms[month_num]),
+        "AvgVol", CALCULATE(AVERAGE(searches_terms[search_count]))
+    )
+RETURN
+    MAXX(MonthlyAvg, [AvgVol])
+
+// Average Monthly Volume - baseline for concentration
+Avg Monthly Volume =
+AVERAGEX(
+    VALUES(searches_terms[month_num]),
+    CALCULATE(SUM(searches_terms[search_count]))
+)
+
+// Concentration Ratio - how much peak month exceeds average
+// Values > 2.0 indicate seasonal patterns
+Concentration Ratio =
+DIVIDE([Peak Month Volume], [Avg Monthly Volume], 1)
+
+// Seasonality Type - classification based on concentration
+Seasonality Type =
+VAR Ratio = [Concentration Ratio]
+RETURN
+    SWITCH(
+        TRUE(),
+        Ratio >= 3.0, "Highly Seasonal",
+        Ratio >= 2.0, "Moderately Seasonal",
+        Ratio >= 1.5, "Slightly Seasonal",
+        "Consistent"
+    )
+
+// Seasonality Sort (for proper ordering in visuals)
+Seasonality Sort =
+VAR Ratio = [Concentration Ratio]
+RETURN
+    SWITCH(
+        TRUE(),
+        Ratio >= 3.0, 1,
+        Ratio >= 2.0, 2,
+        Ratio >= 1.5, 3,
+        4
+    )
+```
+
+#### Recurrence Detection Measures
+
+```dax
+// Years Active - how many different years the term appeared
+Years Active =
+DISTINCTCOUNT(YEAR(searches_terms[session_date]))
+
+// Peak Month - which month has highest volume
+Peak Month =
+VAR MonthlyTotals =
+    ADDCOLUMNS(
+        VALUES(searches_terms[month_num]),
+        "Vol", CALCULATE(SUM(searches_terms[search_count]))
+    )
+VAR PeakMonthNum = MAXX(TOPN(1, MonthlyTotals, [Vol], DESC), [month_num])
+RETURN
+    FORMAT(DATE(2024, PeakMonthNum, 1), "MMMM")
+
+// Recurring Term Flag - appeared in same month across 2+ years
+Is Recurring =
+VAR PeakMonthNum =
+    MAXX(
+        TOPN(1,
+            ADDCOLUMNS(VALUES(searches_terms[month_num]), "Vol", CALCULATE(SUM(searches_terms[search_count]))),
+            [Vol], DESC),
+        [month_num])
+VAR YearsInPeakMonth =
+    CALCULATE(
+        DISTINCTCOUNT(YEAR(searches_terms[session_date])),
+        searches_terms[month_num] = PeakMonthNum
+    )
+RETURN
+    IF(YearsInPeakMonth >= 2, "Recurring", "Single Occurrence")
+
+// Activity Density - % of days with activity since first seen
+Activity Density % =
+VAR DaysActive = DISTINCTCOUNT(searches_terms[session_date])
+VAR TotalSpan = DATEDIFF(MIN(searches_terms[first_seen_date]), MAX(searches_terms[session_date]), DAY) + 1
+RETURN
+    DIVIDE(DaysActive, TotalSpan, 0) * 100
+```
+
+#### Seasonality Classification
+
+| Type | Concentration | Interpretation |
+|------|---------------|----------------|
+| Highly Seasonal | ≥ 3.0 | Very concentrated in 1-2 months (holiday, annual events) |
+| Moderately Seasonal | 2.0 - 3.0 | Clear seasonal pattern (quarterly reviews, fiscal periods) |
+| Slightly Seasonal | 1.5 - 2.0 | Some monthly variation, not strongly seasonal |
+| Consistent | < 1.5 | Evenly distributed throughout year (core vocabulary) |
+
+---
+
+#### Answering Seasonality Questions
+
+**Q1: Which terms spike every November/December? (HR review season)**
+
+*Visual: Table*
+
+| Field | Well |
+|-------|------|
+| search_term | Rows |
+| [Monthly Searches] | Values |
+| [Peak Month] | Values |
+| [Concentration Ratio] | Values |
+| [Is Recurring] | Values |
+
+*Filters:*
+- Filter `Peak Month` to "November" or "December"
+- Filter `[Concentration Ratio]` >= 2.0
+- Sort by `[Monthly Searches]` descending
+
+---
+
+**Q2: Which terms are one-time events vs recurring?**
+
+*Visual: Stacked Bar Chart*
+
+| Field | Well |
+|-------|------|
+| [Is Recurring] | Axis |
+| search_term | Legend (Top N = 10 by searches) |
+| [Monthly Searches] | Values |
+
+*Alternative: Table with conditional formatting*
+- Show `[Is Recurring]` with icon formatting (checkmark for recurring)
+- Filter `[Years Active]` >= 2 to focus on multi-year terms
+
+---
+
+**Q3: Show me terms with >3x concentration in Q4**
+
+*Visual: Table*
+
+| Field | Well |
+|-------|------|
+| search_term | Rows |
+| [Monthly Searches] | Values |
+| [Peak Month] | Values |
+| [Concentration Ratio] | Values |
+| [Seasonality Type] | Values |
+
+*Filters:*
+- Filter `month_num` to 10, 11, 12 (October-December)
+- Filter `[Concentration Ratio]` >= 3.0
+- Sort by `[Concentration Ratio]` descending
+
+---
+
+**Q4: Monthly volume heatmap for a specific term**
+
+*Visual: Matrix*
+
+| Field | Well |
+|-------|------|
+| Month_Name | Columns |
+| YEAR(session_date) | Rows |
+| [Monthly Searches] | Values |
+
+*Configuration:*
+- Add conditional formatting (background color) on `[Monthly Searches]`
+- Use Month_Sort for column ordering
+- Filter to specific search_term using a slicer
+
+---
+
+**Q5: Seasonal terms by business cycle**
+
+*Visual: Clustered Bar Chart*
+
+| Field | Well |
+|-------|------|
+| [Seasonality Type] | Axis |
+| [Monthly Searches] | Values |
+
+*Drill-down: Add search_term to see which terms fall into each category*
+
+*Additional Table: Terms by Quarter Peak*
+- Create calculated column: `Quarter = "Q" & ROUNDUP(searches_terms[month_num]/3, 0)`
+- Group by Quarter to see Q1 (Jan-Mar), Q2 (Apr-Jun), Q3 (Jul-Sep), Q4 (Oct-Dec) patterns
+
+---
+
+#### Sample Dashboard Layout: Seasonality Analysis
+
+```
++------------------------------------------+------------------------------+
+|                                          |                              |
+|   Seasonality Distribution               |   Top Seasonal Terms         |
+|   (Donut: Highly/Moderate/Slight/None)   |   (Table with Concentration) |
+|                                          |                              |
++------------------------------------------+------------------------------+
+|                                                                         |
+|   Monthly Volume Heatmap                                                |
+|   (Matrix: Months × Years, colored by volume)                          |
+|                                                                         |
++------------------------------------------------------------------------+
+|                                          |                              |
+|   Q4 Seasonal Terms                      |   Recurring vs One-Time     |
+|   (Table: Terms peaking Oct-Dec)         |   (Stacked Bar)             |
+|                                          |                              |
++------------------------------------------+------------------------------+
+```
+
 ### Query Length vs Success Analysis
 
 Use the `word_count` column to understand if longer queries perform better.

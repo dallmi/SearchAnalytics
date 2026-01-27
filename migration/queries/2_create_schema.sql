@@ -520,6 +520,9 @@ CREATE TABLE searches_terms (
     first_seen_date         DATE,
     is_new_term             BOOLEAN,
 
+    -- Seasonality (for monthly pattern analysis)
+    month_num               INTEGER,  -- 1-12 for Jan-Dec
+
     -- Primary key
     PRIMARY KEY (session_date, search_term)
 );
@@ -527,6 +530,7 @@ CREATE TABLE searches_terms (
 CREATE INDEX idx_terms_date ON searches_terms (session_date);
 CREATE INDEX idx_terms_term ON searches_terms (search_term);
 CREATE INDEX idx_terms_count ON searches_terms (search_count DESC);
+CREATE INDEX idx_terms_month ON searches_terms (month_num);
 
 COMMENT ON TABLE searches_terms IS 'Search term analysis with click-through attribution.';
 

@@ -907,7 +907,9 @@ def export_parquet_files(con, output_dir):
                     COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 18 AND event_hour < 24 THEN 1 END) as searches_evening,   -- 18-24 CET (Americas peak)
                     -- Trend detection columns
                     MAX(tfs.first_seen_date) as first_seen_date,
-                    CASE WHEN stc.session_date = MAX(tfs.first_seen_date) THEN true ELSE false END as is_new_term
+                    CASE WHEN stc.session_date = MAX(tfs.first_seen_date) THEN true ELSE false END as is_new_term,
+                    -- Seasonality (for monthly pattern analysis)
+                    EXTRACT(MONTH FROM stc.session_date)::INTEGER as month_num
                 FROM search_terms_with_context stc
                 LEFT JOIN term_first_seen tfs ON stc.active_search_term = tfs.search_term_normalized
                 WHERE stc.active_search_term IS NOT NULL
