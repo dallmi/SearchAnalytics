@@ -858,61 +858,88 @@ def export_parquet_files(con, output_dir):
                 FROM searches
                 WHERE search_term_normalized IS NOT NULL AND search_term_normalized != ''
                 GROUP BY search_term_normalized
+            ),
+            term_aggregates AS (
+                SELECT
+                    session_date,
+                    active_search_term as search_term,
+                    -- Word count for query length analysis
+                    CASE
+                        WHEN active_search_term IS NULL OR active_search_term = '' THEN 0
+                        ELSE LENGTH(active_search_term) - LENGTH(REPLACE(active_search_term, ' ', '')) + 1
+                    END as word_count,
+                    -- Volume metrics
+                    COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' THEN 1 END) as search_count,
+                    COUNT(DISTINCT user_id) as unique_users,
+                    COUNT(DISTINCT session_key) as unique_sessions,
+                    -- Result metrics
+                    COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_events,
+                    SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END) as null_result_count,
+                    -- Click metrics (clicks attributed to this search term)
+                    COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_count,
+                    COUNT(CASE WHEN is_success_click = true THEN 1 END) as success_click_count,
+                    COUNT(CASE WHEN click_category = 'Result' THEN 1 END) as clicks_result,
+                    COUNT(CASE WHEN click_category = 'Trending' THEN 1 END) as clicks_trending,
+                    COUNT(CASE WHEN click_category = 'Tab' THEN 1 END) as clicks_tab,
+                    COUNT(CASE WHEN click_category LIKE 'Pagination%' THEN 1 END) as clicks_pagination,
+                    COUNT(CASE WHEN click_category = 'Pagination_All' THEN 1 END) as clicks_pagination_all,
+                    COUNT(CASE WHEN click_category = 'Pagination_News' THEN 1 END) as clicks_pagination_news,
+                    COUNT(CASE WHEN click_category = 'Pagination_GoTo' THEN 1 END) as clicks_pagination_goto,
+                    COUNT(CASE WHEN click_category = 'Filter' THEN 1 END) as clicks_filter,
+                    -- Timing metrics (result to success click time for this term)
+                    ROUND(AVG(CASE
+                        WHEN is_success_click = true AND prev_event = 'SEARCH_RESULT_COUNT'
+                        THEN ms_since_prev_event / 1000.0
+                    END), 2) as avg_sec_to_click,
+                    COUNT(CASE
+                        WHEN is_success_click = true AND prev_event = 'SEARCH_RESULT_COUNT'
+                        THEN 1
+                    END) as clicks_with_timing,
+                    SUM(CASE
+                        WHEN is_success_click = true AND prev_event = 'SEARCH_RESULT_COUNT'
+                        THEN ms_since_prev_event / 1000.0
+                        ELSE 0
+                    END) as sum_sec_to_click,
+                    -- Hour distribution (when is this term searched? CET-based, regional alignment)
+                    COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 0 AND event_hour < 8 THEN 1 END) as searches_night,       -- 0-8 CET (APAC peak)
+                    COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 8 AND event_hour < 12 THEN 1 END) as searches_morning,    -- 8-12 CET (EMEA peak)
+                    COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 12 AND event_hour < 18 THEN 1 END) as searches_afternoon, -- 12-18 CET (EMEA+Americas overlap)
+                    COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 18 AND event_hour < 24 THEN 1 END) as searches_evening,   -- 18-24 CET (Americas peak)
+                    -- Trend detection columns
+                    MAX(tfs.first_seen_date) as first_seen_date,
+                    CASE WHEN stc.session_date = MAX(tfs.first_seen_date) THEN true ELSE false END as is_new_term
+                FROM search_terms_with_context stc
+                LEFT JOIN term_first_seen tfs ON stc.active_search_term = tfs.search_term_normalized
+                WHERE stc.active_search_term IS NOT NULL
+                  AND stc.active_search_term != ''
+                GROUP BY stc.session_date, stc.active_search_term
             )
             SELECT
-                session_date,
-                active_search_term as search_term,
-                -- Word count for query length analysis
+                t.*,
+                -- Calculated rate metrics
+                ROUND(100.0 * t.success_click_count / NULLIF(t.search_count, 0), 2) as ctr_pct,
+                ROUND(100.0 * t.null_result_count / NULLIF(t.result_events, 0), 2) as null_rate_pct,
+                -- Effectiveness score: CTR% - (NullRate% * 0.5)
+                ROUND(
+                    (100.0 * t.success_click_count / NULLIF(t.search_count, 0))
+                    - (100.0 * t.null_result_count / NULLIF(t.result_events, 0) * 0.5)
+                , 1) as effectiveness_score,
+                -- Term status classification (priority: High Null Rate > High CTR > Low CTR > Moderate CTR)
                 CASE
-                    WHEN active_search_term IS NULL OR active_search_term = '' THEN 0
-                    ELSE LENGTH(active_search_term) - LENGTH(REPLACE(active_search_term, ' ', '')) + 1
-                END as word_count,
-                -- Volume metrics
-                COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' THEN 1 END) as search_count,
-                COUNT(DISTINCT user_id) as unique_users,
-                COUNT(DISTINCT session_key) as unique_sessions,
-                -- Result metrics
-                COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_events,
-                SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END) as null_result_count,
-                -- Click metrics (clicks attributed to this search term)
-                COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_count,
-                COUNT(CASE WHEN is_success_click = true THEN 1 END) as success_click_count,
-                COUNT(CASE WHEN click_category = 'Result' THEN 1 END) as clicks_result,
-                COUNT(CASE WHEN click_category = 'Trending' THEN 1 END) as clicks_trending,
-                COUNT(CASE WHEN click_category = 'Tab' THEN 1 END) as clicks_tab,
-                COUNT(CASE WHEN click_category LIKE 'Pagination%' THEN 1 END) as clicks_pagination,
-                COUNT(CASE WHEN click_category = 'Pagination_All' THEN 1 END) as clicks_pagination_all,
-                COUNT(CASE WHEN click_category = 'Pagination_News' THEN 1 END) as clicks_pagination_news,
-                COUNT(CASE WHEN click_category = 'Pagination_GoTo' THEN 1 END) as clicks_pagination_goto,
-                COUNT(CASE WHEN click_category = 'Filter' THEN 1 END) as clicks_filter,
-                -- Timing metrics (result to success click time for this term)
-                ROUND(AVG(CASE
-                    WHEN is_success_click = true AND prev_event = 'SEARCH_RESULT_COUNT'
-                    THEN ms_since_prev_event / 1000.0
-                END), 2) as avg_sec_to_click,
-                COUNT(CASE
-                    WHEN is_success_click = true AND prev_event = 'SEARCH_RESULT_COUNT'
-                    THEN 1
-                END) as clicks_with_timing,
-                SUM(CASE
-                    WHEN is_success_click = true AND prev_event = 'SEARCH_RESULT_COUNT'
-                    THEN ms_since_prev_event / 1000.0
-                    ELSE 0
-                END) as sum_sec_to_click,
-                -- Hour distribution (when is this term searched? CET-based, regional alignment)
-                COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 0 AND event_hour < 8 THEN 1 END) as searches_night,       -- 0-8 CET (APAC peak)
-                COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 8 AND event_hour < 12 THEN 1 END) as searches_morning,    -- 8-12 CET (EMEA peak)
-                COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 12 AND event_hour < 18 THEN 1 END) as searches_afternoon, -- 12-18 CET (EMEA+Americas overlap)
-                COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 18 AND event_hour < 24 THEN 1 END) as searches_evening,   -- 18-24 CET (Americas peak)
-                -- Trend detection columns
-                MAX(tfs.first_seen_date) as first_seen_date,
-                CASE WHEN stc.session_date = MAX(tfs.first_seen_date) THEN true ELSE false END as is_new_term
-            FROM search_terms_with_context stc
-            LEFT JOIN term_first_seen tfs ON stc.active_search_term = tfs.search_term_normalized
-            WHERE stc.active_search_term IS NOT NULL
-              AND stc.active_search_term != ''
-            GROUP BY stc.session_date, stc.active_search_term
-            ORDER BY stc.session_date, search_count DESC
+                    WHEN 100.0 * t.null_result_count / NULLIF(t.result_events, 0) > 50 THEN 'High Null Rate'
+                    WHEN 100.0 * t.success_click_count / NULLIF(t.search_count, 0) > 30 THEN 'High CTR'
+                    WHEN 100.0 * t.success_click_count / NULLIF(t.search_count, 0) < 10 THEN 'Low CTR'
+                    ELSE 'Moderate CTR'
+                END as term_status,
+                -- Sort order for Power BI (1=High Null Rate, 2=Low CTR, 3=Moderate CTR, 4=High CTR)
+                CASE
+                    WHEN 100.0 * t.null_result_count / NULLIF(t.result_events, 0) > 50 THEN 1
+                    WHEN 100.0 * t.success_click_count / NULLIF(t.search_count, 0) < 10 THEN 2
+                    WHEN 100.0 * t.success_click_count / NULLIF(t.search_count, 0) > 30 THEN 4
+                    ELSE 3
+                END as term_status_sort
+            FROM term_aggregates t
+            ORDER BY t.session_date, t.search_count DESC
         ) TO '{terms_file}' (FORMAT PARQUET)
     """)
     terms_count = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{terms_file}')").df()['n'][0]

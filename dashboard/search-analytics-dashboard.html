@@ -1044,10 +1044,10 @@
                                 <input type="text" class="search-input" id="termSearch" placeholder="Search terms...">
                                 <select class="filter-select" id="termStatusFilter">
                                     <option value="">All statuses</option>
-                                    <option value="good">Good</option>
-                                    <option value="normal">Normal</option>
-                                    <option value="lowctr">Low CTR</option>
-                                    <option value="highnull">High Null</option>
+                                    <option value="good">High CTR (&gt;30%)</option>
+                                    <option value="normal">Moderate CTR (10-30%)</option>
+                                    <option value="lowctr">Low CTR (&lt;10%)</option>
+                                    <option value="highnull">High Null Rate (&gt;50%)</option>
                                 </select>
                             </div>
                             <div class="table-container">
@@ -1881,16 +1881,16 @@
 
                 let statusBadge, scoreColor;
                 if (nullRate > 50) {
-                    statusBadge = '<span class="badge badge-danger">High Null</span>';
+                    statusBadge = '<span class="badge badge-danger">High Null Rate</span>';
                     scoreColor = COLORS.danger;
                 } else if (ctr > 30) {
-                    statusBadge = '<span class="badge badge-success">Good</span>';
+                    statusBadge = '<span class="badge badge-success">High CTR</span>';
                     scoreColor = COLORS.success;
                 } else if (ctr < 10) {
                     statusBadge = '<span class="badge badge-warning">Low CTR</span>';
                     scoreColor = COLORS.warning;
                 } else {
-                    statusBadge = '<span class="badge badge-neutral">Normal</span>';
+                    statusBadge = '<span class="badge badge-neutral">Moderate CTR</span>';
                     scoreColor = COLORS.gray;
                 }
 

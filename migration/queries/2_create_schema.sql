@@ -520,6 +520,15 @@ CREATE TABLE searches_terms (
     first_seen_date         DATE,
     is_new_term             BOOLEAN,
 
+    -- Calculated rate metrics
+    ctr_pct                 NUMERIC(5,2),
+    null_rate_pct           NUMERIC(5,2),
+    effectiveness_score     NUMERIC(6,1),
+
+    -- Term status classification
+    term_status             VARCHAR(20),      -- High Null Rate, High CTR, Low CTR, Moderate CTR
+    term_status_sort        INTEGER,          -- 1=High Null Rate, 2=Low CTR, 3=Moderate CTR, 4=High CTR
+
     -- Primary key
     PRIMARY KEY (session_date, search_term)
 );
@@ -527,6 +536,7 @@ CREATE TABLE searches_terms (
 CREATE INDEX idx_terms_date ON searches_terms (session_date);
 CREATE INDEX idx_terms_term ON searches_terms (search_term);
 CREATE INDEX idx_terms_count ON searches_terms (search_count DESC);
+CREATE INDEX idx_terms_status ON searches_terms (term_status);
 
 COMMENT ON TABLE searches_terms IS 'Search term analysis with click-through attribution.';
 
