@@ -421,6 +421,11 @@ def add_calculated_columns(con):
                 WHEN name = 'SEARCH_RESULT_COUNT' THEN false
                 ELSE NULL
             END as is_clickable_result,
+            -- Store result count for aggregation (sum/count pattern for weighted avg)
+            CASE
+                WHEN name = 'SEARCH_RESULT_COUNT' THEN CAST(CP_totalResultCount AS INTEGER)
+                ELSE NULL
+            END as cp_total_result_count,
             -- Click category: categorizes ALL click events for analysis
             CASE
                 WHEN name = 'SEARCH_RESULT_CLICK' THEN 'Result'
