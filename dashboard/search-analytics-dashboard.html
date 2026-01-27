@@ -742,7 +742,11 @@
                 ORDER BY date DESC
                 LIMIT 5
             `);
-            console.log('First 5 rows of daily data:', rawRows.toArray());
+            const rowsArray = rawRows.toArray();
+            console.log('First 5 rows of daily data:');
+            rowsArray.forEach((row, i) => {
+                console.log(`  Row ${i}: date=${row.date}, search_starts=${row.search_starts} (type: ${typeof row.search_starts}), unique_sessions=${row.unique_sessions}, unique_users=${row.unique_users}`);
+            });
 
             // Debug: Show summary of daily data
             const debugResult = await conn.query(`
