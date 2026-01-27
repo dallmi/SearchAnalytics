@@ -1103,7 +1103,7 @@
                                             <th>Search Term</th>
                                             <th class="text-right">Searches</th>
                                             <th class="text-right">Users</th>
-                                            <th class="text-right">Days Active</th>
+                                            <th class="text-right">Term Age</th>
                                             <th class="text-center">Status</th>
                                         </tr>
                                     </thead>
@@ -1947,7 +1947,7 @@
                 SELECT search_term, first_seen_date,
                     SUM(CAST(search_count AS DOUBLE)) as searches,
                     SUM(CAST(unique_users AS DOUBLE)) as users,
-                    COUNT(DISTINCT session_date) as days_active
+                    CAST(DATE_DIFF('day', first_seen_date, MAX(session_date)) + 1 AS INTEGER) as term_age
                 FROM terms WHERE ${getDateWhereClause('session_date')}
                 GROUP BY search_term, first_seen_date
                 HAVING first_seen_date >= '${formatDateForInput(dateFilter.from)}'
@@ -1957,15 +1957,15 @@
             const data = result.toArray();
 
             document.getElementById('newTermsBody').innerHTML = data.map(d => {
-                const badge = d.days_active <= 3 ? 'badge-info' : 'badge-neutral';
-                const label = d.days_active <= 3 ? 'New' : 'Recent';
+                const badge = d.term_age <= 3 ? 'badge-info' : 'badge-neutral';
+                const label = d.term_age <= 3 ? 'New' : 'Recent';
 
                 return `
                     <tr class="clickable" onclick="showTermDetail('${escapeHtml(d.search_term)}')">
                         <td>${escapeHtml(d.search_term)}</td>
                         <td class="text-right">${formatNumber(d.searches)}</td>
                         <td class="text-right">${formatNumber(d.users)}</td>
-                        <td class="text-right">${d.days_active}</td>
+                        <td class="text-right">${d.term_age}</td>
                         <td class="text-center"><span class="badge ${badge}">${label}</span></td>
                     </tr>
                 `;

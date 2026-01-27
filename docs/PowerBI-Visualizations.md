@@ -928,6 +928,30 @@ RETURN
 - Status is recalculated from totals, not read from a pre-stored daily value
 - Works correctly whether viewing a single day, week, month, or all time
 
+### Term Age (New/Trending Terms)
+
+Calculate the age of a term (elapsed days since first appearance) dynamically based on filter context:
+
+```dax
+// Term Age - elapsed days since term first appeared
+Term Age =
+DATEDIFF(
+    MIN(searches_terms[first_seen_date]),
+    MAX(searches_terms[session_date]),
+    DAY
+) + 1
+
+// Is New Term - terms that appeared within last 3 days of the filtered period
+Is New Term =
+IF([Term Age] <= 3, "New", "Recent")
+```
+
+**Usage Notes:**
+- `Term Age` gives the number of days from when the term first appeared to the latest date in the current filter context
+- Use `Is New Term` to create badges or conditional formatting in tables
+- Filter to show only new terms: Add a visual-level filter where `Is New Term = "New"`
+- The calculation is relative to the filtered date range, making it safe for any slicer selection
+
 ### Query Length vs Success Analysis
 
 Use the `word_count` column to understand if longer queries perform better.
