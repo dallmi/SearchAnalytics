@@ -253,10 +253,6 @@
         .insight-card.warning { border-left-color: var(--warning); }
         .insight-card.action { border-left-color: var(--primary); }
 
-        .insight-icon {
-            font-size: 1.25rem;
-            line-height: 1;
-        }
 
         .insight-content {
             flex: 1;
@@ -742,9 +738,6 @@
             align-items: flex-start;
         }
 
-        .recommendation-icon {
-            font-size: 1rem;
-        }
 
         .recommendation-content {
             flex: 1;
@@ -1453,7 +1446,6 @@
             const avgSearchesPerDay = metrics.searches / periodDays;
             insights.push({
                 type: 'info',
-                icon: '📊',
                 title: 'Search Activity',
                 text: `${formatNumber(Math.round(avgSearchesPerDay))} searches per day average across ${formatNumber(metrics.sessions)} sessions`
             });
@@ -1462,14 +1454,12 @@
             if (successRate >= 40) {
                 insights.push({
                     type: 'positive',
-                    icon: '✅',
                     title: 'Good Success Rate',
                     text: `${successRate.toFixed(1)}% of sessions result in content clicks - users are finding what they need`
                 });
             } else if (successRate < 25) {
                 insights.push({
                     type: 'negative',
-                    icon: '⚠️',
                     title: 'Low Success Rate',
                     text: `Only ${successRate.toFixed(1)}% click-through rate. Consider improving search relevance or content coverage`
                 });
@@ -1479,7 +1469,6 @@
             if (nullRate > 10) {
                 insights.push({
                     type: 'warning',
-                    icon: '🔍',
                     title: 'Content Gaps Detected',
                     text: `${nullRate.toFixed(1)}% of searches return no results. Review "Content Gaps" tab for specific terms`
                 });
@@ -1489,7 +1478,6 @@
             if (topProblem) {
                 insights.push({
                     type: 'action',
-                    icon: '💡',
                     title: 'Top Content Gap',
                     text: `"${topProblem.search_term}" has ${formatNumber(topProblem.nulls)} null results - consider adding content`
                 });
@@ -1498,7 +1486,6 @@
             // Render insights
             document.getElementById('insightsGrid').innerHTML = insights.map(i => `
                 <div class="insight-card ${i.type}">
-                    <div class="insight-icon">${i.icon}</div>
                     <div class="insight-content">
                         <div class="insight-title">${i.title}</div>
                         <div class="insight-text">${i.text}</div>
@@ -2446,7 +2433,6 @@
                 ${nullRate > 50 ? `
                 <div class="recommendations">
                     <div class="recommendation">
-                        <div class="recommendation-icon">💡</div>
                         <div class="recommendation-content">
                             <div class="recommendation-title">High Null Rate Detected</div>
                             <div class="recommendation-text">
