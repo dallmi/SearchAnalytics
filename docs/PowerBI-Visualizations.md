@@ -862,6 +862,72 @@ DIVIDE(
 ) * 100
 ```
 
+### Term Status Classification (Dynamic DAX Measures)
+
+These measures calculate term status dynamically from aggregated totals, ensuring correct results regardless of date slicer or filter context. **Do not use pre-calculated status columns** from the parquet file as they cannot be correctly aggregated across multiple days.
+
+```dax
+// CTR Percentage - calculated from aggregated totals
+Term CTR % =
+DIVIDE(
+    SUM(searches_terms[success_click_count]),
+    SUM(searches_terms[search_count]),
+    0
+) * 100
+
+// Null Rate Percentage - calculated from aggregated totals
+Term Null Rate % =
+DIVIDE(
+    SUM(searches_terms[null_result_count]),
+    SUM(searches_terms[result_events]),
+    0
+) * 100
+
+// Effectiveness Score - CTR minus weighted null penalty
+Term Effectiveness Score =
+[Term CTR %] - ([Term Null Rate %] * 0.5)
+
+// Term Status - calculated from aggregated rates (safe for any date range)
+Term Status =
+VAR NullRate = [Term Null Rate %]
+VAR CTR = [Term CTR %]
+RETURN
+    SWITCH(
+        TRUE(),
+        NullRate > 50, "High Null Rate",
+        CTR > 30, "High CTR",
+        CTR < 10, "Low CTR",
+        "Moderate CTR"
+    )
+
+// Term Status Sort Order - for proper sorting in visuals
+Term Status Sort =
+VAR NullRate = [Term Null Rate %]
+VAR CTR = [Term CTR %]
+RETURN
+    SWITCH(
+        TRUE(),
+        NullRate > 50, 1,  -- High Null Rate first (worst)
+        CTR < 10, 2,       -- Low CTR second
+        CTR > 30, 4,       -- High CTR last (best)
+        3                   -- Moderate CTR
+    )
+```
+
+**Status Classification Thresholds:**
+
+| Status | Condition | Priority | Interpretation |
+|--------|-----------|----------|----------------|
+| High Null Rate | Null Rate > 50% | 1 (worst) | Content gap - users search but find nothing |
+| Low CTR | CTR < 10% | 2 | Results exist but don't match user intent |
+| Moderate CTR | CTR 10-30% | 3 | Average performance, room for improvement |
+| High CTR | CTR > 30% | 4 (best) | Term is performing well |
+
+**Why these measures are aggregation-safe:**
+- They use `SUM()` which correctly aggregates across any filter context
+- Status is recalculated from totals, not read from a pre-stored daily value
+- Works correctly whether viewing a single day, week, month, or all time
+
 ### Query Length vs Success Analysis
 
 Use the `word_count` column to understand if longer queries perform better.

@@ -164,29 +164,7 @@ BEGIN
         t.searches_evening,
         t.searches_night,
         t.first_seen_date,
-        t.is_new_term,
-        -- Calculated rate metrics
-        ROUND(100.0 * t.success_click_count / NULLIF(t.search_count, 0), 2)::NUMERIC(5,2) as ctr_pct,
-        ROUND(100.0 * t.null_result_count / NULLIF(t.result_events, 0), 2)::NUMERIC(5,2) as null_rate_pct,
-        -- Effectiveness score: CTR% - (NullRate% * 0.5)
-        ROUND(
-            (100.0 * t.success_click_count / NULLIF(t.search_count, 0))
-            - (100.0 * t.null_result_count / NULLIF(t.result_events, 0) * 0.5)
-        , 1)::NUMERIC(6,1) as effectiveness_score,
-        -- Term status classification (priority: High Null Rate > High CTR > Low CTR > Moderate CTR)
-        CASE
-            WHEN 100.0 * t.null_result_count / NULLIF(t.result_events, 0) > 50 THEN 'High Null Rate'
-            WHEN 100.0 * t.success_click_count / NULLIF(t.search_count, 0) > 30 THEN 'High CTR'
-            WHEN 100.0 * t.success_click_count / NULLIF(t.search_count, 0) < 10 THEN 'Low CTR'
-            ELSE 'Moderate CTR'
-        END as term_status,
-        -- Sort order for Power BI (1=High Null Rate, 2=Low CTR, 3=Moderate CTR, 4=High CTR)
-        CASE
-            WHEN 100.0 * t.null_result_count / NULLIF(t.result_events, 0) > 50 THEN 1
-            WHEN 100.0 * t.success_click_count / NULLIF(t.search_count, 0) < 10 THEN 2
-            WHEN 100.0 * t.success_click_count / NULLIF(t.search_count, 0) > 30 THEN 4
-            ELSE 3
-        END as term_status_sort
+        t.is_new_term
     FROM term_aggregates t
     ORDER BY t.session_date, t.search_count DESC;
 
@@ -309,26 +287,7 @@ BEGIN
         t.searches_evening,
         t.searches_night,
         t.first_seen_date,
-        t.is_new_term,
-        -- Calculated rate metrics
-        ROUND(100.0 * t.success_click_count / NULLIF(t.search_count, 0), 2)::NUMERIC(5,2) as ctr_pct,
-        ROUND(100.0 * t.null_result_count / NULLIF(t.result_events, 0), 2)::NUMERIC(5,2) as null_rate_pct,
-        ROUND(
-            (100.0 * t.success_click_count / NULLIF(t.search_count, 0))
-            - (100.0 * t.null_result_count / NULLIF(t.result_events, 0) * 0.5)
-        , 1)::NUMERIC(6,1) as effectiveness_score,
-        CASE
-            WHEN 100.0 * t.null_result_count / NULLIF(t.result_events, 0) > 50 THEN 'High Null Rate'
-            WHEN 100.0 * t.success_click_count / NULLIF(t.search_count, 0) > 30 THEN 'High CTR'
-            WHEN 100.0 * t.success_click_count / NULLIF(t.search_count, 0) < 10 THEN 'Low CTR'
-            ELSE 'Moderate CTR'
-        END as term_status,
-        CASE
-            WHEN 100.0 * t.null_result_count / NULLIF(t.result_events, 0) > 50 THEN 1
-            WHEN 100.0 * t.success_click_count / NULLIF(t.search_count, 0) < 10 THEN 2
-            WHEN 100.0 * t.success_click_count / NULLIF(t.search_count, 0) > 30 THEN 4
-            ELSE 3
-        END as term_status_sort
+        t.is_new_term
     FROM term_aggregates t
     ORDER BY t.session_date, t.search_count DESC;
 
@@ -386,7 +345,8 @@ GROUP BY search_term
 HAVING SUM(null_result_count) > 0
 ORDER BY null_results DESC;
 
--- Terms by status classification (for Power BI filtering)
+-- Terms by status classification (aggregates ALL data - for PostgreSQL direct queries)
+-- NOTE: For Power BI with date slicers, use DAX measures to calculate these dynamically
 CREATE OR REPLACE VIEW v_terms_by_status AS
 SELECT
     search_term,

@@ -914,30 +914,7 @@ def export_parquet_files(con, output_dir):
                   AND stc.active_search_term != ''
                 GROUP BY stc.session_date, stc.active_search_term
             )
-            SELECT
-                t.*,
-                -- Calculated rate metrics
-                ROUND(100.0 * t.success_click_count / NULLIF(t.search_count, 0), 2) as ctr_pct,
-                ROUND(100.0 * t.null_result_count / NULLIF(t.result_events, 0), 2) as null_rate_pct,
-                -- Effectiveness score: CTR% - (NullRate% * 0.5)
-                ROUND(
-                    (100.0 * t.success_click_count / NULLIF(t.search_count, 0))
-                    - (100.0 * t.null_result_count / NULLIF(t.result_events, 0) * 0.5)
-                , 1) as effectiveness_score,
-                -- Term status classification (priority: High Null Rate > High CTR > Low CTR > Moderate CTR)
-                CASE
-                    WHEN 100.0 * t.null_result_count / NULLIF(t.result_events, 0) > 50 THEN 'High Null Rate'
-                    WHEN 100.0 * t.success_click_count / NULLIF(t.search_count, 0) > 30 THEN 'High CTR'
-                    WHEN 100.0 * t.success_click_count / NULLIF(t.search_count, 0) < 10 THEN 'Low CTR'
-                    ELSE 'Moderate CTR'
-                END as term_status,
-                -- Sort order for Power BI (1=High Null Rate, 2=Low CTR, 3=Moderate CTR, 4=High CTR)
-                CASE
-                    WHEN 100.0 * t.null_result_count / NULLIF(t.result_events, 0) > 50 THEN 1
-                    WHEN 100.0 * t.success_click_count / NULLIF(t.search_count, 0) < 10 THEN 2
-                    WHEN 100.0 * t.success_click_count / NULLIF(t.search_count, 0) > 30 THEN 4
-                    ELSE 3
-                END as term_status_sort
+            SELECT t.*
             FROM term_aggregates t
             ORDER BY t.session_date, t.search_count DESC
         ) TO '{terms_file}' (FORMAT PARQUET)
