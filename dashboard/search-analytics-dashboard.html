@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Analytics Dashboard</title>
+
+    <!-- DuckDB WASM -->
+    <script src="https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/dist/duckdb-browser-mvp.js"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #E60000;
+            --primary-dark: #CC0000;
+            --primary-light: #FF3333;
+            --black: #000000;
+            --dark-gray: #333333;
+            --medium-gray: #666666;
+            --light-gray: #E5E5E5;
+            --white: #FFFFFF;
+            --success: #00875A;
+            --warning: #FF8B00;
+            --danger: #DE350B;
+            --info: #0052CC;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background-color: var(--light-gray);
+            color: var(--dark-gray);
+            line-height: 1.5;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: var(--white);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .date-filter {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .date-filter label {
+            font-size: 0.875rem;
+        }
+
+        .date-filter input {
+            padding: 0.5rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.875rem;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--white);
+            color: var(--primary);
+        }
+
+        .btn-primary:hover {
+            background: var(--light-gray);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.2);
+            color: var(--white);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* Main content */
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+
+        /* Loading state */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+            gap: 1rem;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid var(--light-gray);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: var(--medium-gray);
+            font-size: 0.875rem;
+        }
+
+        /* KPI Cards */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .kpi-card {
+            background: var(--white);
+            border-radius: 8px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-left: 4px solid var(--primary);
+        }
+
+        .kpi-card.success { border-left-color: var(--success); }
+        .kpi-card.warning { border-left-color: var(--warning); }
+        .kpi-card.danger { border-left-color: var(--danger); }
+        .kpi-card.info { border-left-color: var(--info); }
+
+        .kpi-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--medium-gray);
+            margin-bottom: 0.5rem;
+        }
+
+        .kpi-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--black);
+        }
+
+        .kpi-change {
+            font-size: 0.75rem;
+            margin-top: 0.25rem;
+        }
+
+        .kpi-change.positive { color: var(--success); }
+        .kpi-change.negative { color: var(--danger); }
+
+        /* Chart containers */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .chart-card {
+            background: var(--white);
+            border-radius: 8px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .chart-card.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .chart-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--dark-gray);
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chart-subtitle {
+            font-size: 0.75rem;
+            color: var(--medium-gray);
+            font-weight: 400;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        .chart-container.tall {
+            height: 400px;
+        }
+
+        /* Tables */
+        .table-container {
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--light-gray);
+        }
+
+        th {
+            background: var(--light-gray);
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        tr:hover {
+            background: #f9f9f9;
+        }
+
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge-success { background: #E3FCEF; color: var(--success); }
+        .badge-warning { background: #FFFAE6; color: var(--warning); }
+        .badge-danger { background: #FFEBE6; color: var(--danger); }
+        .badge-info { background: #DEEBFF; color: var(--info); }
+        .badge-neutral { background: var(--light-gray); color: var(--medium-gray); }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid var(--light-gray);
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--medium-gray);
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: var(--dark-gray);
+        }
+
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Journey funnel */
+        .funnel {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .funnel-step {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .funnel-bar {
+            height: 36px;
+            background: var(--primary);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            padding: 0 1rem;
+            color: var(--white);
+            font-weight: 500;
+            font-size: 0.875rem;
+            min-width: 60px;
+            transition: width 0.5s ease;
+        }
+
+        .funnel-bar.success { background: var(--success); }
+        .funnel-bar.engaged { background: var(--info); }
+        .funnel-bar.abandoned { background: var(--warning); }
+        .funnel-bar.no-results { background: var(--danger); }
+        .funnel-bar.unknown { background: var(--medium-gray); }
+
+        .funnel-label {
+            min-width: 100px;
+            font-size: 0.875rem;
+            color: var(--dark-gray);
+        }
+
+        .funnel-value {
+            font-size: 0.875rem;
+            color: var(--medium-gray);
+            min-width: 120px;
+        }
+
+        /* Error state */
+        .error {
+            background: #FFEBE6;
+            color: var(--danger);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .header-controls {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .date-filter {
+                flex-wrap: wrap;
+            }
+
+            .kpi-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* Data status indicator */
+        .data-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--medium-gray);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+
+        .status-dot.loading { background: var(--warning); }
+        .status-dot.error { background: var(--danger); }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>Search Analytics Dashboard</h1>
+        <div class="header-controls">
+            <div class="date-filter">
+                <label>From:</label>
+                <input type="date" id="dateFrom">
+                <label>To:</label>
+                <input type="date" id="dateTo">
+                <button class="btn btn-primary" onclick="applyDateFilter()">Apply</button>
+                <button class="btn btn-secondary" onclick="resetDateFilter()">Reset</button>
+            </div>
+            <div class="data-status">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">Initializing...</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Loading State -->
+        <div class="loading" id="loadingState">
+            <div class="spinner"></div>
+            <div class="loading-text" id="loadingText">Initializing DuckDB...</div>
+        </div>
+
+        <!-- Error State -->
+        <div class="error" id="errorState" style="display: none;"></div>
+
+        <!-- Dashboard Content -->
+        <div id="dashboardContent" style="display: none;">
+            <!-- KPI Cards -->
+            <div class="kpi-grid" id="kpiGrid">
+                <div class="kpi-card">
+                    <div class="kpi-label">Total Searches</div>
+                    <div class="kpi-value" id="kpiSearches">-</div>
+                </div>
+                <div class="kpi-card info">
+                    <div class="kpi-label">Unique Sessions</div>
+                    <div class="kpi-value" id="kpiSessions">-</div>
+                </div>
+                <div class="kpi-card success">
+                    <div class="kpi-label">Success Rate</div>
+                    <div class="kpi-value" id="kpiSuccessRate">-</div>
+                </div>
+                <div class="kpi-card warning">
+                    <div class="kpi-label">Null Result Rate</div>
+                    <div class="kpi-value" id="kpiNullRate">-</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Unique Users</div>
+                    <div class="kpi-value" id="kpiUsers">-</div>
+                </div>
+                <div class="kpi-card danger">
+                    <div class="kpi-label">Abandonment Rate</div>
+                    <div class="kpi-value" id="kpiAbandonRate">-</div>
+                </div>
+            </div>
+
+            <!-- Charts Row 1 -->
+            <div class="charts-grid">
+                <!-- Daily Trends -->
+                <div class="chart-card full-width">
+                    <div class="chart-title">
+                        Daily Search Trends
+                        <span class="chart-subtitle">Searches, Sessions & Success Rate over time</span>
+                    </div>
+                    <div class="chart-container tall">
+                        <canvas id="dailyTrendsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row 2 -->
+            <div class="charts-grid">
+                <!-- Journey Outcomes -->
+                <div class="chart-card">
+                    <div class="chart-title">Journey Outcomes</div>
+                    <div id="journeyFunnel" class="funnel"></div>
+                </div>
+
+                <!-- Journey Outcome Pie -->
+                <div class="chart-card">
+                    <div class="chart-title">Outcome Distribution</div>
+                    <div class="chart-container">
+                        <canvas id="outcomeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row 3 -->
+            <div class="charts-grid">
+                <!-- Time Distribution -->
+                <div class="chart-card">
+                    <div class="chart-title">
+                        Search Distribution by Hour (CET)
+                        <span class="chart-subtitle">When do users search?</span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="hourlyChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Day of Week -->
+                <div class="chart-card">
+                    <div class="chart-title">
+                        Search Distribution by Day
+                        <span class="chart-subtitle">Weekday patterns</span>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="weekdayChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs Section -->
+            <div class="chart-card full-width">
+                <div class="tabs">
+                    <button class="tab active" data-tab="topTerms">Top Search Terms</button>
+                    <button class="tab" data-tab="problemTerms">Problem Terms</button>
+                    <button class="tab" data-tab="clickCategories">Click Categories</button>
+                </div>
+
+                <!-- Top Terms Tab -->
+                <div class="tab-content active" id="topTermsTab">
+                    <div class="table-container">
+                        <table id="topTermsTable">
+                            <thead>
+                                <tr>
+                                    <th>Search Term</th>
+                                    <th class="text-right">Searches</th>
+                                    <th class="text-right">Users</th>
+                                    <th class="text-right">Success CTR</th>
+                                    <th class="text-right">Null Rate</th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="topTermsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Problem Terms Tab -->
+                <div class="tab-content" id="problemTermsTab">
+                    <div class="table-container">
+                        <table id="problemTermsTable">
+                            <thead>
+                                <tr>
+                                    <th>Search Term</th>
+                                    <th class="text-right">Searches</th>
+                                    <th class="text-right">Null Results</th>
+                                    <th class="text-right">Null Rate</th>
+                                    <th class="text-center">Issue</th>
+                                </tr>
+                            </thead>
+                            <tbody id="problemTermsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Click Categories Tab -->
+                <div class="tab-content" id="clickCategoriesTab">
+                    <div class="chart-container">
+                        <canvas id="clickCategoriesChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Session Complexity -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <div class="chart-title">Session Complexity</div>
+                    <div class="chart-container">
+                        <canvas id="complexityChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-title">Time to Click Distribution</div>
+                    <div class="chart-container">
+                        <canvas id="timeToClickChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Global state
+        let db = null;
+        let conn = null;
+        let dailyData = null;
+        let journeysData = null;
+        let termsData = null;
+        let dateFilter = { from: null, to: null };
+
+        // Chart instances
+        let charts = {};
+
+        // Colors
+        const COLORS = {
+            primary: '#E60000',
+            primaryLight: '#FF3333',
+            success: '#00875A',
+            warning: '#FF8B00',
+            danger: '#DE350B',
+            info: '#0052CC',
+            gray: '#666666',
+            lightGray: '#E5E5E5'
+        };
+
+        const OUTCOME_COLORS = {
+            'Success': COLORS.success,
+            'Engaged': COLORS.info,
+            'Abandoned': COLORS.warning,
+            'No Results': COLORS.danger,
+            'Unknown': COLORS.gray
+        };
+
+        // Initialize
+        async function init() {
+            try {
+                updateStatus('loading', 'Initializing DuckDB...');
+
+                // Initialize DuckDB
+                const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
+                const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES);
+                const worker_url = URL.createObjectURL(
+                    new Blob([`importScripts("${bundle.mainWorker}");`], { type: 'text/javascript' })
+                );
+                const worker = new Worker(worker_url);
+                const logger = new duckdb.ConsoleLogger();
+                db = new duckdb.AsyncDuckDB(logger, worker);
+                await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+                URL.revokeObjectURL(worker_url);
+
+                conn = await db.connect();
+
+                updateStatus('loading', 'Loading parquet files...');
+
+                // Load parquet files
+                await loadParquetFiles();
+
+                updateStatus('success', 'Data loaded');
+
+                // Set initial date range
+                await setInitialDateRange();
+
+                // Render dashboard
+                await renderDashboard();
+
+                // Show dashboard
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('dashboardContent').style.display = 'block';
+
+                // Setup tab handlers
+                setupTabs();
+
+            } catch (error) {
+                console.error('Initialization error:', error);
+                showError(`Failed to initialize: ${error.message}`);
+                updateStatus('error', 'Error loading data');
+            }
+        }
+
+        async function loadParquetFiles() {
+            const basePath = '../output/';
+
+            // Register parquet files
+            try {
+                await conn.query(`
+                    CREATE VIEW daily AS
+                    SELECT * FROM read_parquet('${basePath}searches_daily.parquet')
+                `);
+                setLoadingText('Loaded daily data...');
+            } catch (e) {
+                console.warn('Could not load daily parquet, trying alternative path');
+                await conn.query(`
+                    CREATE VIEW daily AS
+                    SELECT * FROM read_parquet('output/searches_daily.parquet')
+                `);
+            }
+
+            try {
+                await conn.query(`
+                    CREATE VIEW journeys AS
+                    SELECT * FROM read_parquet('${basePath}searches_journeys.parquet')
+                `);
+                setLoadingText('Loaded journeys data...');
+            } catch (e) {
+                await conn.query(`
+                    CREATE VIEW journeys AS
+                    SELECT * FROM read_parquet('output/searches_journeys.parquet')
+                `);
+            }
+
+            try {
+                await conn.query(`
+                    CREATE VIEW terms AS
+                    SELECT * FROM read_parquet('${basePath}searches_terms.parquet')
+                `);
+                setLoadingText('Loaded terms data...');
+            } catch (e) {
+                await conn.query(`
+                    CREATE VIEW terms AS
+                    SELECT * FROM read_parquet('output/searches_terms.parquet')
+                `);
+            }
+        }
+
+        async function setInitialDateRange() {
+            const result = await conn.query(`
+                SELECT MIN(session_date) as min_date, MAX(session_date) as max_date
+                FROM daily
+            `);
+            const row = result.toArray()[0];
+
+            const minDate = new Date(row.min_date);
+            const maxDate = new Date(row.max_date);
+
+            document.getElementById('dateFrom').value = formatDateForInput(minDate);
+            document.getElementById('dateTo').value = formatDateForInput(maxDate);
+
+            dateFilter.from = minDate;
+            dateFilter.to = maxDate;
+        }
+
+        function formatDateForInput(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        function getDateWhereClause(dateColumn = 'session_date') {
+            if (!dateFilter.from || !dateFilter.to) return '1=1';
+            return `${dateColumn} >= '${formatDateForInput(dateFilter.from)}' AND ${dateColumn} <= '${formatDateForInput(dateFilter.to)}'`;
+        }
+
+        async function applyDateFilter() {
+            const fromInput = document.getElementById('dateFrom').value;
+            const toInput = document.getElementById('dateTo').value;
+
+            if (fromInput && toInput) {
+                dateFilter.from = new Date(fromInput);
+                dateFilter.to = new Date(toInput);
+                await renderDashboard();
+            }
+        }
+
+        async function resetDateFilter() {
+            await setInitialDateRange();
+            await renderDashboard();
+        }
+
+        async function renderDashboard() {
+            updateStatus('loading', 'Refreshing...');
+
+            try {
+                await Promise.all([
+                    renderKPIs(),
+                    renderDailyTrends(),
+                    renderJourneyOutcomes(),
+                    renderHourlyDistribution(),
+                    renderWeekdayDistribution(),
+                    renderTopTerms(),
+                    renderProblemTerms(),
+                    renderClickCategories(),
+                    renderSessionComplexity(),
+                    renderTimeToClick()
+                ]);
+
+                updateStatus('success', `Last updated: ${new Date().toLocaleTimeString()}`);
+            } catch (error) {
+                console.error('Render error:', error);
+                updateStatus('error', 'Error rendering');
+            }
+        }
+
+        async function renderKPIs() {
+            const result = await conn.query(`
+                SELECT
+                    SUM(search_starts) as total_searches,
+                    SUM(unique_sessions) as total_sessions,
+                    SUM(unique_users) as total_users,
+                    SUM(success_clicks) as total_success_clicks,
+                    SUM(null_results) as total_null_results,
+                    SUM(result_events) as total_result_events,
+                    SUM(sessions_with_clicks) as sessions_with_clicks,
+                    SUM(sessions_with_results) as sessions_with_results,
+                    SUM(sessions_abandoned) as sessions_abandoned
+                FROM daily
+                WHERE ${getDateWhereClause('session_date')}
+            `);
+
+            const data = result.toArray()[0];
+
+            const successRate = data.sessions_with_results > 0
+                ? (data.sessions_with_clicks / data.sessions_with_results * 100).toFixed(1)
+                : 0;
+
+            const nullRate = data.total_result_events > 0
+                ? (data.total_null_results / data.total_result_events * 100).toFixed(1)
+                : 0;
+
+            const abandonRate = data.sessions_with_results > 0
+                ? (data.sessions_abandoned / data.sessions_with_results * 100).toFixed(1)
+                : 0;
+
+            document.getElementById('kpiSearches').textContent = formatNumber(data.total_searches);
+            document.getElementById('kpiSessions').textContent = formatNumber(data.total_sessions);
+            document.getElementById('kpiUsers').textContent = formatNumber(data.total_users);
+            document.getElementById('kpiSuccessRate').textContent = `${successRate}%`;
+            document.getElementById('kpiNullRate').textContent = `${nullRate}%`;
+            document.getElementById('kpiAbandonRate').textContent = `${abandonRate}%`;
+        }
+
+        async function renderDailyTrends() {
+            const result = await conn.query(`
+                SELECT
+                    session_date,
+                    search_starts,
+                    unique_sessions,
+                    CASE WHEN sessions_with_results > 0
+                        THEN ROUND(100.0 * sessions_with_clicks / sessions_with_results, 1)
+                        ELSE 0 END as success_rate,
+                    CASE WHEN result_events > 0
+                        THEN ROUND(100.0 * null_results / result_events, 1)
+                        ELSE 0 END as null_rate
+                FROM daily
+                WHERE ${getDateWhereClause('session_date')}
+                ORDER BY session_date
+            `);
+
+            const data = result.toArray();
+
+            const labels = data.map(d => new Date(d.session_date));
+            const searches = data.map(d => Number(d.search_starts));
+            const sessions = data.map(d => Number(d.unique_sessions));
+            const successRates = data.map(d => Number(d.success_rate));
+
+            if (charts.dailyTrends) {
+                charts.dailyTrends.destroy();
+            }
+
+            const ctx = document.getElementById('dailyTrendsChart').getContext('2d');
+            charts.dailyTrends = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Searches',
+                            data: searches,
+                            borderColor: COLORS.primary,
+                            backgroundColor: COLORS.primary + '20',
+                            fill: true,
+                            tension: 0.3,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Sessions',
+                            data: sessions,
+                            borderColor: COLORS.info,
+                            backgroundColor: 'transparent',
+                            borderDash: [5, 5],
+                            tension: 0.3,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Success Rate %',
+                            data: successRates,
+                            borderColor: COLORS.success,
+                            backgroundColor: 'transparent',
+                            tension: 0.3,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'day',
+                                displayFormats: {
+                                    day: 'MMM d'
+                                }
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Count'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            min: 0,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Success Rate %'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+
+        async function renderJourneyOutcomes() {
+            const result = await conn.query(`
+                SELECT
+                    journey_outcome,
+                    COUNT(*) as sessions,
+                    ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER(), 1) as pct
+                FROM journeys
+                WHERE ${getDateWhereClause('session_date')}
+                GROUP BY journey_outcome
+                ORDER BY
+                    CASE journey_outcome
+                        WHEN 'Success' THEN 1
+                        WHEN 'Engaged' THEN 2
+                        WHEN 'Abandoned' THEN 3
+                        WHEN 'No Results' THEN 4
+                        ELSE 5
+                    END
+            `);
+
+            const data = result.toArray();
+            const maxSessions = Math.max(...data.map(d => Number(d.sessions)));
+
+            // Render funnel
+            const funnelHtml = data.map(d => {
+                const width = Math.max(10, (Number(d.sessions) / maxSessions) * 100);
+                const outcomeClass = d.journey_outcome.toLowerCase().replace(' ', '-');
+                return `
+                    <div class="funnel-step">
+                        <div class="funnel-label">${d.journey_outcome}</div>
+                        <div class="funnel-bar ${outcomeClass}" style="width: ${width}%">
+                            ${d.pct}%
+                        </div>
+                        <div class="funnel-value">${formatNumber(d.sessions)} sessions</div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('journeyFunnel').innerHTML = funnelHtml;
+
+            // Render pie chart
+            if (charts.outcome) {
+                charts.outcome.destroy();
+            }
+
+            const ctx = document.getElementById('outcomeChart').getContext('2d');
+            charts.outcome = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.map(d => d.journey_outcome),
+                    datasets: [{
+                        data: data.map(d => Number(d.sessions)),
+                        backgroundColor: data.map(d => OUTCOME_COLORS[d.journey_outcome] || COLORS.gray)
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        }
+                    }
+                }
+            });
+        }
+
+        async function renderHourlyDistribution() {
+            const result = await conn.query(`
+                SELECT
+                    SUM(searches_night) as night,
+                    SUM(searches_morning) as morning,
+                    SUM(searches_afternoon) as afternoon,
+                    SUM(searches_evening) as evening
+                FROM daily
+                WHERE ${getDateWhereClause('session_date')}
+            `);
+
+            const data = result.toArray()[0];
+
+            if (charts.hourly) {
+                charts.hourly.destroy();
+            }
+
+            const ctx = document.getElementById('hourlyChart').getContext('2d');
+            charts.hourly = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Night (0-8)', 'Morning (8-12)', 'Afternoon (12-18)', 'Evening (18-24)'],
+                    datasets: [{
+                        label: 'Searches',
+                        data: [
+                            Number(data.night),
+                            Number(data.morning),
+                            Number(data.afternoon),
+                            Number(data.evening)
+                        ],
+                        backgroundColor: [
+                            COLORS.gray,
+                            COLORS.info,
+                            COLORS.primary,
+                            COLORS.warning
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        async function renderWeekdayDistribution() {
+            const result = await conn.query(`
+                SELECT
+                    day_of_week,
+                    day_of_week_num,
+                    SUM(search_starts) as searches
+                FROM daily
+                WHERE ${getDateWhereClause('session_date')}
+                GROUP BY day_of_week, day_of_week_num
+                ORDER BY day_of_week_num
+            `);
+
+            const data = result.toArray();
+
+            if (charts.weekday) {
+                charts.weekday.destroy();
+            }
+
+            const ctx = document.getElementById('weekdayChart').getContext('2d');
+            charts.weekday = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.day_of_week.trim()),
+                    datasets: [{
+                        label: 'Searches',
+                        data: data.map(d => Number(d.searches)),
+                        backgroundColor: COLORS.primary
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        async function renderTopTerms() {
+            const result = await conn.query(`
+                SELECT
+                    search_term,
+                    SUM(search_count) as searches,
+                    SUM(unique_users) as users,
+                    SUM(success_click_count) as success_clicks,
+                    SUM(null_result_count) as null_results,
+                    SUM(result_events) as result_events
+                FROM terms
+                WHERE ${getDateWhereClause('session_date')}
+                GROUP BY search_term
+                ORDER BY searches DESC
+                LIMIT 20
+            `);
+
+            const data = result.toArray();
+
+            const tbody = document.getElementById('topTermsBody');
+            tbody.innerHTML = data.map(d => {
+                const successCTR = d.searches > 0
+                    ? (Number(d.success_clicks) / Number(d.searches) * 100).toFixed(1)
+                    : 0;
+                const nullRate = d.result_events > 0
+                    ? (Number(d.null_results) / Number(d.result_events) * 100).toFixed(1)
+                    : 0;
+
+                let statusBadge = '';
+                if (nullRate > 50) {
+                    statusBadge = '<span class="badge badge-danger">High Null</span>';
+                } else if (successCTR > 30) {
+                    statusBadge = '<span class="badge badge-success">Good</span>';
+                } else if (successCTR < 10) {
+                    statusBadge = '<span class="badge badge-warning">Low CTR</span>';
+                } else {
+                    statusBadge = '<span class="badge badge-neutral">Normal</span>';
+                }
+
+                return `
+                    <tr>
+                        <td>${escapeHtml(d.search_term)}</td>
+                        <td class="text-right">${formatNumber(d.searches)}</td>
+                        <td class="text-right">${formatNumber(d.users)}</td>
+                        <td class="text-right">${successCTR}%</td>
+                        <td class="text-right">${nullRate}%</td>
+                        <td class="text-center">${statusBadge}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function renderProblemTerms() {
+            const result = await conn.query(`
+                SELECT
+                    search_term,
+                    SUM(search_count) as searches,
+                    SUM(null_result_count) as null_results,
+                    SUM(result_events) as result_events
+                FROM terms
+                WHERE ${getDateWhereClause('session_date')}
+                GROUP BY search_term
+                HAVING SUM(null_result_count) > 0 AND SUM(search_count) >= 5
+                ORDER BY null_results DESC
+                LIMIT 20
+            `);
+
+            const data = result.toArray();
+
+            const tbody = document.getElementById('problemTermsBody');
+            tbody.innerHTML = data.map(d => {
+                const nullRate = d.result_events > 0
+                    ? (Number(d.null_results) / Number(d.result_events) * 100).toFixed(1)
+                    : 0;
+
+                let issueBadge = '';
+                if (nullRate >= 100) {
+                    issueBadge = '<span class="badge badge-danger">No Content</span>';
+                } else if (nullRate > 50) {
+                    issueBadge = '<span class="badge badge-warning">Content Gap</span>';
+                } else {
+                    issueBadge = '<span class="badge badge-info">Partial</span>';
+                }
+
+                return `
+                    <tr>
+                        <td>${escapeHtml(d.search_term)}</td>
+                        <td class="text-right">${formatNumber(d.searches)}</td>
+                        <td class="text-right">${formatNumber(d.null_results)}</td>
+                        <td class="text-right">${nullRate}%</td>
+                        <td class="text-center">${issueBadge}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function renderClickCategories() {
+            const result = await conn.query(`
+                SELECT
+                    SUM(clicks_result) as result_clicks,
+                    SUM(clicks_trending) as trending_clicks,
+                    SUM(clicks_tab) as tab_clicks,
+                    SUM(clicks_pagination) as pagination_clicks,
+                    SUM(clicks_filter) as filter_clicks
+                FROM daily
+                WHERE ${getDateWhereClause('session_date')}
+            `);
+
+            const data = result.toArray()[0];
+
+            if (charts.clickCategories) {
+                charts.clickCategories.destroy();
+            }
+
+            const ctx = document.getElementById('clickCategoriesChart').getContext('2d');
+            charts.clickCategories = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Result', 'Trending', 'Tab', 'Pagination', 'Filter'],
+                    datasets: [{
+                        label: 'Clicks',
+                        data: [
+                            Number(data.result_clicks),
+                            Number(data.trending_clicks),
+                            Number(data.tab_clicks),
+                            Number(data.pagination_clicks),
+                            Number(data.filter_clicks)
+                        ],
+                        backgroundColor: [
+                            COLORS.success,
+                            COLORS.info,
+                            COLORS.warning,
+                            COLORS.primary,
+                            COLORS.gray
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        async function renderSessionComplexity() {
+            const result = await conn.query(`
+                SELECT
+                    session_complexity,
+                    COUNT(*) as sessions
+                FROM journeys
+                WHERE ${getDateWhereClause('session_date')}
+                GROUP BY session_complexity
+                ORDER BY
+                    CASE session_complexity
+                        WHEN 'Single Action' THEN 1
+                        WHEN 'Simple' THEN 2
+                        WHEN 'Medium' THEN 3
+                        WHEN 'Complex' THEN 4
+                        ELSE 5
+                    END
+            `);
+
+            const data = result.toArray();
+
+            if (charts.complexity) {
+                charts.complexity.destroy();
+            }
+
+            const ctx = document.getElementById('complexityChart').getContext('2d');
+            charts.complexity = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: data.map(d => d.session_complexity),
+                    datasets: [{
+                        data: data.map(d => Number(d.sessions)),
+                        backgroundColor: [
+                            COLORS.lightGray,
+                            COLORS.info,
+                            COLORS.warning,
+                            COLORS.primary
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        }
+                    }
+                }
+            });
+        }
+
+        async function renderTimeToClick() {
+            const result = await conn.query(`
+                SELECT
+                    search_to_result_bucket,
+                    search_to_result_sort,
+                    COUNT(*) as sessions
+                FROM journeys
+                WHERE ${getDateWhereClause('session_date')}
+                  AND search_to_result_bucket IS NOT NULL
+                GROUP BY search_to_result_bucket, search_to_result_sort
+                ORDER BY search_to_result_sort
+            `);
+
+            const data = result.toArray();
+
+            if (charts.timeToClick) {
+                charts.timeToClick.destroy();
+            }
+
+            const ctx = document.getElementById('timeToClickChart').getContext('2d');
+            charts.timeToClick = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.search_to_result_bucket),
+                    datasets: [{
+                        label: 'Sessions',
+                        data: data.map(d => Number(d.sessions)),
+                        backgroundColor: COLORS.primary
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // Utility functions
+        function formatNumber(num) {
+            if (num === null || num === undefined) return '-';
+            return Number(num).toLocaleString();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function updateStatus(status, text) {
+            const dot = document.getElementById('statusDot');
+            const textEl = document.getElementById('statusText');
+
+            dot.className = 'status-dot';
+            if (status === 'loading') dot.classList.add('loading');
+            if (status === 'error') dot.classList.add('error');
+
+            textEl.textContent = text;
+        }
+
+        function setLoadingText(text) {
+            document.getElementById('loadingText').textContent = text;
+        }
+
+        function showError(message) {
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('errorState').style.display = 'block';
+            document.getElementById('errorState').textContent = message;
+        }
+
+        function setupTabs() {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const tabName = tab.dataset.tab;
+
+                    // Update active tab
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+
+                    // Update active content
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    document.getElementById(`${tabName}Tab`).classList.add('active');
+                });
+            });
+        }
+
+        // Start
+        init();
+    </script>
+</body>
+</html>
