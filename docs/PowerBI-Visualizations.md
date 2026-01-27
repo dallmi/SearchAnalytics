@@ -1227,6 +1227,172 @@ RETURN
 +------------------------------------------+------------------------------+
 ```
 
+### Time-of-Day Pattern Analysis
+
+The `searches_terms` table includes pre-calculated time distribution columns (`searches_morning`, `searches_afternoon`, `searches_evening`, `searches_night`) that reveal when specific terms are being searched. This can indicate regional usage patterns and help identify terms associated with specific time zones.
+
+**Time Period Definitions:**
+| Period | Hours (CET) | Regional Alignment |
+|--------|-------------|-------------------|
+| Morning | 6-12 | APAC peak (afternoon in Asia) |
+| Afternoon | 12-18 | EMEA peak |
+| Evening | 18-24 | Americas peak (morning in US) |
+| Night | 0-6 | Americas late (evening in US West) |
+
+#### DAX Measures for Time-of-Day Analysis
+
+**Create these measures** (Report view → Modeling tab → New measure):
+
+**Peak Time Period** - Identifies which time of day a term is most searched:
+```dax
+Peak Time Period =
+VAR MorningTotal = SUM(searches_terms[searches_morning])
+VAR AfternoonTotal = SUM(searches_terms[searches_afternoon])
+VAR EveningTotal = SUM(searches_terms[searches_evening])
+VAR NightTotal = SUM(searches_terms[searches_night])
+VAR MaxVal = MAX(MAX(MorningTotal, AfternoonTotal), MAX(EveningTotal, NightTotal))
+RETURN
+SWITCH(
+    TRUE(),
+    MaxVal = 0, "No Data",
+    MorningTotal = MaxVal, "Morning (6-12)",
+    AfternoonTotal = MaxVal, "Afternoon (12-18)",
+    EveningTotal = MaxVal, "Evening (18-24)",
+    NightTotal = MaxVal, "Night (0-6)",
+    "Unknown"
+)
+```
+
+**Peak Period Sort** - For proper sorting in visuals:
+```dax
+Peak Period Sort =
+VAR MorningTotal = SUM(searches_terms[searches_morning])
+VAR AfternoonTotal = SUM(searches_terms[searches_afternoon])
+VAR EveningTotal = SUM(searches_terms[searches_evening])
+VAR NightTotal = SUM(searches_terms[searches_night])
+VAR MaxVal = MAX(MAX(MorningTotal, AfternoonTotal), MAX(EveningTotal, NightTotal))
+RETURN
+SWITCH(
+    TRUE(),
+    MaxVal = 0, 99,
+    MorningTotal = MaxVal, 1,
+    AfternoonTotal = MaxVal, 2,
+    EveningTotal = MaxVal, 3,
+    NightTotal = MaxVal, 4,
+    99
+)
+```
+
+**Time Concentration %** - How concentrated the searches are in the peak period:
+```dax
+Time Concentration % =
+VAR MorningTotal = SUM(searches_terms[searches_morning])
+VAR AfternoonTotal = SUM(searches_terms[searches_afternoon])
+VAR EveningTotal = SUM(searches_terms[searches_evening])
+VAR NightTotal = SUM(searches_terms[searches_night])
+VAR Total = MorningTotal + AfternoonTotal + EveningTotal + NightTotal
+VAR MaxVal = MAX(MAX(MorningTotal, AfternoonTotal), MAX(EveningTotal, NightTotal))
+RETURN
+IF(Total > 0, DIVIDE(MaxVal, Total) * 100, 0)
+```
+*Interpretation: 40%+ = strongly time-concentrated, 25-40% = normal distribution, <25% = evenly distributed*
+
+**Primary Region** - Infers likely user region based on search timing:
+```dax
+Primary Region =
+VAR MorningTotal = SUM(searches_terms[searches_morning])
+VAR AfternoonTotal = SUM(searches_terms[searches_afternoon])
+VAR EveningTotal = SUM(searches_terms[searches_evening])
+VAR NightTotal = SUM(searches_terms[searches_night])
+VAR Total = MorningTotal + AfternoonTotal + EveningTotal + NightTotal
+VAR MorningPct = DIVIDE(MorningTotal, Total)
+VAR AfternoonPct = DIVIDE(AfternoonTotal, Total)
+VAR EveningPct = DIVIDE(EveningTotal, Total)
+VAR NightPct = DIVIDE(NightTotal, Total)
+RETURN
+SWITCH(
+    TRUE(),
+    Total = 0, "No Data",
+    MorningPct > 0.4, "APAC",
+    AfternoonPct > 0.4, "EMEA",
+    EveningPct > 0.4 || NightPct > 0.4, "Americas",
+    AfternoonPct + EveningPct > 0.6, "EMEA/Americas",
+    MorningPct + AfternoonPct > 0.6, "APAC/EMEA",
+    "Global"
+)
+```
+
+**Morning Share %**, **Afternoon Share %**, **Evening Share %**, **Night Share %** - Individual period percentages:
+```dax
+Morning Share % =
+VAR MorningTotal = SUM(searches_terms[searches_morning])
+VAR Total = SUM(searches_terms[searches_morning]) + SUM(searches_terms[searches_afternoon]) +
+            SUM(searches_terms[searches_evening]) + SUM(searches_terms[searches_night])
+RETURN IF(Total > 0, DIVIDE(MorningTotal, Total) * 100, 0)
+```
+*Create similar measures for Afternoon, Evening, and Night by changing the numerator variable*
+
+#### Questions You Can Answer
+
+**Q: Which terms are "morning terms"?**
+1. Create Table visual
+2. Add: `search_term`, `Total Searches`, `Morning Share %`, `Peak Time Period`
+3. Filter: `Peak Time Period = "Morning (6-12)"`
+4. Sort by `Morning Share %` descending
+
+**Q: Which terms are Americas-focused?**
+1. Create Table visual
+2. Add: `search_term`, `Total Searches`, `Primary Region`, `Evening Share %`, `Night Share %`
+3. Filter: `Primary Region = "Americas"`
+4. Sort by combined Evening + Night percentage
+
+**Q: What is the time distribution for a specific term?**
+1. Select term using slicer
+2. Create Donut/Pie chart with:
+   - Values: `Morning Share %`, `Afternoon Share %`, `Evening Share %`, `Night Share %`
+3. Or use a 100% Stacked Bar with the four share measures
+
+**Q: Which terms have unusual time patterns?**
+1. Create Table visual
+2. Add: `search_term`, `Total Searches`, `Time Concentration %`, `Peak Time Period`
+3. Filter: `Time Concentration % > 50` (highly concentrated) or `Time Concentration % < 25` (evenly spread)
+4. High concentration may indicate regional-specific terms; even distribution indicates global usage
+
+**Q: How does search volume vary by time of day across all terms?**
+1. Create Clustered Bar Chart
+2. Use separate bars for each time period total
+3. Create measure for each:
+```dax
+Total Morning Searches = SUM(searches_terms[searches_morning])
+Total Afternoon Searches = SUM(searches_terms[searches_afternoon])
+Total Evening Searches = SUM(searches_terms[searches_evening])
+Total Night Searches = SUM(searches_terms[searches_night])
+```
+4. Add all four measures to Values
+
+---
+
+#### Sample Dashboard Layout: Time-of-Day Analysis
+
+```
++------------------------------------------+------------------------------+
+|                                          |                              |
+|   Search Volume by Time Period           |   Regional Distribution      |
+|   (Clustered Bar: 4 period totals)       |   (Donut: APAC/EMEA/Americas)|
+|                                          |                              |
++------------------------------------------+------------------------------+
+|                                                                         |
+|   Top Terms by Peak Period                                              |
+|   (Matrix: Term rows × Period columns, values = search count)           |
+|                                                                         |
++-------------------------------------------------------------------------+
+|                                          |                              |
+|   Time-Concentrated Terms                |   Global Terms               |
+|   (Table: Concentration > 50%)           |   (Table: Concentration < 30%)|
+|                                          |                              |
++------------------------------------------+------------------------------+
+```
+
 ### Query Length vs Success Analysis
 
 Use the `word_count` column to understand if longer queries perform better.
