@@ -47,28 +47,20 @@
 
         /* Header */
         .header {
-            background: var(--black);
-            color: var(--white);
+            background: var(--white);
+            color: var(--black);
             padding: 1rem 2rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-bottom: 1px solid var(--light-gray);
         }
 
         .header h1 {
             font-size: 1.5rem;
             font-weight: 600;
-        }
-
-        .header h1::before {
-            content: '';
-            display: inline-block;
-            width: 4px;
-            height: 1.25rem;
-            background: var(--primary);
-            margin-right: 0.75rem;
-            vertical-align: middle;
+            padding-left: 1rem;
+            border-left: 4px solid var(--primary);
         }
 
         .header-controls {
@@ -105,22 +97,22 @@
         }
 
         .btn-primary {
-            background: var(--white);
-            color: var(--black);
+            background: var(--black);
+            color: var(--white);
         }
 
         .btn-primary:hover {
-            background: var(--light-gray);
+            background: var(--dark-gray);
         }
 
         .btn-secondary {
             background: transparent;
-            color: var(--white);
-            border: 1px solid rgba(255,255,255,0.4);
+            color: var(--dark-gray);
+            border: 1px solid var(--light-gray);
         }
 
         .btn-secondary:hover {
-            background: rgba(255,255,255,0.1);
+            background: var(--light-gray);
         }
 
         /* Main content */
@@ -168,17 +160,17 @@
 
         .kpi-card {
             background: var(--white);
-            border-radius: 8px;
+            border-radius: 0;
             padding: 1.25rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            border-left: 4px solid var(--dark-gray);
+            border: 1px solid var(--light-gray);
+            border-top: 3px solid var(--dark-gray);
         }
 
-        .kpi-card.highlight { border-left-color: var(--primary); }
-        .kpi-card.success { border-left-color: var(--success); }
-        .kpi-card.warning { border-left-color: var(--warning); }
-        .kpi-card.danger { border-left-color: var(--danger); }
-        .kpi-card.info { border-left-color: var(--info); }
+        .kpi-card.highlight { border-top-color: var(--primary); }
+        .kpi-card.success { border-top-color: var(--success); }
+        .kpi-card.warning { border-top-color: var(--warning); }
+        .kpi-card.danger { border-top-color: var(--danger); }
+        .kpi-card.info { border-top-color: var(--info); }
 
         .kpi-label {
             font-size: 0.75rem;
@@ -212,9 +204,9 @@
 
         .chart-card {
             background: var(--white);
-            border-radius: 8px;
+            border-radius: 0;
             padding: 1.25rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid var(--light-gray);
         }
 
         .chart-card.full-width {
@@ -226,6 +218,8 @@
             font-weight: 600;
             color: var(--dark-gray);
             margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--light-gray);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -283,16 +277,18 @@
         .badge {
             display: inline-block;
             padding: 0.25rem 0.5rem;
-            border-radius: 4px;
+            border-radius: 0;
             font-size: 0.75rem;
             font-weight: 500;
+            border-left: 2px solid;
+            background: var(--white);
         }
 
-        .badge-success { background: #E3FCEF; color: var(--success); }
-        .badge-warning { background: #FFFAE6; color: var(--warning); }
-        .badge-danger { background: #FFEBE6; color: var(--danger); }
-        .badge-info { background: #DEEBFF; color: var(--info); }
-        .badge-neutral { background: var(--light-gray); color: var(--medium-gray); }
+        .badge-success { border-left-color: var(--success); color: var(--success); }
+        .badge-warning { border-left-color: var(--warning); color: var(--warning); }
+        .badge-danger { border-left-color: var(--danger); color: var(--danger); }
+        .badge-info { border-left-color: var(--info); color: var(--info); }
+        .badge-neutral { border-left-color: var(--medium-gray); color: var(--medium-gray); }
 
         /* Tabs */
         .tabs {
@@ -347,23 +343,24 @@
 
         .funnel-bar {
             height: 36px;
-            background: var(--primary);
-            border-radius: 4px;
+            background: var(--light-gray);
+            border-radius: 0;
+            border-left: 4px solid var(--dark-gray);
             display: flex;
             align-items: center;
             padding: 0 1rem;
-            color: var(--white);
+            color: var(--dark-gray);
             font-weight: 500;
             font-size: 0.875rem;
             min-width: 60px;
             transition: width 0.5s ease;
         }
 
-        .funnel-bar.success { background: var(--success); }
-        .funnel-bar.engaged { background: var(--info); }
-        .funnel-bar.abandoned { background: var(--warning); }
-        .funnel-bar.no-results { background: var(--danger); }
-        .funnel-bar.unknown { background: var(--medium-gray); }
+        .funnel-bar.success { border-left-color: var(--success); color: var(--success); }
+        .funnel-bar.engaged { border-left-color: var(--info); color: var(--info); }
+        .funnel-bar.abandoned { border-left-color: var(--warning); color: var(--warning); }
+        .funnel-bar.no-results { border-left-color: var(--danger); color: var(--danger); }
+        .funnel-bar.unknown { border-left-color: var(--medium-gray); color: var(--medium-gray); }
 
         .funnel-label {
             min-width: 100px;
@@ -379,10 +376,12 @@
 
         /* Error state */
         .error {
-            background: #FFEBE6;
+            background: var(--white);
             color: var(--danger);
             padding: 1rem;
-            border-radius: 8px;
+            border-radius: 0;
+            border: 1px solid var(--light-gray);
+            border-left: 4px solid var(--danger);
             margin-bottom: 1rem;
         }
 
@@ -420,17 +419,12 @@
             gap: 0.5rem;
             font-size: 0.75rem;
             color: var(--medium-gray);
+            padding-left: 0.5rem;
+            border-left: 3px solid var(--success);
         }
 
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--success);
-        }
-
-        .status-dot.loading { background: var(--warning); }
-        .status-dot.error { background: var(--danger); }
+        .data-status.loading { border-left-color: var(--warning); }
+        .data-status.error { border-left-color: var(--danger); }
     </style>
 </head>
 <body>
@@ -445,8 +439,7 @@
                 <button class="btn btn-primary" onclick="applyDateFilter()">Apply</button>
                 <button class="btn btn-secondary" onclick="resetDateFilter()">Reset</button>
             </div>
-            <div class="data-status">
-                <span class="status-dot" id="statusDot"></span>
+            <div class="data-status" id="dataStatus">
                 <span id="statusText">Initializing...</span>
             </div>
         </div>
@@ -1395,12 +1388,12 @@
         }
 
         function updateStatus(status, text) {
-            const dot = document.getElementById('statusDot');
+            const statusEl = document.getElementById('dataStatus');
             const textEl = document.getElementById('statusText');
 
-            dot.className = 'status-dot';
-            if (status === 'loading') dot.classList.add('loading');
-            if (status === 'error') dot.classList.add('error');
+            statusEl.className = 'data-status';
+            if (status === 'loading') statusEl.classList.add('loading');
+            if (status === 'error') statusEl.classList.add('error');
 
             textEl.textContent = text;
         }
