@@ -472,6 +472,7 @@
         .badge-danger { background: var(--danger-light); color: var(--danger); }
         .badge-info { background: var(--info-light); color: var(--info); }
         .badge-neutral { background: var(--light-gray); color: var(--medium-gray); }
+        .badge-secondary { background: #e2e8f0; color: #64748b; }
 
         /* Search/Filter */
         .table-controls {
@@ -1104,7 +1105,7 @@
                                             <th class="text-right">Searches</th>
                                             <th class="text-right">Users</th>
                                             <th class="text-right">Term Age</th>
-                                            <th class="text-center">Status</th>
+                                            <th class="text-center">Lifecycle</th>
                                         </tr>
                                     </thead>
                                     <tbody id="newTermsBody"></tbody>
@@ -1957,8 +1958,19 @@
             const data = result.toArray();
 
             document.getElementById('newTermsBody').innerHTML = data.map(d => {
-                const badge = d.term_age <= 3 ? 'badge-info' : 'badge-neutral';
-                const label = d.term_age <= 3 ? 'New' : 'Recent';
+                // Term age buckets: New (1-3), Emerging (4-7), Establishing (8-14), Established (15-30), Mature (31+)
+                let badge, label;
+                if (d.term_age <= 3) {
+                    badge = 'badge-info'; label = 'New';
+                } else if (d.term_age <= 7) {
+                    badge = 'badge-success'; label = 'Emerging';
+                } else if (d.term_age <= 14) {
+                    badge = 'badge-warning'; label = 'Establishing';
+                } else if (d.term_age <= 30) {
+                    badge = 'badge-neutral'; label = 'Established';
+                } else {
+                    badge = 'badge-secondary'; label = 'Mature';
+                }
 
                 return `
                     <tr class="clickable" onclick="showTermDetail('${escapeHtml(d.search_term)}')">

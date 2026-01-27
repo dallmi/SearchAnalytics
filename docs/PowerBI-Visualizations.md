@@ -928,9 +928,9 @@ RETURN
 - Status is recalculated from totals, not read from a pre-stored daily value
 - Works correctly whether viewing a single day, week, month, or all time
 
-### Term Age (New/Trending Terms)
+### Term Age & Lifecycle Classification
 
-Calculate the age of a term (elapsed days since first appearance) dynamically based on filter context:
+Calculate the age of a term (elapsed days since first appearance) and classify into lifecycle buckets:
 
 ```dax
 // Term Age - elapsed days since term first appeared
@@ -941,16 +941,55 @@ DATEDIFF(
     DAY
 ) + 1
 
-// Is New Term - terms that appeared within last 3 days of the filtered period
-Is New Term =
-IF([Term Age] <= 3, "New", "Recent")
+// Term Lifecycle Bucket - 5-stage classification
+Term Lifecycle =
+VAR Age = [Term Age]
+RETURN
+    SWITCH(
+        TRUE(),
+        Age <= 3, "New",
+        Age <= 7, "Emerging",
+        Age <= 14, "Establishing",
+        Age <= 30, "Established",
+        "Mature"
+    )
+
+// Term Lifecycle Sort Order - for proper sorting in visuals
+Term Lifecycle Sort =
+VAR Age = [Term Age]
+RETURN
+    SWITCH(
+        TRUE(),
+        Age <= 3, 1,
+        Age <= 7, 2,
+        Age <= 14, 3,
+        Age <= 30, 4,
+        5
+    )
 ```
+
+**Lifecycle Classification:**
+
+| Bucket | Days Since First Seen | Sort | Interpretation |
+|--------|----------------------|------|----------------|
+| New | 1-3 days | 1 | Just emerged, monitor for trending |
+| Emerging | 4-7 days | 2 | Past initial spike, validate staying power |
+| Establishing | 8-14 days | 3 | Building consistent usage pattern |
+| Established | 15-30 days | 4 | Regular part of user vocabulary |
+| Mature | 31+ days | 5 | Long-standing, stable terms |
 
 **Usage Notes:**
 - `Term Age` gives the number of days from when the term first appeared to the latest date in the current filter context
-- Use `Is New Term` to create badges or conditional formatting in tables
-- Filter to show only new terms: Add a visual-level filter where `Is New Term = "New"`
+- Use `Term Lifecycle` for badges, icons, or conditional formatting in tables
+- Filter by lifecycle stage to focus analysis (e.g., only "New" terms to spot trends)
 - The calculation is relative to the filtered date range, making it safe for any slicer selection
+- Set "Sort by column" on `Term Lifecycle` to use `Term Lifecycle Sort` for correct ordering
+
+**Analysis Use Cases:**
+- **Flash trends**: High volume in "New" but drops off in "Emerging"
+- **Growing terms**: Steady increase from New → Emerging → Establishing
+- **Seasonal terms**: Reappear periodically after being "Mature"
+- **Core vocabulary**: Consistently high volume in "Mature" bucket
 
 ### Query Length vs Success Analysis
 
