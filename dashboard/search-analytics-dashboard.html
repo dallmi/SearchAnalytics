@@ -25,11 +25,16 @@
             --dark-gray: #333333;
             --medium-gray: #666666;
             --light-gray: #E5E5E5;
+            --lighter-gray: #F5F5F5;
             --white: #FFFFFF;
             --success: #00875A;
+            --success-light: #E3FCEF;
             --warning: #FF8B00;
+            --warning-light: #FFFAE6;
             --danger: #DE350B;
+            --danger-light: #FFEBE6;
             --info: #0052CC;
+            --info-light: #DEEBFF;
         }
 
         * {
@@ -40,7 +45,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background-color: var(--light-gray);
+            background-color: var(--lighter-gray);
             color: var(--dark-gray);
             line-height: 1.5;
         }
@@ -49,18 +54,21 @@
         .header {
             background: var(--white);
             color: var(--black);
-            padding: 1rem 2rem;
+            padding: 0.75rem 2rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid var(--light-gray);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
 
         .header h1 {
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             font-weight: 600;
-            padding-left: 1rem;
-            border-left: 4px solid var(--primary);
+            padding-left: 0.75rem;
+            border-left: 3px solid var(--primary);
         }
 
         .header-controls {
@@ -76,22 +84,23 @@
         }
 
         .date-filter label {
-            font-size: 0.875rem;
+            font-size: 0.8rem;
+            color: var(--medium-gray);
         }
 
         .date-filter input {
-            padding: 0.5rem;
-            border: none;
+            padding: 0.4rem 0.5rem;
+            border: 1px solid var(--light-gray);
             border-radius: 4px;
-            font-size: 0.875rem;
+            font-size: 0.8rem;
         }
 
         .btn {
-            padding: 0.5rem 1rem;
+            padding: 0.4rem 0.75rem;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             font-weight: 500;
             transition: all 0.2s;
         }
@@ -117,9 +126,55 @@
 
         /* Main content */
         .container {
-            max-width: 1600px;
+            max-width: 1800px;
             margin: 0 auto;
-            padding: 1.5rem;
+            padding: 1rem;
+        }
+
+        /* Navigation Tabs */
+        .nav-tabs {
+            display: flex;
+            gap: 0;
+            background: var(--white);
+            border-radius: 8px 8px 0 0;
+            border-bottom: 2px solid var(--light-gray);
+            margin-bottom: 0;
+            overflow-x: auto;
+        }
+
+        .nav-tab {
+            padding: 0.75rem 1.25rem;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--medium-gray);
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .nav-tab:hover {
+            color: var(--dark-gray);
+            background: var(--lighter-gray);
+        }
+
+        .nav-tab.active {
+            color: var(--black);
+            border-bottom-color: var(--primary);
+        }
+
+        .nav-content {
+            display: none;
+            background: var(--white);
+            border-radius: 0 0 8px 8px;
+            padding: 1rem;
+        }
+
+        .nav-content.active {
+            display: block;
         }
 
         /* Loading state */
@@ -133,9 +188,9 @@
         }
 
         .spinner {
-            width: 48px;
-            height: 48px;
-            border: 4px solid var(--light-gray);
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--light-gray);
             border-top-color: var(--primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
@@ -147,65 +202,168 @@
 
         .loading-text {
             color: var(--medium-gray);
-            font-size: 0.875rem;
+            font-size: 0.85rem;
+        }
+
+        /* Executive Summary */
+        .executive-summary {
+            background: linear-gradient(135deg, var(--white) 0%, var(--lighter-gray) 100%);
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--light-gray);
+        }
+
+        .summary-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .summary-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--dark-gray);
+        }
+
+        .summary-period {
+            font-size: 0.75rem;
+            color: var(--medium-gray);
+        }
+
+        .insights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .insight-card {
+            background: var(--white);
+            border-radius: 6px;
+            padding: 0.75rem;
+            border-left: 3px solid var(--info);
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-start;
+        }
+
+        .insight-card.positive { border-left-color: var(--success); }
+        .insight-card.negative { border-left-color: var(--danger); }
+        .insight-card.warning { border-left-color: var(--warning); }
+        .insight-card.action { border-left-color: var(--primary); }
+
+        .insight-icon {
+            font-size: 1.25rem;
+            line-height: 1;
+        }
+
+        .insight-content {
+            flex: 1;
+        }
+
+        .insight-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--dark-gray);
+            margin-bottom: 0.25rem;
+        }
+
+        .insight-text {
+            font-size: 0.75rem;
+            color: var(--medium-gray);
+            line-height: 1.4;
         }
 
         /* KPI Cards */
         .kpi-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1rem;
         }
 
         .kpi-card {
             background: var(--white);
-            border-radius: 0;
-            padding: 1.25rem;
+            border-radius: 6px;
+            padding: 1rem;
             border: 1px solid var(--light-gray);
-            border-top: 3px solid var(--dark-gray);
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
         }
 
-        .kpi-card.highlight { border-top-color: var(--primary); }
-        .kpi-card.success { border-top-color: var(--success); }
-        .kpi-card.warning { border-top-color: var(--warning); }
-        .kpi-card.danger { border-top-color: var(--danger); }
-        .kpi-card.info { border-top-color: var(--info); }
+        .kpi-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            transform: translateY(-1px);
+        }
+
+        .kpi-card.selected {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(230, 0, 0, 0.1);
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            border-radius: 6px 6px 0 0;
+        }
+
+        .kpi-card.highlight::before { background: var(--primary); }
+        .kpi-card.success::before { background: var(--success); }
+        .kpi-card.warning::before { background: var(--warning); }
+        .kpi-card.danger::before { background: var(--danger); }
+        .kpi-card.info::before { background: var(--info); }
 
         .kpi-label {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.3px;
             color: var(--medium-gray);
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.25rem;
         }
 
         .kpi-value {
-            font-size: 2rem;
+            font-size: 1.5rem;
             font-weight: 700;
             color: var(--black);
+            line-height: 1.2;
         }
 
         .kpi-change {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             margin-top: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
         }
 
         .kpi-change.positive { color: var(--success); }
         .kpi-change.negative { color: var(--danger); }
+        .kpi-change.neutral { color: var(--medium-gray); }
+
+        .kpi-subtitle {
+            font-size: 0.65rem;
+            color: var(--medium-gray);
+            margin-top: 0.25rem;
+        }
 
         /* Chart containers */
         .charts-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 1.5rem;
-            margin-bottom: 1.5rem;
+            gap: 1rem;
+            margin-bottom: 1rem;
         }
 
         .chart-card {
             background: var(--white);
-            border-radius: 0;
-            padding: 1.25rem;
+            border-radius: 6px;
+            padding: 1rem;
             border: 1px solid var(--light-gray);
         }
 
@@ -213,12 +371,21 @@
             grid-column: 1 / -1;
         }
 
+        .chart-card.clickable {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .chart-card.clickable:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
         .chart-title {
-            font-size: 1rem;
+            font-size: 0.9rem;
             font-weight: 600;
             color: var(--dark-gray);
-            margin-bottom: 1rem;
-            padding-bottom: 0.75rem;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
             border-bottom: 1px solid var(--light-gray);
             display: flex;
             justify-content: space-between;
@@ -226,18 +393,22 @@
         }
 
         .chart-subtitle {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: var(--medium-gray);
             font-weight: 400;
         }
 
         .chart-container {
+            height: 200px;
             position: relative;
-            height: 300px;
         }
 
         .chart-container.tall {
-            height: 400px;
+            height: 280px;
+        }
+
+        .chart-container.short {
+            height: 150px;
         }
 
         /* Tables */
@@ -250,25 +421,37 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.875rem;
-        }
-
-        th, td {
-            padding: 0.75rem 1rem;
-            text-align: left;
-            border-bottom: 1px solid var(--light-gray);
+            font-size: 0.8rem;
         }
 
         th {
-            background: var(--light-gray);
+            background: var(--lighter-gray);
+            padding: 0.6rem 0.75rem;
+            text-align: left;
             font-weight: 600;
+            color: var(--dark-gray);
+            border-bottom: 1px solid var(--light-gray);
             position: sticky;
             top: 0;
             z-index: 1;
         }
 
-        tr:hover {
-            background: #f9f9f9;
+        td {
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid var(--light-gray);
+            color: var(--dark-gray);
+        }
+
+        tr:hover td {
+            background: var(--lighter-gray);
+        }
+
+        tr.clickable {
+            cursor: pointer;
+        }
+
+        tr.clickable:hover td {
+            background: var(--info-light);
         }
 
         .text-right { text-align: right; }
@@ -276,38 +459,68 @@
 
         .badge {
             display: inline-block;
-            padding: 0.25rem 0.5rem;
-            border-radius: 0;
-            font-size: 0.75rem;
-            font-weight: 500;
-            border-left: 2px solid;
-            background: var(--white);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
         }
 
-        .badge-success { border-left-color: var(--success); color: var(--success); }
-        .badge-warning { border-left-color: var(--warning); color: var(--warning); }
-        .badge-danger { border-left-color: var(--danger); color: var(--danger); }
-        .badge-info { border-left-color: var(--info); color: var(--info); }
-        .badge-neutral { border-left-color: var(--medium-gray); color: var(--medium-gray); }
+        .badge-success { background: var(--success-light); color: var(--success); }
+        .badge-warning { background: var(--warning-light); color: var(--warning); }
+        .badge-danger { background: var(--danger-light); color: var(--danger); }
+        .badge-info { background: var(--info-light); color: var(--info); }
+        .badge-neutral { background: var(--light-gray); color: var(--medium-gray); }
+
+        /* Search/Filter */
+        .table-controls {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+            align-items: center;
+        }
+
+        .search-input {
+            flex: 1;
+            max-width: 300px;
+            padding: 0.4rem 0.75rem;
+            border: 1px solid var(--light-gray);
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--info);
+        }
+
+        .filter-select {
+            padding: 0.4rem 0.75rem;
+            border: 1px solid var(--light-gray);
+            border-radius: 4px;
+            font-size: 0.8rem;
+            background: var(--white);
+        }
 
         /* Tabs */
         .tabs {
             display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-            border-bottom: 2px solid var(--light-gray);
+            gap: 0;
+            margin-bottom: 0.75rem;
+            border-bottom: 1px solid var(--light-gray);
         }
 
         .tab {
-            padding: 0.75rem 1.5rem;
-            background: none;
+            padding: 0.5rem 1rem;
+            background: transparent;
             border: none;
             cursor: pointer;
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             font-weight: 500;
             color: var(--medium-gray);
             border-bottom: 2px solid transparent;
-            margin-bottom: -2px;
+            margin-bottom: -1px;
             transition: all 0.2s;
         }
 
@@ -317,7 +530,7 @@
 
         .tab.active {
             color: var(--black);
-            border-bottom-color: var(--black);
+            border-bottom-color: var(--primary);
         }
 
         .tab-content {
@@ -328,7 +541,7 @@
             display: block;
         }
 
-        /* Journey funnel */
+        /* Funnel */
         .funnel {
             display: flex;
             flex-direction: column;
@@ -338,50 +551,244 @@
         .funnel-step {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .funnel-step:hover {
+            background: var(--lighter-gray);
+        }
+
+        .funnel-step.selected {
+            background: var(--info-light);
         }
 
         .funnel-bar {
-            height: 36px;
+            height: 28px;
             background: var(--light-gray);
-            border-radius: 0;
-            border-left: 4px solid var(--dark-gray);
+            border-radius: 4px;
             display: flex;
             align-items: center;
-            padding: 0 1rem;
-            color: var(--dark-gray);
-            font-weight: 500;
-            font-size: 0.875rem;
-            min-width: 60px;
+            padding: 0 0.75rem;
+            color: var(--white);
+            font-weight: 600;
+            font-size: 0.75rem;
+            min-width: 50px;
             transition: width 0.5s ease;
         }
 
-        .funnel-bar.success { border-left-color: var(--success); color: var(--success); }
-        .funnel-bar.engaged { border-left-color: var(--info); color: var(--info); }
-        .funnel-bar.abandoned { border-left-color: var(--warning); color: var(--warning); }
-        .funnel-bar.no-results { border-left-color: var(--danger); color: var(--danger); }
-        .funnel-bar.unknown { border-left-color: var(--medium-gray); color: var(--medium-gray); }
+        .funnel-bar.success { background: var(--success); }
+        .funnel-bar.engaged { background: var(--info); }
+        .funnel-bar.abandoned { background: var(--warning); }
+        .funnel-bar.no-results { background: var(--danger); }
+        .funnel-bar.unknown { background: var(--medium-gray); }
 
         .funnel-label {
-            min-width: 100px;
-            font-size: 0.875rem;
+            min-width: 80px;
+            font-size: 0.8rem;
+            font-weight: 500;
             color: var(--dark-gray);
         }
 
         .funnel-value {
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             color: var(--medium-gray);
-            min-width: 120px;
         }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--white);
+            border-radius: 8px;
+            max-width: 900px;
+            width: 100%;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--light-gray);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--dark-gray);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--medium-gray);
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: var(--dark-gray);
+        }
+
+        .modal-body {
+            padding: 1rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        /* Filter indicator */
+        .active-filters {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.75rem;
+        }
+
+        .filter-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            background: var(--info-light);
+            color: var(--info);
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+
+        .filter-tag button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--info);
+            font-size: 0.9rem;
+            line-height: 1;
+            padding: 0;
+            margin-left: 0.25rem;
+        }
+
+        .clear-filters {
+            font-size: 0.7rem;
+            color: var(--medium-gray);
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        /* Metric cards for detail view */
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .metric-card {
+            background: var(--lighter-gray);
+            border-radius: 6px;
+            padding: 0.75rem;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--dark-gray);
+        }
+
+        .metric-label {
+            font-size: 0.7rem;
+            color: var(--medium-gray);
+            margin-top: 0.25rem;
+        }
+
+        /* Recommendations */
+        .recommendations {
+            margin-top: 1rem;
+        }
+
+        .recommendation {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: var(--lighter-gray);
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            align-items: flex-start;
+        }
+
+        .recommendation-icon {
+            font-size: 1rem;
+        }
+
+        .recommendation-content {
+            flex: 1;
+        }
+
+        .recommendation-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--dark-gray);
+            margin-bottom: 0.25rem;
+        }
+
+        .recommendation-text {
+            font-size: 0.75rem;
+            color: var(--medium-gray);
+        }
+
+        /* Data status indicator */
+        .data-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.7rem;
+            color: var(--medium-gray);
+            padding: 0.25rem 0.5rem;
+            background: var(--lighter-gray);
+            border-radius: 4px;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+
+        .data-status.loading .status-dot { background: var(--warning); }
+        .data-status.error .status-dot { background: var(--danger); }
 
         /* Error state */
         .error {
-            background: var(--white);
+            background: var(--danger-light);
             color: var(--danger);
             padding: 1rem;
-            border-radius: 0;
-            border: 1px solid var(--light-gray);
-            border-left: 4px solid var(--danger);
+            border-radius: 6px;
             margin-bottom: 1rem;
         }
 
@@ -395,7 +802,8 @@
         @media (max-width: 768px) {
             .header {
                 flex-direction: column;
-                gap: 1rem;
+                gap: 0.75rem;
+                padding: 0.75rem 1rem;
             }
 
             .header-controls {
@@ -405,26 +813,53 @@
 
             .date-filter {
                 flex-wrap: wrap;
+                justify-content: center;
             }
 
             .kpi-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
+
+            .nav-tabs {
+                overflow-x: auto;
+            }
         }
 
-        /* Data status indicator */
-        .data-status {
+        /* Score indicator */
+        .score-indicator {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            font-size: 0.75rem;
-            color: var(--medium-gray);
-            padding-left: 0.5rem;
-            border-left: 3px solid var(--success);
         }
 
-        .data-status.loading { border-left-color: var(--warning); }
-        .data-status.error { border-left-color: var(--danger); }
+        .score-bar {
+            flex: 1;
+            height: 8px;
+            background: var(--light-gray);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .score-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .score-value {
+            font-size: 0.85rem;
+            font-weight: 600;
+            min-width: 40px;
+            text-align: right;
+        }
+
+        /* Trend sparkline placeholder */
+        .trend-mini {
+            width: 60px;
+            height: 20px;
+            display: inline-block;
+            vertical-align: middle;
+        }
     </style>
 </head>
 <body>
@@ -440,6 +875,7 @@
                 <button class="btn btn-secondary" onclick="resetDateFilter()">Reset</button>
             </div>
             <div class="data-status" id="dataStatus">
+                <span class="status-dot"></span>
                 <span id="statusText">Initializing...</span>
             </div>
         </div>
@@ -457,175 +893,354 @@
 
         <!-- Dashboard Content -->
         <div id="dashboardContent" style="display: none;">
-            <!-- KPI Cards -->
-            <div class="kpi-grid" id="kpiGrid">
-                <div class="kpi-card">
-                    <div class="kpi-label">Total Searches</div>
-                    <div class="kpi-value" id="kpiSearches">-</div>
+
+            <!-- Active Filters Indicator -->
+            <div class="active-filters" id="activeFilters" style="display: none;"></div>
+
+            <!-- Executive Summary -->
+            <div class="executive-summary" id="executiveSummary">
+                <div class="summary-header">
+                    <div class="summary-title">Executive Summary</div>
+                    <div class="summary-period" id="summaryPeriod">Loading...</div>
                 </div>
-                <div class="kpi-card info">
-                    <div class="kpi-label">Unique Sessions</div>
-                    <div class="kpi-value" id="kpiSessions">-</div>
-                </div>
-                <div class="kpi-card success">
-                    <div class="kpi-label">Success Rate</div>
-                    <div class="kpi-value" id="kpiSuccessRate">-</div>
-                </div>
-                <div class="kpi-card warning">
-                    <div class="kpi-label">Null Result Rate</div>
-                    <div class="kpi-value" id="kpiNullRate">-</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Unique Users</div>
-                    <div class="kpi-value" id="kpiUsers">-</div>
-                </div>
-                <div class="kpi-card danger">
-                    <div class="kpi-label">Abandonment Rate</div>
-                    <div class="kpi-value" id="kpiAbandonRate">-</div>
+                <div class="insights-grid" id="insightsGrid">
+                    <!-- Insights will be populated dynamically -->
                 </div>
             </div>
 
-            <!-- Charts Row 1 -->
-            <div class="charts-grid">
-                <!-- Daily Trends -->
-                <div class="chart-card full-width">
-                    <div class="chart-title">
-                        Daily Search Trends
-                        <span class="chart-subtitle">Searches, Sessions & Success Rate over time</span>
+            <!-- Navigation Tabs -->
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-nav="overview">Overview</button>
+                <button class="nav-tab" data-nav="terms">Search Terms</button>
+                <button class="nav-tab" data-nav="journeys">User Journeys</button>
+                <button class="nav-tab" data-nav="performance">Performance</button>
+            </div>
+
+            <!-- Overview Tab -->
+            <div class="nav-content active" id="navOverview">
+                <!-- KPI Cards -->
+                <div class="kpi-grid" id="kpiGrid">
+                    <div class="kpi-card highlight" data-kpi="searches">
+                        <div class="kpi-label">Total Searches</div>
+                        <div class="kpi-value" id="kpiSearches">-</div>
+                        <div class="kpi-change neutral" id="kpiSearchesChange">-</div>
                     </div>
-                    <div class="chart-container tall">
-                        <canvas id="dailyTrendsChart"></canvas>
+                    <div class="kpi-card info" data-kpi="sessions">
+                        <div class="kpi-label">Unique Sessions</div>
+                        <div class="kpi-value" id="kpiSessions">-</div>
+                        <div class="kpi-change neutral" id="kpiSessionsChange">-</div>
+                    </div>
+                    <div class="kpi-card" data-kpi="users">
+                        <div class="kpi-label">Unique Users</div>
+                        <div class="kpi-value" id="kpiUsers">-</div>
+                        <div class="kpi-change neutral" id="kpiUsersChange">-</div>
+                    </div>
+                    <div class="kpi-card success" data-kpi="success">
+                        <div class="kpi-label">Success Rate</div>
+                        <div class="kpi-value" id="kpiSuccessRate">-</div>
+                        <div class="kpi-change neutral" id="kpiSuccessChange">-</div>
+                    </div>
+                    <div class="kpi-card warning" data-kpi="null">
+                        <div class="kpi-label">Null Result Rate</div>
+                        <div class="kpi-value" id="kpiNullRate">-</div>
+                        <div class="kpi-change neutral" id="kpiNullChange">-</div>
+                    </div>
+                    <div class="kpi-card danger" data-kpi="abandon">
+                        <div class="kpi-label">Abandonment Rate</div>
+                        <div class="kpi-value" id="kpiAbandonRate">-</div>
+                        <div class="kpi-change neutral" id="kpiAbandonChange">-</div>
+                    </div>
+                    <div class="kpi-card info" data-kpi="effectiveness">
+                        <div class="kpi-label">Effectiveness Score</div>
+                        <div class="kpi-value" id="kpiEffectiveness">-</div>
+                        <div class="kpi-subtitle">Higher is better</div>
+                    </div>
+                    <div class="kpi-card" data-kpi="avgSearches">
+                        <div class="kpi-label">Searches/Session</div>
+                        <div class="kpi-value" id="kpiAvgSearches">-</div>
+                        <div class="kpi-subtitle">Avg. per session</div>
+                    </div>
+                </div>
+
+                <!-- Charts Row 1 -->
+                <div class="charts-grid">
+                    <div class="chart-card full-width">
+                        <div class="chart-title">
+                            Daily Trends
+                            <span class="chart-subtitle">Click on chart to filter by date</span>
+                        </div>
+                        <div class="chart-container tall">
+                            <canvas id="dailyTrendsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row 2 -->
+                <div class="charts-grid">
+                    <div class="chart-card clickable">
+                        <div class="chart-title">Journey Outcomes</div>
+                        <div id="journeyFunnel" class="funnel"></div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-title">Outcome Distribution</div>
+                        <div class="chart-container">
+                            <canvas id="outcomeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row 3 -->
+                <div class="charts-grid">
+                    <div class="chart-card clickable">
+                        <div class="chart-title">
+                            Regional Activity (CET)
+                            <span class="chart-subtitle">Click to filter</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="hourlyChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card clickable">
+                        <div class="chart-title">
+                            Weekly Pattern
+                            <span class="chart-subtitle">Click to filter</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="weekdayChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row 4: User Cohorts -->
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-title">New vs Returning Users</div>
+                        <div class="chart-container">
+                            <canvas id="userCohortChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-title">Click Categories</div>
+                        <div class="chart-container">
+                            <canvas id="clickCategoriesChart"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Charts Row 2 -->
-            <div class="charts-grid">
-                <!-- Journey Outcomes -->
-                <div class="chart-card">
-                    <div class="chart-title">Journey Outcomes</div>
-                    <div id="journeyFunnel" class="funnel"></div>
+            <!-- Search Terms Tab -->
+            <div class="nav-content" id="navTerms">
+                <div class="charts-grid">
+                    <div class="chart-card full-width">
+                        <div class="tabs">
+                            <button class="tab active" data-tab="topTerms">Top Terms</button>
+                            <button class="tab" data-tab="problemTerms">Content Gaps</button>
+                            <button class="tab" data-tab="newTerms">New/Trending</button>
+                        </div>
+
+                        <!-- Top Terms Tab -->
+                        <div class="tab-content active" id="topTermsTab">
+                            <div class="table-controls">
+                                <input type="text" class="search-input" id="termSearch" placeholder="Search terms...">
+                                <select class="filter-select" id="termStatusFilter">
+                                    <option value="">All statuses</option>
+                                    <option value="good">Good</option>
+                                    <option value="normal">Normal</option>
+                                    <option value="lowctr">Low CTR</option>
+                                    <option value="highnull">High Null</option>
+                                </select>
+                            </div>
+                            <div class="table-container">
+                                <table id="topTermsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Search Term</th>
+                                            <th class="text-right">Searches</th>
+                                            <th class="text-right">Users</th>
+                                            <th class="text-right">Success CTR</th>
+                                            <th class="text-right">Null Rate</th>
+                                            <th class="text-center">Status</th>
+                                            <th class="text-center">Score</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="topTermsBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Problem Terms Tab -->
+                        <div class="tab-content" id="problemTermsTab">
+                            <p style="font-size: 0.8rem; color: var(--medium-gray); margin-bottom: 0.75rem;">
+                                These search terms have high null result rates, indicating potential content gaps.
+                                <strong>Action:</strong> Review these terms and add relevant content or improve search synonyms.
+                            </p>
+                            <div class="table-container">
+                                <table id="problemTermsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Search Term</th>
+                                            <th class="text-right">Searches</th>
+                                            <th class="text-right">Null Results</th>
+                                            <th class="text-right">Null Rate</th>
+                                            <th class="text-center">Priority</th>
+                                            <th class="text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="problemTermsBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- New Terms Tab -->
+                        <div class="tab-content" id="newTermsTab">
+                            <p style="font-size: 0.8rem; color: var(--medium-gray); margin-bottom: 0.75rem;">
+                                Recently emerged search terms that may indicate new user needs or trending topics.
+                            </p>
+                            <div class="table-container">
+                                <table id="newTermsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Search Term</th>
+                                            <th class="text-right">Searches</th>
+                                            <th class="text-right">Users</th>
+                                            <th class="text-right">Days Active</th>
+                                            <th class="text-center">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="newTermsBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Journey Outcome Pie -->
-                <div class="chart-card">
-                    <div class="chart-title">Outcome Distribution</div>
-                    <div class="chart-container">
-                        <canvas id="outcomeChart"></canvas>
+                <!-- Term Analysis Charts -->
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-title">Term Performance Distribution</div>
+                        <div class="chart-container">
+                            <canvas id="termPerformanceChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-title">Query Length Analysis</div>
+                        <div class="chart-container">
+                            <canvas id="queryLengthChart"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Charts Row 3 -->
-            <div class="charts-grid">
-                <!-- Time Distribution -->
-                <div class="chart-card">
-                    <div class="chart-title">
-                        Search Distribution by Hour (CET)
-                        <span class="chart-subtitle">When do users search?</span>
+            <!-- User Journeys Tab -->
+            <div class="nav-content" id="navJourneys">
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-title">Session Complexity</div>
+                        <div class="chart-container">
+                            <canvas id="complexityChart"></canvas>
+                        </div>
                     </div>
-                    <div class="chart-container">
-                        <canvas id="hourlyChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Day of Week -->
-                <div class="chart-card">
-                    <div class="chart-title">
-                        Search Distribution by Day
-                        <span class="chart-subtitle">Weekday patterns</span>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="weekdayChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Tabs Section -->
-            <div class="chart-card full-width">
-                <div class="tabs">
-                    <button class="tab active" data-tab="topTerms">Top Search Terms</button>
-                    <button class="tab" data-tab="problemTerms">Problem Terms</button>
-                    <button class="tab" data-tab="clickCategories">Click Categories</button>
-                </div>
-
-                <!-- Top Terms Tab -->
-                <div class="tab-content active" id="topTermsTab">
-                    <div class="table-container">
-                        <table id="topTermsTable">
-                            <thead>
-                                <tr>
-                                    <th>Search Term</th>
-                                    <th class="text-right">Searches</th>
-                                    <th class="text-right">Users</th>
-                                    <th class="text-right">Success CTR</th>
-                                    <th class="text-right">Null Rate</th>
-                                    <th class="text-center">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="topTermsBody"></tbody>
-                        </table>
+                    <div class="chart-card">
+                        <div class="chart-title">Session Duration Distribution</div>
+                        <div class="chart-container">
+                            <canvas id="durationChart"></canvas>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Problem Terms Tab -->
-                <div class="tab-content" id="problemTermsTab">
-                    <div class="table-container">
-                        <table id="problemTermsTable">
-                            <thead>
-                                <tr>
-                                    <th>Search Term</th>
-                                    <th class="text-right">Searches</th>
-                                    <th class="text-right">Null Results</th>
-                                    <th class="text-right">Null Rate</th>
-                                    <th class="text-center">Issue</th>
-                                </tr>
-                            </thead>
-                            <tbody id="problemTermsBody"></tbody>
-                        </table>
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-title">Query Reformulation</div>
+                        <div class="chart-container short">
+                            <canvas id="reformulationChart"></canvas>
+                        </div>
+                        <div style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--medium-gray);">
+                            Users who changed their search query within a session
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-title">Null Result Recovery</div>
+                        <div class="chart-container short">
+                            <canvas id="recoveryChart"></canvas>
+                        </div>
+                        <div style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--medium-gray);">
+                            Users who found content after initially getting zero results
+                        </div>
                     </div>
                 </div>
 
-                <!-- Click Categories Tab -->
-                <div class="tab-content" id="clickCategoriesTab">
-                    <div class="chart-container">
-                        <canvas id="clickCategoriesChart"></canvas>
+                <div class="charts-grid">
+                    <div class="chart-card full-width">
+                        <div class="chart-title">Journey Outcome by Complexity</div>
+                        <div class="chart-container tall">
+                            <canvas id="outcomeByComplexityChart"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Session Complexity -->
-            <div class="charts-grid">
-                <div class="chart-card">
-                    <div class="chart-title">Session Complexity</div>
-                    <div class="chart-container">
-                        <canvas id="complexityChart"></canvas>
+            <!-- Performance Tab -->
+            <div class="nav-content" id="navPerformance">
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-title">Search to Result Latency</div>
+                        <div class="chart-container">
+                            <canvas id="searchLatencyChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-title">Time to First Click</div>
+                        <div class="chart-container">
+                            <canvas id="timeToClickChart"></canvas>
+                        </div>
                     </div>
                 </div>
 
+                <div class="charts-grid">
+                    <div class="chart-card full-width">
+                        <div class="chart-title">Latency Trend Over Time</div>
+                        <div class="chart-container tall">
+                            <canvas id="latencyTrendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Performance Metrics -->
                 <div class="chart-card">
-                    <div class="chart-title">Time to Click Distribution</div>
-                    <div class="chart-container">
-                        <canvas id="timeToClickChart"></canvas>
+                    <div class="chart-title">Performance Summary</div>
+                    <div class="metric-grid" id="performanceMetrics">
+                        <!-- Will be populated dynamically -->
                     </div>
                 </div>
             </div>
         </div>
     </main>
 
+    <!-- Term Detail Modal -->
+    <div class="modal-overlay" id="termModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title" id="modalTermTitle">Search Term Details</div>
+                <button class="modal-close" onclick="closeTermModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalTermBody">
+                <!-- Will be populated dynamically -->
+            </div>
+        </div>
+    </div>
+
     <script>
         // Global state
         let db = null;
         let conn = null;
-        let dailyData = null;
-        let journeysData = null;
-        let termsData = null;
         let dateFilter = { from: null, to: null };
+        let activeFilters = {};
+        let allTermsData = [];
 
         // Chart instances
         let charts = {};
 
-        // Colors - red used sparingly as accent
+        // Colors
         const COLORS = {
             primary: '#E60000',
             primaryLight: '#FF3333',
@@ -636,7 +1251,7 @@
             gray: '#666666',
             lightGray: '#E5E5E5',
             dark: '#333333',
-            chart: '#4A5568'  // Neutral color for single-series charts
+            chart: '#4A5568'
         };
 
         const OUTCOME_COLORS = {
@@ -652,7 +1267,6 @@
             try {
                 updateStatus('loading', 'Waiting for DuckDB...');
 
-                // Wait for DuckDB module to be ready
                 if (!window.duckdb) {
                     await new Promise(resolve => {
                         window.addEventListener('duckdb-ready', resolve, { once: true });
@@ -676,25 +1290,16 @@
                 conn = await db.connect();
 
                 updateStatus('loading', 'Loading parquet files...');
-
-                // Load parquet files
                 await loadParquetFiles();
 
-                updateStatus('success', 'Data loaded');
-
-                // Set initial date range
                 await setInitialDateRange();
 
-                // Render dashboard
-                await renderDashboard();
-
-                // Show dashboard
                 document.getElementById('loadingState').style.display = 'none';
                 document.getElementById('dashboardContent').style.display = 'block';
 
-                // Setup tab handlers
-                setupTabs();
+                await renderDashboard();
 
+                updateStatus('success', `Last updated: ${new Date().toLocaleTimeString()}`);
             } catch (error) {
                 console.error('Initialization error:', error);
                 showError(`Failed to initialize: ${error.message}`);
@@ -703,8 +1308,6 @@
         }
 
         async function loadParquetFiles() {
-            // DuckDB-WASM requires full HTTP URLs for remote file access
-            // Build absolute URL based on current page location
             const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '');
             const pathsToTry = [
                 `${baseUrl}/../output/`,
@@ -716,19 +1319,14 @@
                 for (const basePath of pathsToTry) {
                     try {
                         const fullPath = basePath + fileName;
-                        console.log(`Trying to load ${fileName} from ${fullPath}`);
-                        await conn.query(`
-                            CREATE VIEW ${viewName} AS
-                            SELECT * FROM read_parquet('${fullPath}')
-                        `);
+                        await conn.query(`CREATE VIEW ${viewName} AS SELECT * FROM read_parquet('${fullPath}')`);
                         setLoadingText(statusText);
-                        console.log(`Successfully loaded ${fileName} from ${fullPath}`);
                         return;
                     } catch (e) {
-                        console.warn(`Could not load ${fileName} from ${basePath}: ${e.message}`);
+                        // Try next path
                     }
                 }
-                throw new Error(`Could not find ${fileName} in any of the expected locations. Make sure the parquet files exist in the output/ folder and you're running an HTTP server from the SearchAnalytics directory.`);
+                throw new Error(`Could not find ${fileName}`);
             }
 
             await loadWithFallback('daily', 'searches_daily.parquet', 'Loaded daily data...');
@@ -737,10 +1335,7 @@
         }
 
         async function setInitialDateRange() {
-            const result = await conn.query(`
-                SELECT MIN(date) as min_date, MAX(date) as max_date
-                FROM daily
-            `);
+            const result = await conn.query(`SELECT MIN(date) as min_date, MAX(date) as max_date FROM daily`);
             const row = result.toArray()[0];
 
             const minDate = new Date(row.min_date);
@@ -774,6 +1369,8 @@
         }
 
         async function resetDateFilter() {
+            activeFilters = {};
+            updateFiltersDisplay();
             await setInitialDateRange();
             await renderDashboard();
         }
@@ -782,17 +1379,30 @@
             updateStatus('loading', 'Refreshing...');
 
             try {
+                // Run all renders in parallel for the active tab
                 await Promise.all([
+                    renderExecutiveSummary(),
                     renderKPIs(),
                     renderDailyTrends(),
                     renderJourneyOutcomes(),
                     renderHourlyDistribution(),
                     renderWeekdayDistribution(),
+                    renderUserCohorts(),
+                    renderClickCategories(),
                     renderTopTerms(),
                     renderProblemTerms(),
-                    renderClickCategories(),
+                    renderNewTerms(),
+                    renderTermPerformance(),
+                    renderQueryLength(),
                     renderSessionComplexity(),
-                    renderTimeToClick()
+                    renderSessionDuration(),
+                    renderReformulation(),
+                    renderRecovery(),
+                    renderOutcomeByComplexity(),
+                    renderSearchLatency(),
+                    renderTimeToClick(),
+                    renderLatencyTrend(),
+                    renderPerformanceMetrics()
                 ]);
 
                 updateStatus('success', `Last updated: ${new Date().toLocaleTimeString()}`);
@@ -802,8 +1412,101 @@
             }
         }
 
+        // Executive Summary
+        async function renderExecutiveSummary() {
+            const periodDays = Math.ceil((dateFilter.to - dateFilter.from) / (1000 * 60 * 60 * 24)) + 1;
+            document.getElementById('summaryPeriod').textContent =
+                `${formatDateForInput(dateFilter.from)} to ${formatDateForInput(dateFilter.to)} (${periodDays} days)`;
+
+            // Get key metrics for insights
+            const result = await conn.query(`
+                SELECT
+                    SUM(CAST(search_starts AS DOUBLE)) as searches,
+                    SUM(CAST(unique_sessions AS DOUBLE)) as sessions,
+                    SUM(CAST(null_results AS DOUBLE)) as null_results,
+                    SUM(CAST(result_events AS DOUBLE)) as result_events,
+                    SUM(CAST(sessions_with_clicks AS DOUBLE)) as clicked,
+                    SUM(CAST(sessions_with_results AS DOUBLE)) as with_results
+                FROM daily WHERE ${getDateWhereClause('date')}
+            `);
+            const metrics = result.toArray()[0];
+
+            const successRate = metrics.with_results > 0 ? (metrics.clicked / metrics.with_results * 100) : 0;
+            const nullRate = metrics.result_events > 0 ? (metrics.null_results / metrics.result_events * 100) : 0;
+
+            // Get top problem term
+            const problemResult = await conn.query(`
+                SELECT search_term, SUM(CAST(null_result_count AS DOUBLE)) as nulls
+                FROM terms WHERE ${getDateWhereClause('session_date')}
+                GROUP BY search_term
+                HAVING SUM(CAST(null_result_count AS DOUBLE)) > 0
+                ORDER BY nulls DESC LIMIT 1
+            `);
+            const topProblem = problemResult.toArray()[0];
+
+            // Build insights
+            const insights = [];
+
+            // Search volume insight
+            const avgSearchesPerDay = metrics.searches / periodDays;
+            insights.push({
+                type: 'info',
+                icon: '📊',
+                title: 'Search Activity',
+                text: `${formatNumber(Math.round(avgSearchesPerDay))} searches per day average across ${formatNumber(metrics.sessions)} sessions`
+            });
+
+            // Success rate insight
+            if (successRate >= 40) {
+                insights.push({
+                    type: 'positive',
+                    icon: '✅',
+                    title: 'Good Success Rate',
+                    text: `${successRate.toFixed(1)}% of sessions result in content clicks - users are finding what they need`
+                });
+            } else if (successRate < 25) {
+                insights.push({
+                    type: 'negative',
+                    icon: '⚠️',
+                    title: 'Low Success Rate',
+                    text: `Only ${successRate.toFixed(1)}% click-through rate. Consider improving search relevance or content coverage`
+                });
+            }
+
+            // Null rate insight
+            if (nullRate > 10) {
+                insights.push({
+                    type: 'warning',
+                    icon: '🔍',
+                    title: 'Content Gaps Detected',
+                    text: `${nullRate.toFixed(1)}% of searches return no results. Review "Content Gaps" tab for specific terms`
+                });
+            }
+
+            // Top problem insight
+            if (topProblem) {
+                insights.push({
+                    type: 'action',
+                    icon: '💡',
+                    title: 'Top Content Gap',
+                    text: `"${topProblem.search_term}" has ${formatNumber(topProblem.nulls)} null results - consider adding content`
+                });
+            }
+
+            // Render insights
+            document.getElementById('insightsGrid').innerHTML = insights.map(i => `
+                <div class="insight-card ${i.type}">
+                    <div class="insight-icon">${i.icon}</div>
+                    <div class="insight-content">
+                        <div class="insight-title">${i.title}</div>
+                        <div class="insight-text">${i.text}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // KPIs with period comparison
         async function renderKPIs() {
-            // Cast to DOUBLE before SUM to work around DuckDB-WASM BigInt aggregation bug
             const result = await conn.query(`
                 SELECT
                     SUM(CAST(search_starts AS DOUBLE)) as total_searches,
@@ -815,13 +1518,10 @@
                     SUM(CAST(sessions_with_clicks AS DOUBLE)) as sessions_with_clicks,
                     SUM(CAST(sessions_with_results AS DOUBLE)) as sessions_with_results,
                     SUM(CAST(sessions_abandoned AS DOUBLE)) as sessions_abandoned
-                FROM daily
-                WHERE ${getDateWhereClause('date')}
+                FROM daily WHERE ${getDateWhereClause('date')}
             `);
 
             const row = result.toArray()[0];
-
-            // Convert to Numbers for calculations (values already DOUBLE from query)
             const data = {
                 total_searches: Number(row.total_searches || 0),
                 total_sessions: Number(row.total_sessions || 0),
@@ -835,25 +1535,35 @@
             };
 
             const successRate = data.sessions_with_results > 0
-                ? (data.sessions_with_clicks / data.sessions_with_results * 100).toFixed(1)
+                ? (data.sessions_with_clicks / data.sessions_with_results * 100)
                 : 0;
 
             const nullRate = data.total_result_events > 0
-                ? (data.total_null_results / data.total_result_events * 100).toFixed(1)
+                ? (data.total_null_results / data.total_result_events * 100)
                 : 0;
 
             const abandonRate = data.sessions_with_results > 0
-                ? (data.sessions_abandoned / data.sessions_with_results * 100).toFixed(1)
+                ? (data.sessions_abandoned / data.sessions_with_results * 100)
+                : 0;
+
+            // Effectiveness score: CTR% - (NullRate% * 0.5)
+            const effectiveness = successRate - (nullRate * 0.5);
+
+            const avgSearches = data.total_sessions > 0
+                ? (data.total_searches / data.total_sessions)
                 : 0;
 
             document.getElementById('kpiSearches').textContent = formatNumber(data.total_searches);
             document.getElementById('kpiSessions').textContent = formatNumber(data.total_sessions);
             document.getElementById('kpiUsers').textContent = formatNumber(data.total_users);
-            document.getElementById('kpiSuccessRate').textContent = `${successRate}%`;
-            document.getElementById('kpiNullRate').textContent = `${nullRate}%`;
-            document.getElementById('kpiAbandonRate').textContent = `${abandonRate}%`;
+            document.getElementById('kpiSuccessRate').textContent = `${successRate.toFixed(1)}%`;
+            document.getElementById('kpiNullRate').textContent = `${nullRate.toFixed(1)}%`;
+            document.getElementById('kpiAbandonRate').textContent = `${abandonRate.toFixed(1)}%`;
+            document.getElementById('kpiEffectiveness').textContent = effectiveness.toFixed(1);
+            document.getElementById('kpiAvgSearches').textContent = avgSearches.toFixed(2);
         }
 
+        // Daily Trends
         async function renderDailyTrends() {
             const result = await conn.query(`
                 SELECT
@@ -862,25 +1572,16 @@
                     unique_sessions,
                     CASE WHEN sessions_with_results > 0
                         THEN ROUND(100.0 * sessions_with_clicks / sessions_with_results, 1)
-                        ELSE 0 END as success_rate,
-                    CASE WHEN result_events > 0
-                        THEN ROUND(100.0 * null_results / result_events, 1)
-                        ELSE 0 END as null_rate
+                        ELSE 0 END as success_rate
                 FROM daily
                 WHERE ${getDateWhereClause('date')}
                 ORDER BY date
             `);
 
             const data = result.toArray();
-
             const labels = data.map(d => new Date(d.date));
-            const searches = data.map(d => Number(d.search_starts));
-            const sessions = data.map(d => Number(d.unique_sessions));
-            const successRates = data.map(d => Number(d.success_rate));
 
-            if (charts.dailyTrends) {
-                charts.dailyTrends.destroy();
-            }
+            if (charts.dailyTrends) charts.dailyTrends.destroy();
 
             const ctx = document.getElementById('dailyTrendsChart').getContext('2d');
             charts.dailyTrends = new Chart(ctx, {
@@ -890,16 +1591,16 @@
                     datasets: [
                         {
                             label: 'Searches',
-                            data: searches,
+                            data: data.map(d => Number(d.search_starts)),
                             borderColor: COLORS.primary,
-                            backgroundColor: COLORS.primary + '20',
+                            backgroundColor: 'rgba(230, 0, 0, 0.1)',
                             fill: true,
                             tension: 0.3,
                             yAxisID: 'y'
                         },
                         {
                             label: 'Sessions',
-                            data: sessions,
+                            data: data.map(d => Number(d.unique_sessions)),
                             borderColor: COLORS.info,
                             backgroundColor: 'transparent',
                             borderDash: [5, 5],
@@ -908,7 +1609,7 @@
                         },
                         {
                             label: 'Success Rate %',
-                            data: successRates,
+                            data: data.map(d => Number(d.success_rate)),
                             borderColor: COLORS.success,
                             backgroundColor: 'transparent',
                             tension: 0.3,
@@ -919,95 +1620,61 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false
-                    },
+                    interaction: { mode: 'index', intersect: false },
                     scales: {
                         x: {
                             type: 'time',
-                            time: {
-                                unit: 'day',
-                                displayFormats: {
-                                    day: 'MMM d'
-                                }
-                            }
+                            time: { unit: 'day', displayFormats: { day: 'MMM d' } }
                         },
                         y: {
                             type: 'linear',
                             position: 'left',
-                            title: {
-                                display: true,
-                                text: 'Count'
-                            }
+                            title: { display: true, text: 'Count' }
                         },
                         y1: {
                             type: 'linear',
                             position: 'right',
                             min: 0,
                             max: 100,
-                            title: {
-                                display: true,
-                                text: 'Success Rate %'
-                            },
-                            grid: {
-                                drawOnChartArea: false
-                            }
+                            title: { display: true, text: 'Success Rate %' },
+                            grid: { drawOnChartArea: false }
                         }
                     },
-                    plugins: {
-                        legend: {
-                            position: 'top'
-                        }
-                    }
+                    plugins: { legend: { position: 'top' } }
                 }
             });
         }
 
+        // Journey Outcomes with click-to-filter
         async function renderJourneyOutcomes() {
             const result = await conn.query(`
-                SELECT
-                    journey_outcome,
-                    COUNT(*) as sessions,
+                SELECT journey_outcome, COUNT(*) as sessions,
                     ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER(), 1) as pct
-                FROM journeys
-                WHERE ${getDateWhereClause('session_date')}
+                FROM journeys WHERE ${getDateWhereClause('session_date')}
                 GROUP BY journey_outcome
-                ORDER BY
-                    CASE journey_outcome
-                        WHEN 'Success' THEN 1
-                        WHEN 'Engaged' THEN 2
-                        WHEN 'Abandoned' THEN 3
-                        WHEN 'No Results' THEN 4
-                        ELSE 5
-                    END
+                ORDER BY CASE journey_outcome
+                    WHEN 'Success' THEN 1 WHEN 'Engaged' THEN 2
+                    WHEN 'Abandoned' THEN 3 WHEN 'No Results' THEN 4 ELSE 5 END
             `);
 
             const data = result.toArray();
             const maxSessions = Math.max(...data.map(d => Number(d.sessions)));
 
-            // Render funnel
-            const funnelHtml = data.map(d => {
-                const width = Math.max(10, (Number(d.sessions) / maxSessions) * 100);
+            document.getElementById('journeyFunnel').innerHTML = data.map(d => {
+                const width = Math.max(15, (Number(d.sessions) / maxSessions) * 100);
                 const outcomeClass = d.journey_outcome.toLowerCase().replace(' ', '-');
+                const selected = activeFilters.outcome === d.journey_outcome ? 'selected' : '';
                 return `
-                    <div class="funnel-step">
+                    <div class="funnel-step ${selected}" onclick="filterByOutcome('${d.journey_outcome}')">
                         <div class="funnel-label">${d.journey_outcome}</div>
-                        <div class="funnel-bar ${outcomeClass}" style="width: ${width}%">
-                            ${d.pct}%
-                        </div>
+                        <div class="funnel-bar ${outcomeClass}" style="width: ${width}%">${d.pct}%</div>
                         <div class="funnel-value">${formatNumber(d.sessions)} sessions</div>
                     </div>
                 `;
             }).join('');
 
-            document.getElementById('journeyFunnel').innerHTML = funnelHtml;
-
-            // Render pie chart
-            if (charts.outcome) {
-                charts.outcome.destroy();
-            }
-
+            // Pie chart
+            if (charts.outcome) charts.outcome.destroy();
             const ctx = document.getElementById('outcomeChart').getContext('2d');
             charts.outcome = new Chart(ctx, {
                 type: 'doughnut',
@@ -1021,90 +1688,56 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'right'
-                        }
-                    }
+                    plugins: { legend: { position: 'right' } }
                 }
             });
         }
 
+        // Hourly distribution
         async function renderHourlyDistribution() {
-            // Cast to DOUBLE to avoid DuckDB-WASM BigInt aggregation bug
             const result = await conn.query(`
                 SELECT
                     SUM(CAST(searches_night AS DOUBLE)) as night,
                     SUM(CAST(searches_morning AS DOUBLE)) as morning,
                     SUM(CAST(searches_afternoon AS DOUBLE)) as afternoon,
                     SUM(CAST(searches_evening AS DOUBLE)) as evening
-                FROM daily
-                WHERE ${getDateWhereClause('date')}
+                FROM daily WHERE ${getDateWhereClause('date')}
             `);
 
             const data = result.toArray()[0];
 
-            if (charts.hourly) {
-                charts.hourly.destroy();
-            }
-
+            if (charts.hourly) charts.hourly.destroy();
             const ctx = document.getElementById('hourlyChart').getContext('2d');
             charts.hourly = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['Night (0-8)', 'Morning (8-12)', 'Afternoon (12-18)', 'Evening (18-24)'],
+                    labels: ['Night (0-8)\nAPAC', 'Morning (8-12)\nEMEA', 'Afternoon (12-18)\nOverlap', 'Evening (18-24)\nAmericas'],
                     datasets: [{
                         label: 'Searches',
-                        data: [
-                            Number(data.night),
-                            Number(data.morning),
-                            Number(data.afternoon),
-                            Number(data.evening)
-                        ],
-                        backgroundColor: [
-                            COLORS.gray,
-                            COLORS.info,
-                            COLORS.primary,
-                            COLORS.warning
-                        ]
+                        data: [Number(data.night), Number(data.morning), Number(data.afternoon), Number(data.evening)],
+                        backgroundColor: [COLORS.gray, COLORS.info, COLORS.primary, COLORS.warning]
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
                 }
             });
         }
 
+        // Weekday distribution
         async function renderWeekdayDistribution() {
-            // Cast to DOUBLE to avoid DuckDB-WASM BigInt aggregation bug
             const result = await conn.query(`
-                SELECT
-                    day_of_week,
-                    day_of_week_num,
-                    SUM(CAST(search_starts AS DOUBLE)) as searches
-                FROM daily
-                WHERE ${getDateWhereClause('date')}
-                GROUP BY day_of_week, day_of_week_num
-                ORDER BY day_of_week_num
+                SELECT day_of_week, day_of_week_num, SUM(CAST(search_starts AS DOUBLE)) as searches
+                FROM daily WHERE ${getDateWhereClause('date')}
+                GROUP BY day_of_week, day_of_week_num ORDER BY day_of_week_num
             `);
 
             const data = result.toArray();
 
-            if (charts.weekday) {
-                charts.weekday.destroy();
-            }
-
+            if (charts.weekday) charts.weekday.destroy();
             const ctx = document.getElementById('weekdayChart').getContext('2d');
             charts.weekday = new Chart(ctx, {
                 type: 'bar',
@@ -1119,119 +1752,54 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
                 }
             });
         }
 
-        async function renderTopTerms() {
-            // Cast to DOUBLE to avoid DuckDB-WASM BigInt aggregation bug
+        // User cohorts
+        async function renderUserCohorts() {
             const result = await conn.query(`
-                SELECT
-                    search_term,
-                    SUM(CAST(search_count AS DOUBLE)) as searches,
-                    SUM(CAST(unique_users AS DOUBLE)) as users,
-                    SUM(CAST(success_click_count AS DOUBLE)) as success_clicks,
-                    SUM(CAST(null_result_count AS DOUBLE)) as null_results,
-                    SUM(CAST(result_events AS DOUBLE)) as result_events
-                FROM terms
-                WHERE ${getDateWhereClause('session_date')}
-                GROUP BY search_term
-                ORDER BY searches DESC
-                LIMIT 20
+                SELECT date, new_users, returning_users
+                FROM daily WHERE ${getDateWhereClause('date')} ORDER BY date
             `);
 
             const data = result.toArray();
 
-            const tbody = document.getElementById('topTermsBody');
-            tbody.innerHTML = data.map(d => {
-                const successCTR = d.searches > 0
-                    ? (Number(d.success_clicks) / Number(d.searches) * 100).toFixed(1)
-                    : 0;
-                const nullRate = d.result_events > 0
-                    ? (Number(d.null_results) / Number(d.result_events) * 100).toFixed(1)
-                    : 0;
-
-                let statusBadge = '';
-                if (nullRate > 50) {
-                    statusBadge = '<span class="badge badge-danger">High Null</span>';
-                } else if (successCTR > 30) {
-                    statusBadge = '<span class="badge badge-success">Good</span>';
-                } else if (successCTR < 10) {
-                    statusBadge = '<span class="badge badge-warning">Low CTR</span>';
-                } else {
-                    statusBadge = '<span class="badge badge-neutral">Normal</span>';
+            if (charts.userCohort) charts.userCohort.destroy();
+            const ctx = document.getElementById('userCohortChart').getContext('2d');
+            charts.userCohort = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => new Date(d.date)),
+                    datasets: [
+                        {
+                            label: 'New Users',
+                            data: data.map(d => Number(d.new_users || 0)),
+                            backgroundColor: COLORS.info
+                        },
+                        {
+                            label: 'Returning Users',
+                            data: data.map(d => Number(d.returning_users || 0)),
+                            backgroundColor: COLORS.success
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { type: 'time', time: { unit: 'day' }, stacked: true },
+                        y: { stacked: true, beginAtZero: true }
+                    },
+                    plugins: { legend: { position: 'top' } }
                 }
-
-                return `
-                    <tr>
-                        <td>${escapeHtml(d.search_term)}</td>
-                        <td class="text-right">${formatNumber(d.searches)}</td>
-                        <td class="text-right">${formatNumber(d.users)}</td>
-                        <td class="text-right">${successCTR}%</td>
-                        <td class="text-right">${nullRate}%</td>
-                        <td class="text-center">${statusBadge}</td>
-                    </tr>
-                `;
-            }).join('');
+            });
         }
 
-        async function renderProblemTerms() {
-            // Cast to DOUBLE to avoid DuckDB-WASM BigInt aggregation bug
-            const result = await conn.query(`
-                SELECT
-                    search_term,
-                    SUM(CAST(search_count AS DOUBLE)) as searches,
-                    SUM(CAST(null_result_count AS DOUBLE)) as null_results,
-                    SUM(CAST(result_events AS DOUBLE)) as result_events
-                FROM terms
-                WHERE ${getDateWhereClause('session_date')}
-                GROUP BY search_term
-                HAVING SUM(CAST(null_result_count AS DOUBLE)) > 0 AND SUM(CAST(search_count AS DOUBLE)) >= 5
-                ORDER BY null_results DESC
-                LIMIT 20
-            `);
-
-            const data = result.toArray();
-
-            const tbody = document.getElementById('problemTermsBody');
-            tbody.innerHTML = data.map(d => {
-                const nullRate = d.result_events > 0
-                    ? (Number(d.null_results) / Number(d.result_events) * 100).toFixed(1)
-                    : 0;
-
-                let issueBadge = '';
-                if (nullRate >= 100) {
-                    issueBadge = '<span class="badge badge-danger">No Content</span>';
-                } else if (nullRate > 50) {
-                    issueBadge = '<span class="badge badge-warning">Content Gap</span>';
-                } else {
-                    issueBadge = '<span class="badge badge-info">Partial</span>';
-                }
-
-                return `
-                    <tr>
-                        <td>${escapeHtml(d.search_term)}</td>
-                        <td class="text-right">${formatNumber(d.searches)}</td>
-                        <td class="text-right">${formatNumber(d.null_results)}</td>
-                        <td class="text-right">${nullRate}%</td>
-                        <td class="text-center">${issueBadge}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
+        // Click categories
         async function renderClickCategories() {
-            // Cast to DOUBLE to avoid DuckDB-WASM BigInt aggregation bug
             const result = await conn.query(`
                 SELECT
                     SUM(CAST(clicks_result AS DOUBLE)) as result_clicks,
@@ -1239,21 +1807,17 @@
                     SUM(CAST(clicks_tab AS DOUBLE)) as tab_clicks,
                     SUM(CAST(clicks_pagination AS DOUBLE)) as pagination_clicks,
                     SUM(CAST(clicks_filter AS DOUBLE)) as filter_clicks
-                FROM daily
-                WHERE ${getDateWhereClause('date')}
+                FROM daily WHERE ${getDateWhereClause('date')}
             `);
 
             const data = result.toArray()[0];
 
-            if (charts.clickCategories) {
-                charts.clickCategories.destroy();
-            }
-
+            if (charts.clickCategories) charts.clickCategories.destroy();
             const ctx = document.getElementById('clickCategoriesChart').getContext('2d');
             charts.clickCategories = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['Result', 'Trending', 'Tab', 'Pagination', 'Filter'],
+                    labels: ['Result (Success)', 'Trending', 'Tab', 'Pagination', 'Filter'],
                     datasets: [{
                         label: 'Clicks',
                         data: [
@@ -1263,52 +1827,251 @@
                             Number(data.pagination_clicks),
                             Number(data.filter_clicks)
                         ],
-                        backgroundColor: [
-                            COLORS.success,
-                            COLORS.info,
-                            COLORS.warning,
-                            COLORS.primary,
-                            COLORS.gray
-                        ]
+                        backgroundColor: [COLORS.success, COLORS.info, COLORS.warning, COLORS.primary, COLORS.gray]
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     indexAxis: 'y',
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    }
+                    plugins: { legend: { display: false } }
                 }
             });
         }
 
-        async function renderSessionComplexity() {
+        // Top terms with search and filter
+        async function renderTopTerms() {
             const result = await conn.query(`
-                SELECT
-                    session_complexity,
-                    COUNT(*) as sessions
-                FROM journeys
-                WHERE ${getDateWhereClause('session_date')}
-                GROUP BY session_complexity
-                ORDER BY
-                    CASE session_complexity
-                        WHEN 'Single Action' THEN 1
-                        WHEN 'Simple' THEN 2
-                        WHEN 'Medium' THEN 3
-                        WHEN 'Complex' THEN 4
-                        ELSE 5
-                    END
+                SELECT search_term,
+                    SUM(CAST(search_count AS DOUBLE)) as searches,
+                    SUM(CAST(unique_users AS DOUBLE)) as users,
+                    SUM(CAST(success_click_count AS DOUBLE)) as success_clicks,
+                    SUM(CAST(null_result_count AS DOUBLE)) as null_results,
+                    SUM(CAST(result_events AS DOUBLE)) as result_events
+                FROM terms WHERE ${getDateWhereClause('session_date')}
+                GROUP BY search_term ORDER BY searches DESC LIMIT 50
+            `);
+
+            allTermsData = result.toArray();
+            renderFilteredTerms();
+        }
+
+        function renderFilteredTerms() {
+            const searchQuery = document.getElementById('termSearch').value.toLowerCase();
+            const statusFilter = document.getElementById('termStatusFilter').value;
+
+            let filtered = allTermsData.filter(d => {
+                if (searchQuery && !d.search_term.toLowerCase().includes(searchQuery)) return false;
+
+                const ctr = d.searches > 0 ? (Number(d.success_clicks) / Number(d.searches) * 100) : 0;
+                const nullRate = d.result_events > 0 ? (Number(d.null_results) / Number(d.result_events) * 100) : 0;
+
+                if (statusFilter === 'good' && ctr <= 30) return false;
+                if (statusFilter === 'normal' && (ctr > 30 || ctr < 10 || nullRate > 50)) return false;
+                if (statusFilter === 'lowctr' && ctr >= 10) return false;
+                if (statusFilter === 'highnull' && nullRate <= 50) return false;
+
+                return true;
+            });
+
+            document.getElementById('topTermsBody').innerHTML = filtered.slice(0, 20).map(d => {
+                const ctr = d.searches > 0 ? (Number(d.success_clicks) / Number(d.searches) * 100) : 0;
+                const nullRate = d.result_events > 0 ? (Number(d.null_results) / Number(d.result_events) * 100) : 0;
+                const score = ctr - (nullRate * 0.5);
+
+                let statusBadge, scoreColor;
+                if (nullRate > 50) {
+                    statusBadge = '<span class="badge badge-danger">High Null</span>';
+                    scoreColor = COLORS.danger;
+                } else if (ctr > 30) {
+                    statusBadge = '<span class="badge badge-success">Good</span>';
+                    scoreColor = COLORS.success;
+                } else if (ctr < 10) {
+                    statusBadge = '<span class="badge badge-warning">Low CTR</span>';
+                    scoreColor = COLORS.warning;
+                } else {
+                    statusBadge = '<span class="badge badge-neutral">Normal</span>';
+                    scoreColor = COLORS.gray;
+                }
+
+                return `
+                    <tr class="clickable" onclick="showTermDetail('${escapeHtml(d.search_term)}')">
+                        <td>${escapeHtml(d.search_term)}</td>
+                        <td class="text-right">${formatNumber(d.searches)}</td>
+                        <td class="text-right">${formatNumber(d.users)}</td>
+                        <td class="text-right">${ctr.toFixed(1)}%</td>
+                        <td class="text-right">${nullRate.toFixed(1)}%</td>
+                        <td class="text-center">${statusBadge}</td>
+                        <td class="text-center" style="color: ${scoreColor}; font-weight: 600;">${score.toFixed(0)}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Problem terms
+        async function renderProblemTerms() {
+            const result = await conn.query(`
+                SELECT search_term,
+                    SUM(CAST(search_count AS DOUBLE)) as searches,
+                    SUM(CAST(null_result_count AS DOUBLE)) as null_results,
+                    SUM(CAST(result_events AS DOUBLE)) as result_events
+                FROM terms WHERE ${getDateWhereClause('session_date')}
+                GROUP BY search_term
+                HAVING SUM(CAST(null_result_count AS DOUBLE)) > 0 AND SUM(CAST(search_count AS DOUBLE)) >= 3
+                ORDER BY null_results DESC LIMIT 20
             `);
 
             const data = result.toArray();
 
-            if (charts.complexity) {
-                charts.complexity.destroy();
-            }
+            document.getElementById('problemTermsBody').innerHTML = data.map((d, i) => {
+                const nullRate = d.result_events > 0 ? (Number(d.null_results) / Number(d.result_events) * 100) : 0;
+                const priority = i < 5 ? 'badge-danger' : (i < 10 ? 'badge-warning' : 'badge-info');
+                const priorityLabel = i < 5 ? 'High' : (i < 10 ? 'Medium' : 'Low');
 
+                return `
+                    <tr class="clickable" onclick="showTermDetail('${escapeHtml(d.search_term)}')">
+                        <td>${escapeHtml(d.search_term)}</td>
+                        <td class="text-right">${formatNumber(d.searches)}</td>
+                        <td class="text-right">${formatNumber(d.null_results)}</td>
+                        <td class="text-right">${nullRate.toFixed(1)}%</td>
+                        <td class="text-center"><span class="badge ${priority}">${priorityLabel}</span></td>
+                        <td class="text-center"><span class="badge badge-info">Add Content</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // New/trending terms
+        async function renderNewTerms() {
+            const result = await conn.query(`
+                SELECT search_term, first_seen_date,
+                    SUM(CAST(search_count AS DOUBLE)) as searches,
+                    SUM(CAST(unique_users AS DOUBLE)) as users,
+                    COUNT(DISTINCT session_date) as days_active
+                FROM terms WHERE ${getDateWhereClause('session_date')}
+                GROUP BY search_term, first_seen_date
+                HAVING first_seen_date >= '${formatDateForInput(dateFilter.from)}'
+                ORDER BY searches DESC LIMIT 20
+            `);
+
+            const data = result.toArray();
+
+            document.getElementById('newTermsBody').innerHTML = data.map(d => {
+                const badge = d.days_active <= 3 ? 'badge-info' : 'badge-neutral';
+                const label = d.days_active <= 3 ? 'New' : 'Recent';
+
+                return `
+                    <tr class="clickable" onclick="showTermDetail('${escapeHtml(d.search_term)}')">
+                        <td>${escapeHtml(d.search_term)}</td>
+                        <td class="text-right">${formatNumber(d.searches)}</td>
+                        <td class="text-right">${formatNumber(d.users)}</td>
+                        <td class="text-right">${d.days_active}</td>
+                        <td class="text-center"><span class="badge ${badge}">${label}</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Term performance distribution
+        async function renderTermPerformance() {
+            const result = await conn.query(`
+                WITH term_stats AS (
+                    SELECT search_term,
+                        SUM(CAST(search_count AS DOUBLE)) as searches,
+                        SUM(CAST(success_click_count AS DOUBLE)) as clicks,
+                        SUM(CAST(null_result_count AS DOUBLE)) as nulls,
+                        SUM(CAST(result_events AS DOUBLE)) as results
+                    FROM terms WHERE ${getDateWhereClause('session_date')}
+                    GROUP BY search_term
+                )
+                SELECT
+                    CASE
+                        WHEN results > 0 AND nulls / results >= 1 THEN 'Zero Results'
+                        WHEN results > 0 AND nulls / results > 0.5 THEN 'Mostly No Results'
+                        WHEN searches > 0 AND clicks / searches = 0 THEN 'No Clicks'
+                        WHEN searches > 0 AND clicks / searches < 0.2 THEN 'Low CTR'
+                        ELSE 'Success'
+                    END as category,
+                    COUNT(*) as term_count
+                FROM term_stats GROUP BY category
+            `);
+
+            const data = result.toArray();
+            const order = ['Success', 'Low CTR', 'No Clicks', 'Mostly No Results', 'Zero Results'];
+            data.sort((a, b) => order.indexOf(a.category) - order.indexOf(b.category));
+
+            if (charts.termPerformance) charts.termPerformance.destroy();
+            const ctx = document.getElementById('termPerformanceChart').getContext('2d');
+            charts.termPerformance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.map(d => d.category),
+                    datasets: [{
+                        data: data.map(d => Number(d.term_count)),
+                        backgroundColor: [COLORS.success, COLORS.warning, COLORS.gray, COLORS.danger, '#8B0000']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'right' } }
+                }
+            });
+        }
+
+        // Query length analysis
+        async function renderQueryLength() {
+            const result = await conn.query(`
+                SELECT word_count, SUM(CAST(search_count AS DOUBLE)) as searches
+                FROM terms WHERE ${getDateWhereClause('session_date')} AND word_count IS NOT NULL
+                GROUP BY word_count ORDER BY word_count
+            `);
+
+            const data = result.toArray();
+            const buckets = {};
+            data.forEach(d => {
+                const bucket = d.word_count >= 5 ? '5+' : String(d.word_count);
+                buckets[bucket] = (buckets[bucket] || 0) + Number(d.searches);
+            });
+
+            const labels = ['1', '2', '3', '4', '5+'];
+            const values = labels.map(l => buckets[l] || 0);
+
+            if (charts.queryLength) charts.queryLength.destroy();
+            const ctx = document.getElementById('queryLengthChart').getContext('2d');
+            charts.queryLength = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels.map(l => l + ' word' + (l === '1' ? '' : 's')),
+                    datasets: [{
+                        label: 'Searches',
+                        data: values,
+                        backgroundColor: COLORS.chart
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        // Session complexity
+        async function renderSessionComplexity() {
+            const result = await conn.query(`
+                SELECT session_complexity, COUNT(*) as sessions
+                FROM journeys WHERE ${getDateWhereClause('session_date')}
+                GROUP BY session_complexity
+                ORDER BY CASE session_complexity
+                    WHEN 'Single Action' THEN 1 WHEN 'Simple' THEN 2
+                    WHEN 'Medium' THEN 3 WHEN 'Complex' THEN 4 ELSE 5 END
+            `);
+
+            const data = result.toArray();
+
+            if (charts.complexity) charts.complexity.destroy();
             const ctx = document.getElementById('complexityChart').getContext('2d');
             charts.complexity = new Chart(ctx, {
                 type: 'pie',
@@ -1316,50 +2079,34 @@
                     labels: data.map(d => d.session_complexity),
                     datasets: [{
                         data: data.map(d => Number(d.sessions)),
-                        backgroundColor: [
-                            COLORS.lightGray,
-                            COLORS.info,
-                            COLORS.warning,
-                            COLORS.primary
-                        ]
+                        backgroundColor: [COLORS.lightGray, COLORS.info, COLORS.warning, COLORS.primary]
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'right'
-                        }
-                    }
+                    plugins: { legend: { position: 'right' } }
                 }
             });
         }
 
-        async function renderTimeToClick() {
+        // Session duration
+        async function renderSessionDuration() {
             const result = await conn.query(`
-                SELECT
-                    search_to_result_bucket,
-                    search_to_result_sort,
-                    COUNT(*) as sessions
-                FROM journeys
-                WHERE ${getDateWhereClause('session_date')}
-                  AND search_to_result_bucket IS NOT NULL
-                GROUP BY search_to_result_bucket, search_to_result_sort
-                ORDER BY search_to_result_sort
+                SELECT session_duration_bucket, session_duration_sort, COUNT(*) as sessions
+                FROM journeys WHERE ${getDateWhereClause('session_date')}
+                GROUP BY session_duration_bucket, session_duration_sort
+                ORDER BY session_duration_sort
             `);
 
             const data = result.toArray();
 
-            if (charts.timeToClick) {
-                charts.timeToClick.destroy();
-            }
-
-            const ctx = document.getElementById('timeToClickChart').getContext('2d');
-            charts.timeToClick = new Chart(ctx, {
+            if (charts.duration) charts.duration.destroy();
+            const ctx = document.getElementById('durationChart').getContext('2d');
+            charts.duration = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: data.map(d => d.search_to_result_bucket),
+                    labels: data.map(d => d.session_duration_bucket),
                     datasets: [{
                         label: 'Sessions',
                         data: data.map(d => Number(d.sessions)),
@@ -1369,18 +2116,406 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
                 }
             });
+        }
+
+        // Reformulation
+        async function renderReformulation() {
+            const result = await conn.query(`
+                SELECT had_reformulation, COUNT(*) as sessions
+                FROM journeys WHERE ${getDateWhereClause('session_date')}
+                GROUP BY had_reformulation
+            `);
+
+            const data = result.toArray();
+            const reformed = Number(data.find(d => d.had_reformulation === true)?.sessions || 0);
+            const notReformed = Number(data.find(d => d.had_reformulation === false)?.sessions || 0);
+
+            if (charts.reformulation) charts.reformulation.destroy();
+            const ctx = document.getElementById('reformulationChart').getContext('2d');
+            charts.reformulation = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Refined Query', 'Single Query'],
+                    datasets: [{
+                        data: [reformed, notReformed],
+                        backgroundColor: [COLORS.warning, COLORS.success]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+
+        // Recovery from null
+        async function renderRecovery() {
+            const result = await conn.query(`
+                SELECT
+                    SUM(CASE WHEN had_null_result = true AND recovered_from_null = true THEN 1 ELSE 0 END) as recovered,
+                    SUM(CASE WHEN had_null_result = true AND recovered_from_null = false THEN 1 ELSE 0 END) as not_recovered
+                FROM journeys WHERE ${getDateWhereClause('session_date')}
+            `);
+
+            const data = result.toArray()[0];
+
+            if (charts.recovery) charts.recovery.destroy();
+            const ctx = document.getElementById('recoveryChart').getContext('2d');
+            charts.recovery = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Recovered', 'Gave Up'],
+                    datasets: [{
+                        data: [Number(data.recovered || 0), Number(data.not_recovered || 0)],
+                        backgroundColor: [COLORS.success, COLORS.danger]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+
+        // Outcome by complexity
+        async function renderOutcomeByComplexity() {
+            const result = await conn.query(`
+                SELECT session_complexity, journey_outcome, COUNT(*) as sessions
+                FROM journeys WHERE ${getDateWhereClause('session_date')}
+                GROUP BY session_complexity, journey_outcome
+            `);
+
+            const data = result.toArray();
+            const complexities = ['Single Action', 'Simple', 'Medium', 'Complex'];
+            const outcomes = ['Success', 'Engaged', 'Abandoned', 'No Results', 'Unknown'];
+
+            const datasets = outcomes.map(outcome => ({
+                label: outcome,
+                data: complexities.map(c => {
+                    const match = data.find(d => d.session_complexity === c && d.journey_outcome === outcome);
+                    return match ? Number(match.sessions) : 0;
+                }),
+                backgroundColor: OUTCOME_COLORS[outcome]
+            }));
+
+            if (charts.outcomeByComplexity) charts.outcomeByComplexity.destroy();
+            const ctx = document.getElementById('outcomeByComplexityChart').getContext('2d');
+            charts.outcomeByComplexity = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: complexities, datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+                    plugins: { legend: { position: 'top' } }
+                }
+            });
+        }
+
+        // Search latency
+        async function renderSearchLatency() {
+            const result = await conn.query(`
+                SELECT search_to_result_bucket, search_to_result_sort, COUNT(*) as sessions
+                FROM journeys WHERE ${getDateWhereClause('session_date')}
+                    AND search_to_result_bucket IS NOT NULL
+                GROUP BY search_to_result_bucket, search_to_result_sort
+                ORDER BY search_to_result_sort
+            `);
+
+            const data = result.toArray();
+
+            if (charts.searchLatency) charts.searchLatency.destroy();
+            const ctx = document.getElementById('searchLatencyChart').getContext('2d');
+            charts.searchLatency = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.search_to_result_bucket),
+                    datasets: [{
+                        label: 'Sessions',
+                        data: data.map(d => Number(d.sessions)),
+                        backgroundColor: data.map((d, i) => i <= 2 ? COLORS.success : (i <= 3 ? COLORS.warning : COLORS.danger))
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        // Time to click
+        async function renderTimeToClick() {
+            const result = await conn.query(`
+                SELECT result_to_click_bucket, result_to_click_sort, COUNT(*) as sessions
+                FROM journeys WHERE ${getDateWhereClause('session_date')}
+                    AND result_to_click_bucket IS NOT NULL AND result_to_click_bucket != 'No Click'
+                GROUP BY result_to_click_bucket, result_to_click_sort
+                ORDER BY result_to_click_sort
+            `);
+
+            const data = result.toArray();
+
+            if (charts.timeToClick) charts.timeToClick.destroy();
+            const ctx = document.getElementById('timeToClickChart').getContext('2d');
+            charts.timeToClick = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.result_to_click_bucket),
+                    datasets: [{
+                        label: 'Sessions',
+                        data: data.map(d => Number(d.sessions)),
+                        backgroundColor: COLORS.chart
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        // Latency trend
+        async function renderLatencyTrend() {
+            const result = await conn.query(`
+                SELECT session_date,
+                    AVG(sec_search_to_result) as avg_latency,
+                    AVG(sec_result_to_click) as avg_click_time
+                FROM journeys WHERE ${getDateWhereClause('session_date')}
+                    AND sec_search_to_result IS NOT NULL
+                GROUP BY session_date ORDER BY session_date
+            `);
+
+            const data = result.toArray();
+
+            if (charts.latencyTrend) charts.latencyTrend.destroy();
+            const ctx = document.getElementById('latencyTrendChart').getContext('2d');
+            charts.latencyTrend = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => new Date(d.session_date)),
+                    datasets: [
+                        {
+                            label: 'Avg Latency (sec)',
+                            data: data.map(d => Number(d.avg_latency || 0)),
+                            borderColor: COLORS.primary,
+                            backgroundColor: 'transparent',
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Avg Time to Click (sec)',
+                            data: data.map(d => Number(d.avg_click_time || 0)),
+                            borderColor: COLORS.info,
+                            backgroundColor: 'transparent',
+                            borderDash: [5, 5],
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { type: 'time', time: { unit: 'day' } },
+                        y: { beginAtZero: true, title: { display: true, text: 'Seconds' } }
+                    },
+                    plugins: { legend: { position: 'top' } }
+                }
+            });
+        }
+
+        // Performance metrics
+        async function renderPerformanceMetrics() {
+            const result = await conn.query(`
+                SELECT
+                    AVG(sec_search_to_result) as avg_latency,
+                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY sec_search_to_result) as p50_latency,
+                    PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY sec_search_to_result) as p95_latency,
+                    AVG(sec_result_to_click) as avg_click_time,
+                    AVG(total_duration_sec) as avg_session_duration
+                FROM journeys WHERE ${getDateWhereClause('session_date')}
+                    AND sec_search_to_result IS NOT NULL
+            `);
+
+            const data = result.toArray()[0];
+
+            document.getElementById('performanceMetrics').innerHTML = `
+                <div class="metric-card">
+                    <div class="metric-value">${Number(data.avg_latency || 0).toFixed(2)}s</div>
+                    <div class="metric-label">Avg Latency</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${Number(data.p50_latency || 0).toFixed(2)}s</div>
+                    <div class="metric-label">P50 Latency</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${Number(data.p95_latency || 0).toFixed(2)}s</div>
+                    <div class="metric-label">P95 Latency</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${Number(data.avg_click_time || 0).toFixed(1)}s</div>
+                    <div class="metric-label">Avg Time to Click</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">${Number(data.avg_session_duration || 0).toFixed(0)}s</div>
+                    <div class="metric-label">Avg Session Duration</div>
+                </div>
+            `;
+        }
+
+        // Term detail modal
+        async function showTermDetail(term) {
+            document.getElementById('modalTermTitle').textContent = `"${term}" - Detail Analysis`;
+
+            const result = await conn.query(`
+                SELECT session_date,
+                    SUM(CAST(search_count AS DOUBLE)) as searches,
+                    SUM(CAST(unique_users AS DOUBLE)) as users,
+                    SUM(CAST(success_click_count AS DOUBLE)) as clicks,
+                    SUM(CAST(null_result_count AS DOUBLE)) as nulls,
+                    SUM(CAST(result_events AS DOUBLE)) as results
+                FROM terms WHERE search_term = '${term.replace(/'/g, "''")}'
+                    AND ${getDateWhereClause('session_date')}
+                GROUP BY session_date ORDER BY session_date
+            `);
+
+            const data = result.toArray();
+            const totals = data.reduce((acc, d) => ({
+                searches: acc.searches + Number(d.searches),
+                users: acc.users + Number(d.users),
+                clicks: acc.clicks + Number(d.clicks),
+                nulls: acc.nulls + Number(d.nulls),
+                results: acc.results + Number(d.results)
+            }), { searches: 0, users: 0, clicks: 0, nulls: 0, results: 0 });
+
+            const ctr = totals.searches > 0 ? (totals.clicks / totals.searches * 100) : 0;
+            const nullRate = totals.results > 0 ? (totals.nulls / totals.results * 100) : 0;
+
+            document.getElementById('modalTermBody').innerHTML = `
+                <div class="metric-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">${formatNumber(totals.searches)}</div>
+                        <div class="metric-label">Total Searches</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">${formatNumber(totals.users)}</div>
+                        <div class="metric-label">Unique Users</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">${ctr.toFixed(1)}%</div>
+                        <div class="metric-label">Success CTR</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">${nullRate.toFixed(1)}%</div>
+                        <div class="metric-label">Null Rate</div>
+                    </div>
+                </div>
+
+                <div class="chart-card" style="margin-top: 1rem;">
+                    <div class="chart-title">Daily Trend</div>
+                    <div class="chart-container" style="height: 200px;">
+                        <canvas id="termTrendChart"></canvas>
+                    </div>
+                </div>
+
+                ${nullRate > 50 ? `
+                <div class="recommendations">
+                    <div class="recommendation">
+                        <div class="recommendation-icon">💡</div>
+                        <div class="recommendation-content">
+                            <div class="recommendation-title">High Null Rate Detected</div>
+                            <div class="recommendation-text">
+                                This term has a ${nullRate.toFixed(0)}% null result rate. Consider:
+                                <ul style="margin-top: 0.5rem; padding-left: 1.25rem;">
+                                    <li>Adding content matching this search term</li>
+                                    <li>Creating synonyms or aliases in your search configuration</li>
+                                    <li>Checking if this indicates a user need for new content</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+            `;
+
+            // Render mini trend chart
+            const miniCtx = document.getElementById('termTrendChart').getContext('2d');
+            new Chart(miniCtx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => new Date(d.session_date)),
+                    datasets: [{
+                        label: 'Searches',
+                        data: data.map(d => Number(d.searches)),
+                        borderColor: COLORS.primary,
+                        backgroundColor: 'rgba(230, 0, 0, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { x: { type: 'time', time: { unit: 'day' } }, y: { beginAtZero: true } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            document.getElementById('termModal').classList.add('active');
+        }
+
+        function closeTermModal() {
+            document.getElementById('termModal').classList.remove('active');
+        }
+
+        // Filter functions
+        function filterByOutcome(outcome) {
+            if (activeFilters.outcome === outcome) {
+                delete activeFilters.outcome;
+            } else {
+                activeFilters.outcome = outcome;
+            }
+            updateFiltersDisplay();
+            renderJourneyOutcomes();
+        }
+
+        function updateFiltersDisplay() {
+            const container = document.getElementById('activeFilters');
+            const filters = Object.entries(activeFilters);
+
+            if (filters.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            container.style.display = 'flex';
+            container.innerHTML = filters.map(([key, value]) => `
+                <div class="filter-tag">
+                    ${key}: ${value}
+                    <button onclick="removeFilter('${key}')">&times;</button>
+                </div>
+            `).join('') + `<span class="clear-filters" onclick="clearAllFilters()">Clear all</span>`;
+        }
+
+        function removeFilter(key) {
+            delete activeFilters[key];
+            updateFiltersDisplay();
+            renderDashboard();
+        }
+
+        function clearAllFilters() {
+            activeFilters = {};
+            updateFiltersDisplay();
+            renderDashboard();
         }
 
         // Utility functions
@@ -1397,13 +2532,10 @@
 
         function updateStatus(status, text) {
             const statusEl = document.getElementById('dataStatus');
-            const textEl = document.getElementById('statusText');
-
             statusEl.className = 'data-status';
             if (status === 'loading') statusEl.classList.add('loading');
             if (status === 'error') statusEl.classList.add('error');
-
-            textEl.textContent = text;
+            document.getElementById('statusText').textContent = text;
         }
 
         function setLoadingText(text) {
@@ -1412,27 +2544,49 @@
 
         function showError(message) {
             document.getElementById('loadingState').style.display = 'none';
-            document.getElementById('errorState').style.display = 'block';
-            document.getElementById('errorState').textContent = message;
+            const errorEl = document.getElementById('errorState');
+            errorEl.style.display = 'block';
+            errorEl.textContent = message;
         }
 
-        function setupTabs() {
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.addEventListener('click', () => {
-                    const tabName = tab.dataset.tab;
+        // Tab handling
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const target = tab.dataset.nav;
 
-                    // Update active tab
-                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.nav-content').forEach(c => c.classList.remove('active'));
 
-                    // Update active content
-                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                    document.getElementById(`${tabName}Tab`).classList.add('active');
-                });
+                tab.classList.add('active');
+                document.getElementById('nav' + target.charAt(0).toUpperCase() + target.slice(1)).classList.add('active');
             });
-        }
+        });
 
-        // Start
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const parent = tab.closest('.chart-card');
+                const target = tab.dataset.tab;
+
+                parent.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                parent.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+                tab.classList.add('active');
+                document.getElementById(target + 'Tab').classList.add('active');
+            });
+        });
+
+        // Search input handler
+        document.getElementById('termSearch').addEventListener('input', renderFilteredTerms);
+        document.getElementById('termStatusFilter').addEventListener('change', renderFilteredTerms);
+
+        // Modal close on outside click
+        document.getElementById('termModal').addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal-overlay')) {
+                closeTermModal();
+            }
+        });
+
+        // Initialize on load
         init();
     </script>
 </body>
