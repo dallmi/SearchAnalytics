@@ -738,7 +738,7 @@
 
         async function setInitialDateRange() {
             const result = await conn.query(`
-                SELECT MIN(session_date) as min_date, MAX(session_date) as max_date
+                SELECT MIN(date) as min_date, MAX(date) as max_date
                 FROM daily
             `);
             const row = result.toArray()[0];
@@ -815,7 +815,7 @@
                     SUM(sessions_with_results) as sessions_with_results,
                     SUM(sessions_abandoned) as sessions_abandoned
                 FROM daily
-                WHERE ${getDateWhereClause('session_date')}
+                WHERE ${getDateWhereClause('date')}
             `);
 
             const data = result.toArray()[0];
@@ -843,7 +843,7 @@
         async function renderDailyTrends() {
             const result = await conn.query(`
                 SELECT
-                    session_date,
+                    date,
                     search_starts,
                     unique_sessions,
                     CASE WHEN sessions_with_results > 0
@@ -853,13 +853,13 @@
                         THEN ROUND(100.0 * null_results / result_events, 1)
                         ELSE 0 END as null_rate
                 FROM daily
-                WHERE ${getDateWhereClause('session_date')}
-                ORDER BY session_date
+                WHERE ${getDateWhereClause('date')}
+                ORDER BY date
             `);
 
             const data = result.toArray();
 
-            const labels = data.map(d => new Date(d.session_date));
+            const labels = data.map(d => new Date(d.date));
             const searches = data.map(d => Number(d.search_starts));
             const sessions = data.map(d => Number(d.unique_sessions));
             const successRates = data.map(d => Number(d.success_rate));
@@ -1024,7 +1024,7 @@
                     SUM(searches_afternoon) as afternoon,
                     SUM(searches_evening) as evening
                 FROM daily
-                WHERE ${getDateWhereClause('session_date')}
+                WHERE ${getDateWhereClause('date')}
             `);
 
             const data = result.toArray()[0];
@@ -1078,7 +1078,7 @@
                     day_of_week_num,
                     SUM(search_starts) as searches
                 FROM daily
-                WHERE ${getDateWhereClause('session_date')}
+                WHERE ${getDateWhereClause('date')}
                 GROUP BY day_of_week, day_of_week_num
                 ORDER BY day_of_week_num
             `);
@@ -1221,7 +1221,7 @@
                     SUM(clicks_pagination) as pagination_clicks,
                     SUM(clicks_filter) as filter_clicks
                 FROM daily
-                WHERE ${getDateWhereClause('session_date')}
+                WHERE ${getDateWhereClause('date')}
             `);
 
             const data = result.toArray()[0];
