@@ -492,6 +492,7 @@ CREATE TABLE searches_terms (
     -- Result metrics
     result_events           INTEGER,
     null_result_count       INTEGER,
+    sum_result_count        INTEGER,  -- Sum of result counts for weighted avg calculation
 
     -- Click metrics
     click_count                 INTEGER,

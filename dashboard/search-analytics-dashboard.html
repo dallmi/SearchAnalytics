@@ -1057,6 +1057,7 @@
                                         <tr>
                                             <th>Search Term</th>
                                             <th class="text-right">Searches</th>
+                                            <th class="text-right">Avg Results</th>
                                             <th class="text-right">Users</th>
                                             <th class="text-right">Success CTR</th>
                                             <th class="text-right">Null Rate</th>
@@ -1848,7 +1849,8 @@
                     SUM(CAST(unique_users AS DOUBLE)) as users,
                     SUM(CAST(success_click_count AS DOUBLE)) as success_clicks,
                     SUM(CAST(null_result_count AS DOUBLE)) as null_results,
-                    SUM(CAST(result_events AS DOUBLE)) as result_events
+                    SUM(CAST(result_events AS DOUBLE)) as result_events,
+                    SUM(CAST(sum_result_count AS DOUBLE)) as sum_results
                 FROM terms WHERE ${getDateWhereClause('session_date')}
                 GROUP BY search_term ORDER BY searches DESC LIMIT 50
             `);
@@ -1878,6 +1880,7 @@
             document.getElementById('topTermsBody').innerHTML = filtered.slice(0, 20).map(d => {
                 const ctr = d.searches > 0 ? (Number(d.success_clicks) / Number(d.searches) * 100) : 0;
                 const nullRate = d.result_events > 0 ? (Number(d.null_results) / Number(d.result_events) * 100) : 0;
+                const avgResults = d.result_events > 0 ? (Number(d.sum_results) / Number(d.result_events)) : 0;
                 const score = ctr - (nullRate * 0.5);
 
                 let statusBadge, scoreColor;
@@ -1899,6 +1902,7 @@
                     <tr class="clickable" onclick="showTermDetail('${escapeHtml(d.search_term)}')">
                         <td>${escapeHtml(d.search_term)}</td>
                         <td class="text-right">${formatNumber(d.searches)}</td>
+                        <td class="text-right">${avgResults.toFixed(1)}</td>
                         <td class="text-right">${formatNumber(d.users)}</td>
                         <td class="text-right">${ctr.toFixed(1)}%</td>
                         <td class="text-right">${nullRate.toFixed(1)}%</td>

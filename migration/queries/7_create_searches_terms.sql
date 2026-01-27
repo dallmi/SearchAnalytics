@@ -39,6 +39,7 @@ BEGIN
             user_id,
             name,
             is_null_result,
+            cp_total_result_count,
             click_category,
             is_success_click,
             search_term_normalized,
@@ -91,6 +92,7 @@ BEGIN
             -- Result metrics
             COUNT(CASE WHEN stc.name = 'SEARCH_RESULT_COUNT' THEN 1 END)::INTEGER as result_events,
             SUM(CASE WHEN stc.is_null_result = true THEN 1 ELSE 0 END)::INTEGER as null_result_count,
+            SUM(CASE WHEN stc.name = 'SEARCH_RESULT_COUNT' THEN COALESCE(stc.cp_total_result_count, 0) ELSE 0 END)::INTEGER as sum_result_count,
 
             -- Click metrics (clicks attributed to this search term)
             COUNT(CASE WHEN stc.click_category IS NOT NULL THEN 1 END)::INTEGER as click_count,
@@ -149,6 +151,7 @@ BEGIN
         t.unique_sessions,
         t.result_events,
         t.null_result_count,
+        t.sum_result_count,
         t.click_count,
         t.clicks_result,
         t.clicks_trending,
@@ -205,7 +208,7 @@ BEGIN
     WITH search_terms_with_context AS (
         SELECT
             session_date, session_key, user_id, name,
-            is_null_result, click_category, is_success_click, search_term_normalized,
+            is_null_result, cp_total_result_count, click_category, is_success_click, search_term_normalized,
             prev_event, ms_since_prev_event, event_hour, timestamp,
             (
                 SELECT sub.search_term_normalized
@@ -238,6 +241,7 @@ BEGIN
             COUNT(DISTINCT stc.session_key)::INTEGER as unique_sessions,
             COUNT(CASE WHEN stc.name = 'SEARCH_RESULT_COUNT' THEN 1 END)::INTEGER as result_events,
             SUM(CASE WHEN stc.is_null_result = true THEN 1 ELSE 0 END)::INTEGER as null_result_count,
+            SUM(CASE WHEN stc.name = 'SEARCH_RESULT_COUNT' THEN COALESCE(stc.cp_total_result_count, 0) ELSE 0 END)::INTEGER as sum_result_count,
             COUNT(CASE WHEN stc.click_category IS NOT NULL THEN 1 END)::INTEGER as click_count,
             COUNT(CASE WHEN stc.click_category = 'Result' THEN 1 END)::INTEGER as clicks_result,
             COUNT(CASE WHEN stc.click_category = 'Trending' THEN 1 END)::INTEGER as clicks_trending,
@@ -274,6 +278,7 @@ BEGIN
         t.unique_sessions,
         t.result_events,
         t.null_result_count,
+        t.sum_result_count,
         t.click_count,
         t.clicks_result,
         t.clicks_trending,

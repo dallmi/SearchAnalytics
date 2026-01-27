@@ -833,6 +833,7 @@ def export_parquet_files(con, output_dir):
                     user_id,
                     name,
                     is_null_result,
+                    cp_total_result_count,
                     click_category,
                     is_success_click,
                     search_term_normalized,
@@ -875,6 +876,7 @@ def export_parquet_files(con, output_dir):
                     -- Result metrics
                     COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END) as result_events,
                     SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END) as null_result_count,
+                    SUM(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN COALESCE(cp_total_result_count, 0) ELSE 0 END) as sum_result_count,
                     -- Click metrics (clicks attributed to this search term)
                     COUNT(CASE WHEN click_category IS NOT NULL THEN 1 END) as click_count,
                     COUNT(CASE WHEN is_success_click = true THEN 1 END) as success_click_count,

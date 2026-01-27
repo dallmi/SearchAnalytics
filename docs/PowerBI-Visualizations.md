@@ -767,6 +767,7 @@ The `searches_terms.parquet` file contains **one row per search term per day**. 
 | `unique_sessions` | Integer | Sessions containing this term |
 | `result_events` | Integer | Result count events for this term |
 | `null_result_count` | Integer | Searches returning 0 results |
+| `sum_result_count` | Integer | Sum of result counts (for weighted avg in DAX) |
 | `click_count` | Integer | ALL clicks attributed to this term |
 | `success_click_count` | Integer | SUCCESS clicks only (SEARCH_RESULT_CLICK) ⚠️ |
 | `avg_sec_to_click` | Float | Average seconds from result to click |
@@ -882,6 +883,15 @@ DIVIDE(
     SUM(searches_terms[result_events]),
     0
 ) * 100
+
+// Average Results Shown - weighted average of results per search
+// Uses sum/count pattern for correct aggregation across any date range
+Avg Results Shown =
+DIVIDE(
+    SUM(searches_terms[sum_result_count]),
+    SUM(searches_terms[result_events]),
+    0
+)
 
 // Effectiveness Score - CTR minus weighted null penalty
 Term Effectiveness Score =

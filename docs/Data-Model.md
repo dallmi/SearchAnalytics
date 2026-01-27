@@ -714,6 +714,7 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `unique_sessions` | Integer | Sessions with this term | COUNT(DISTINCT session_key) |
 | `result_events` | Integer | Result events for term | COUNT(SEARCH_RESULT_COUNT) |
 | `null_result_count` | Integer | Zero-result count | SUM(is_null_result) |
+| `sum_result_count` | Integer | Sum of result counts | SUM(cp_total_result_count) - for weighted avg in DAX |
 | `click_count` | Integer | All clicks from this term | COUNT(click_category) |
 | `success_click_count` | Integer | Success clicks (SEARCH_RESULT_CLICK only) | COUNT(is_success_click=true) |
 | `clicks_result` | Integer | SEARCH_RESULT_CLICK events | COUNT(click_category='Result') |
