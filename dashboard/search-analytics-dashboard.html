@@ -734,33 +734,6 @@
             await loadWithFallback('daily', 'searches_daily.parquet', 'Loaded daily data...');
             await loadWithFallback('journeys', 'searches_journeys.parquet', 'Loaded journeys data...');
             await loadWithFallback('terms', 'searches_terms.parquet', 'Loaded terms data...');
-
-            // Debug: Show first 5 rows of daily data to check values
-            const rawRows = await conn.query(`
-                SELECT date, search_starts, unique_sessions, unique_users
-                FROM daily
-                ORDER BY date DESC
-                LIMIT 5
-            `);
-            const rowsArray = rawRows.toArray();
-            console.log('First 5 rows of daily data:');
-            rowsArray.forEach((row, i) => {
-                console.log(`  Row ${i}: date=${row.date}, search_starts=${row.search_starts} (type: ${typeof row.search_starts}), unique_sessions=${row.unique_sessions}, unique_users=${row.unique_users}`);
-            });
-
-            // Debug: Show summary of daily data
-            const debugResult = await conn.query(`
-                SELECT
-                    COUNT(*) as total_rows,
-                    MIN(date) as min_date,
-                    MAX(date) as max_date,
-                    SUM(search_starts) as sum_search_starts,
-                    SUM(unique_sessions) as sum_unique_sessions,
-                    AVG(search_starts) as avg_daily_searches,
-                    AVG(unique_sessions) as avg_daily_sessions
-                FROM daily
-            `);
-            console.log('Daily parquet summary:', debugResult.toArray()[0]);
         }
 
         async function setInitialDateRange() {
@@ -830,25 +803,25 @@
         }
 
         async function renderKPIs() {
+            // Cast to DOUBLE before SUM to work around DuckDB-WASM BigInt aggregation bug
             const result = await conn.query(`
                 SELECT
-                    SUM(search_starts) as total_searches,
-                    SUM(unique_sessions) as total_sessions,
-                    SUM(unique_users) as total_users,
-                    SUM(success_clicks) as total_success_clicks,
-                    SUM(null_results) as total_null_results,
-                    SUM(result_events) as total_result_events,
-                    SUM(sessions_with_clicks) as sessions_with_clicks,
-                    SUM(sessions_with_results) as sessions_with_results,
-                    SUM(sessions_abandoned) as sessions_abandoned
+                    SUM(CAST(search_starts AS DOUBLE)) as total_searches,
+                    SUM(CAST(unique_sessions AS DOUBLE)) as total_sessions,
+                    SUM(CAST(unique_users AS DOUBLE)) as total_users,
+                    SUM(CAST(success_clicks AS DOUBLE)) as total_success_clicks,
+                    SUM(CAST(null_results AS DOUBLE)) as total_null_results,
+                    SUM(CAST(result_events AS DOUBLE)) as total_result_events,
+                    SUM(CAST(sessions_with_clicks AS DOUBLE)) as sessions_with_clicks,
+                    SUM(CAST(sessions_with_results AS DOUBLE)) as sessions_with_results,
+                    SUM(CAST(sessions_abandoned AS DOUBLE)) as sessions_abandoned
                 FROM daily
                 WHERE ${getDateWhereClause('date')}
             `);
 
             const row = result.toArray()[0];
-            console.log('KPI raw row from parquet:', row);
 
-            // Convert BigInt values to Numbers for calculations
+            // Convert to Numbers for calculations (values already DOUBLE from query)
             const data = {
                 total_searches: Number(row.total_searches || 0),
                 total_sessions: Number(row.total_sessions || 0),
@@ -860,7 +833,6 @@
                 sessions_with_results: Number(row.sessions_with_results || 0),
                 sessions_abandoned: Number(row.sessions_abandoned || 0)
             };
-            console.log('KPI converted data:', data);
 
             const successRate = data.sessions_with_results > 0
                 ? (data.sessions_with_clicks / data.sessions_with_results * 100).toFixed(1)
@@ -1059,12 +1031,13 @@
         }
 
         async function renderHourlyDistribution() {
+            // Cast to DOUBLE to avoid DuckDB-WASM BigInt aggregation bug
             const result = await conn.query(`
                 SELECT
-                    SUM(searches_night) as night,
-                    SUM(searches_morning) as morning,
-                    SUM(searches_afternoon) as afternoon,
-                    SUM(searches_evening) as evening
+                    SUM(CAST(searches_night AS DOUBLE)) as night,
+                    SUM(CAST(searches_morning AS DOUBLE)) as morning,
+                    SUM(CAST(searches_afternoon AS DOUBLE)) as afternoon,
+                    SUM(CAST(searches_evening AS DOUBLE)) as evening
                 FROM daily
                 WHERE ${getDateWhereClause('date')}
             `);
@@ -1114,11 +1087,12 @@
         }
 
         async function renderWeekdayDistribution() {
+            // Cast to DOUBLE to avoid DuckDB-WASM BigInt aggregation bug
             const result = await conn.query(`
                 SELECT
                     day_of_week,
                     day_of_week_num,
-                    SUM(search_starts) as searches
+                    SUM(CAST(search_starts AS DOUBLE)) as searches
                 FROM daily
                 WHERE ${getDateWhereClause('date')}
                 GROUP BY day_of_week, day_of_week_num
@@ -1160,14 +1134,15 @@
         }
 
         async function renderTopTerms() {
+            // Cast to DOUBLE to avoid DuckDB-WASM BigInt aggregation bug
             const result = await conn.query(`
                 SELECT
                     search_term,
-                    SUM(search_count) as searches,
-                    SUM(unique_users) as users,
-                    SUM(success_click_count) as success_clicks,
-                    SUM(null_result_count) as null_results,
-                    SUM(result_events) as result_events
+                    SUM(CAST(search_count AS DOUBLE)) as searches,
+                    SUM(CAST(unique_users AS DOUBLE)) as users,
+                    SUM(CAST(success_click_count AS DOUBLE)) as success_clicks,
+                    SUM(CAST(null_result_count AS DOUBLE)) as null_results,
+                    SUM(CAST(result_events AS DOUBLE)) as result_events
                 FROM terms
                 WHERE ${getDateWhereClause('session_date')}
                 GROUP BY search_term
@@ -1211,16 +1186,17 @@
         }
 
         async function renderProblemTerms() {
+            // Cast to DOUBLE to avoid DuckDB-WASM BigInt aggregation bug
             const result = await conn.query(`
                 SELECT
                     search_term,
-                    SUM(search_count) as searches,
-                    SUM(null_result_count) as null_results,
-                    SUM(result_events) as result_events
+                    SUM(CAST(search_count AS DOUBLE)) as searches,
+                    SUM(CAST(null_result_count AS DOUBLE)) as null_results,
+                    SUM(CAST(result_events AS DOUBLE)) as result_events
                 FROM terms
                 WHERE ${getDateWhereClause('session_date')}
                 GROUP BY search_term
-                HAVING SUM(null_result_count) > 0 AND SUM(search_count) >= 5
+                HAVING SUM(CAST(null_result_count AS DOUBLE)) > 0 AND SUM(CAST(search_count AS DOUBLE)) >= 5
                 ORDER BY null_results DESC
                 LIMIT 20
             `);
@@ -1255,13 +1231,14 @@
         }
 
         async function renderClickCategories() {
+            // Cast to DOUBLE to avoid DuckDB-WASM BigInt aggregation bug
             const result = await conn.query(`
                 SELECT
-                    SUM(clicks_result) as result_clicks,
-                    SUM(clicks_trending) as trending_clicks,
-                    SUM(clicks_tab) as tab_clicks,
-                    SUM(clicks_pagination) as pagination_clicks,
-                    SUM(clicks_filter) as filter_clicks
+                    SUM(CAST(clicks_result AS DOUBLE)) as result_clicks,
+                    SUM(CAST(clicks_trending AS DOUBLE)) as trending_clicks,
+                    SUM(CAST(clicks_tab AS DOUBLE)) as tab_clicks,
+                    SUM(CAST(clicks_pagination AS DOUBLE)) as pagination_clicks,
+                    SUM(CAST(clicks_filter AS DOUBLE)) as filter_clicks
                 FROM daily
                 WHERE ${getDateWhereClause('date')}
             `);
