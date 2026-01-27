@@ -453,6 +453,12 @@
         .text-right { text-align: right; }
         .text-center { text-align: center; }
 
+        /* Type label colors for table cells */
+        td.danger { color: var(--danger); font-weight: 500; }
+        td.warning { color: var(--warning); font-weight: 500; }
+        td.info { color: var(--info); font-weight: 500; }
+        td.muted { color: var(--medium-gray); font-style: italic; }
+
         .badge {
             display: inline-block;
             padding: 0.2rem 0.4rem;
@@ -1295,6 +1301,7 @@
                             <option value="high">Highly Seasonal (>3x)</option>
                             <option value="moderate">Moderately Seasonal (2-3x)</option>
                             <option value="slight">Slightly Seasonal (1.5-2x)</option>
+                            <option value="insufficient">Insufficient Data (&lt;6 months)</option>
                         </select>
                     </div>
                     <div class="table-container" style="max-height: 400px; overflow-y: auto;">
@@ -1306,7 +1313,7 @@
                                     <th class="text-right">Peak Month</th>
                                     <th class="text-right">Concentration</th>
                                     <th class="text-right">Type</th>
-                                    <th class="text-right">Months Active</th>
+                                    <th class="text-right" title="Months observed / Months with activity">Coverage</th>
                                 </tr>
                             </thead>
                             <tbody id="seasonalTermsBody"></tbody>
@@ -2692,9 +2699,18 @@
             const monthFilter = document.getElementById('seasonalMonthFilter').value;
             const typeFilter = document.getElementById('seasonalTypeFilter').value;
 
-            // Calculate seasonality for each term
+            // Calculate seasonality for each term with data confidence
             const termsResult = await conn.query(`
-                WITH term_monthly AS (
+                WITH term_dates AS (
+                    -- Get first and last seen dates for each term
+                    SELECT
+                        search_term,
+                        MIN(first_seen_date) as first_seen,
+                        MAX(session_date) as last_seen
+                    FROM terms WHERE ${getDateWhereClause('session_date')}
+                    GROUP BY search_term
+                ),
+                term_monthly AS (
                     SELECT
                         search_term,
                         month_num,
@@ -2704,14 +2720,19 @@
                 ),
                 term_stats AS (
                     SELECT
-                        search_term,
-                        SUM(monthly_searches) as total_searches,
-                        MAX(monthly_searches) as peak_volume,
-                        AVG(monthly_searches) as avg_volume,
-                        COUNT(DISTINCT month_num) as months_active
-                    FROM term_monthly
-                    GROUP BY search_term
-                    HAVING SUM(monthly_searches) >= 10
+                        tm.search_term,
+                        SUM(tm.monthly_searches) as total_searches,
+                        MAX(tm.monthly_searches) as peak_volume,
+                        AVG(tm.monthly_searches) as avg_volume,
+                        COUNT(DISTINCT tm.month_num) as months_active,
+                        -- Calculate potential months (elapsed time since first seen)
+                        td.first_seen,
+                        td.last_seen,
+                        GREATEST(1, DATE_DIFF('month', td.first_seen, td.last_seen) + 1) as potential_months
+                    FROM term_monthly tm
+                    JOIN term_dates td ON tm.search_term = td.search_term
+                    GROUP BY tm.search_term, td.first_seen, td.last_seen
+                    HAVING SUM(tm.monthly_searches) >= 10
                 ),
                 term_peak AS (
                     SELECT DISTINCT ON (tm.search_term)
@@ -2728,7 +2749,9 @@
                     ts.peak_volume,
                     ts.avg_volume,
                     CASE WHEN ts.avg_volume > 0 THEN ts.peak_volume / ts.avg_volume ELSE 1 END as concentration,
-                    ts.months_active
+                    ts.months_active,
+                    ts.potential_months,
+                    ROUND(100.0 * ts.months_active / ts.potential_months, 0) as month_coverage
                 FROM term_stats ts
                 JOIN term_peak tp ON ts.search_term = tp.search_term
                 ORDER BY concentration DESC
@@ -2741,36 +2764,57 @@
 
             const filtered = termsData.filter(d => {
                 const concentration = Number(d.concentration || 1);
+                const potentialMonths = Number(d.potential_months || 1);
+                const hasInsufficientData = potentialMonths < 6;
 
                 // Month filter
                 if (monthFilter && Number(d.peak_month) !== Number(monthFilter)) return false;
 
-                // Type filter
-                if (typeFilter === 'high' && concentration < 3) return false;
-                if (typeFilter === 'moderate' && (concentration < 2 || concentration >= 3)) return false;
-                if (typeFilter === 'slight' && (concentration < 1.5 || concentration >= 2)) return false;
+                // Type filter - now accounts for insufficient data
+                if (typeFilter === 'insufficient' && !hasInsufficientData) return false;
+                if (typeFilter === 'high' && (hasInsufficientData || concentration < 3)) return false;
+                if (typeFilter === 'moderate' && (hasInsufficientData || concentration < 2 || concentration >= 3)) return false;
+                if (typeFilter === 'slight' && (hasInsufficientData || concentration < 1.5 || concentration >= 2)) return false;
 
                 return true;
             });
 
             document.getElementById('seasonalTermsBody').innerHTML = filtered.slice(0, 50).map(d => {
                 const concentration = Number(d.concentration || 1);
+                const potentialMonths = Number(d.potential_months || 1);
+                const monthsActive = Number(d.months_active || 0);
+                const coverage = Number(d.month_coverage || 0);
+                const hasInsufficientData = potentialMonths < 6;
+
                 let typeLabel = 'Consistent';
                 let typeClass = '';
-                if (concentration >= 3) { typeLabel = 'Highly Seasonal'; typeClass = 'danger'; }
-                else if (concentration >= 2) { typeLabel = 'Moderately Seasonal'; typeClass = 'warning'; }
-                else if (concentration >= 1.5) { typeLabel = 'Slightly Seasonal'; typeClass = 'info'; }
+
+                // Insufficient data takes precedence over concentration-based classification
+                if (hasInsufficientData) {
+                    typeLabel = 'Insufficient Data';
+                    typeClass = 'muted';
+                } else if (concentration >= 3) {
+                    typeLabel = 'Highly Seasonal';
+                    typeClass = 'danger';
+                } else if (concentration >= 2) {
+                    typeLabel = 'Moderately Seasonal';
+                    typeClass = 'warning';
+                } else if (concentration >= 1.5) {
+                    typeLabel = 'Slightly Seasonal';
+                    typeClass = 'info';
+                }
 
                 const peakMonth = monthNames[Number(d.peak_month) || 0] || 'Unknown';
+                const coverageDisplay = `${monthsActive}/${potentialMonths} (${coverage}%)`;
 
                 return `
                     <tr>
                         <td><a href="#" onclick="showTermDetail('${d.search_term.replace(/'/g, "\\'")}'); return false;">${d.search_term}</a></td>
                         <td class="text-right">${formatNumber(d.total_searches)}</td>
                         <td class="text-right"><strong>${peakMonth}</strong></td>
-                        <td class="text-right">${concentration.toFixed(1)}x</td>
+                        <td class="text-right">${hasInsufficientData ? '<span style="color: var(--medium-gray);">-</span>' : concentration.toFixed(1) + 'x'}</td>
                         <td class="text-right ${typeClass}">${typeLabel}</td>
-                        <td class="text-right">${d.months_active}</td>
+                        <td class="text-right" title="${monthsActive} months with activity out of ${potentialMonths} months observed">${coverageDisplay}</td>
                     </tr>
                 `;
             }).join('');

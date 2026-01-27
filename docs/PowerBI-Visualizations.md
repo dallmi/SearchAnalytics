@@ -1115,14 +1115,105 @@ RETURN
     DIVIDE(DaysActive, TotalSpan, 0) * 100
 ```
 
+#### Data Confidence & Improved Seasonality
+
+The basic `Seasonality Type` measure above has a limitation: terms with insufficient observation time (e.g., only 1-2 months of data) will always show low concentration ratios and be labeled "Consistent" even though we simply lack data to judge.
+
+**The problem:** A term first seen 2 weeks ago can only have `months_active = 1`, which guarantees `concentration = 1.0`. This doesn't mean the term is "consistent" - it means we don't have enough data yet.
+
+**The solution:** Calculate `potential_months` (how long we've observed the term) and require a minimum observation period before making seasonality claims.
+
+```dax
+// Potential Months - elapsed months since term first appeared
+// This tells us how much data we have to work with
+Potential Months =
+VAR FirstSeen = MIN(searches_terms[first_seen_date])
+VAR LastSeen = MAX(searches_terms[session_date])
+RETURN
+    DATEDIFF(FirstSeen, LastSeen, MONTH) + 1
+
+// Month Coverage - what % of potential months had activity?
+// High coverage (80%+) = term appears regularly
+// Low coverage (<50%) = term is sporadic or intermittent
+Month Coverage % =
+VAR MonthsActive = DISTINCTCOUNT(searches_terms[month_num])
+VAR PotentialMonths = [Potential Months]
+RETURN
+    IF(PotentialMonths > 0, DIVIDE(MonthsActive, PotentialMonths) * 100, 0)
+
+// Data Confidence - do we have enough observation time for seasonality claims?
+Data Confidence =
+VAR PotentialMonths = [Potential Months]
+RETURN
+    SWITCH(
+        TRUE(),
+        PotentialMonths >= 12, "High",      -- Full year of data
+        PotentialMonths >= 6, "Medium",     -- Half year
+        "Insufficient"                       -- Not enough to judge
+    )
+
+// Data Confidence Sort (for proper ordering in visuals)
+Data Confidence Sort =
+VAR PotentialMonths = [Potential Months]
+RETURN
+    SWITCH(
+        TRUE(),
+        PotentialMonths >= 12, 1,
+        PotentialMonths >= 6, 2,
+        3
+    )
+
+// Seasonality Type (Improved) - accounts for data sufficiency
+// Only makes seasonality claims when we have >= 6 months of observation
+Seasonality Type (Improved) =
+VAR Ratio = [Concentration Ratio]
+VAR PotentialMonths = [Potential Months]
+RETURN
+    SWITCH(
+        TRUE(),
+        PotentialMonths < 6, "Insufficient Data",
+        Ratio >= 3.0, "Highly Seasonal",
+        Ratio >= 2.0, "Moderately Seasonal",
+        Ratio >= 1.5, "Slightly Seasonal",
+        "Consistent"
+    )
+
+// Seasonality Type (Improved) Sort
+Seasonality Type (Improved) Sort =
+VAR Ratio = [Concentration Ratio]
+VAR PotentialMonths = [Potential Months]
+RETURN
+    SWITCH(
+        TRUE(),
+        PotentialMonths < 6, 0,  -- Insufficient data first (needs attention)
+        Ratio >= 3.0, 1,
+        Ratio >= 2.0, 2,
+        Ratio >= 1.5, 3,
+        4
+    )
+```
+
+**When to use which measure:**
+
+| Measure | Use Case |
+|---------|----------|
+| `Seasonality Type` | Quick overview, accepts all data regardless of observation period |
+| `Seasonality Type (Improved)` | Accurate classification, filters out terms with insufficient history |
+| `Data Confidence` | Badge/indicator to show data quality alongside any seasonality measure |
+
+**Recommended approach:** Use `Seasonality Type (Improved)` for analysis, and add `Data Confidence` as a visual indicator in tables.
+
 #### Seasonality Classification
 
-| Type | Concentration | Interpretation |
-|------|---------------|----------------|
-| Highly Seasonal | ≥ 3.0 | Very concentrated in 1-2 months (holiday, annual events) |
-| Moderately Seasonal | 2.0 - 3.0 | Clear seasonal pattern (quarterly reviews, fiscal periods) |
-| Slightly Seasonal | 1.5 - 2.0 | Some monthly variation, not strongly seasonal |
-| Consistent | < 1.5 | Evenly distributed throughout year (core vocabulary) |
+| Type | Condition | Sort | Interpretation |
+|------|-----------|------|----------------|
+| Insufficient Data | potential_months < 6 | 0 | Not enough observation time to determine pattern |
+| Highly Seasonal | concentration ≥ 3.0 | 1 | Very concentrated in 1-2 months (holiday, annual events) |
+| Moderately Seasonal | concentration 2.0 - 3.0 | 2 | Clear seasonal pattern (quarterly reviews, fiscal periods) |
+| Slightly Seasonal | concentration 1.5 - 2.0 | 3 | Some monthly variation, not strongly seasonal |
+| Consistent | concentration < 1.5 | 4 | Evenly distributed throughout year (core vocabulary) |
+
+**Note:** The `Seasonality Type (Improved)` measure applies the "Insufficient Data" filter automatically. The basic `Seasonality Type` measure does not check observation time.
 
 ---
 
