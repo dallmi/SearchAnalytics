@@ -818,7 +818,20 @@
                 WHERE ${getDateWhereClause('date')}
             `);
 
-            const data = result.toArray()[0];
+            const row = result.toArray()[0];
+
+            // Convert BigInt values to Numbers for calculations
+            const data = {
+                total_searches: Number(row.total_searches || 0),
+                total_sessions: Number(row.total_sessions || 0),
+                total_users: Number(row.total_users || 0),
+                total_success_clicks: Number(row.total_success_clicks || 0),
+                total_null_results: Number(row.total_null_results || 0),
+                total_result_events: Number(row.total_result_events || 0),
+                sessions_with_clicks: Number(row.sessions_with_clicks || 0),
+                sessions_with_results: Number(row.sessions_with_results || 0),
+                sessions_abandoned: Number(row.sessions_abandoned || 0)
+            };
 
             const successRate = data.sessions_with_results > 0
                 ? (data.sessions_with_clicks / data.sessions_with_results * 100).toFixed(1)
