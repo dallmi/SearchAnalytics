@@ -735,6 +735,15 @@
             await loadWithFallback('journeys', 'searches_journeys.parquet', 'Loaded journeys data...');
             await loadWithFallback('terms', 'searches_terms.parquet', 'Loaded terms data...');
 
+            // Debug: Show first 5 rows of daily data to check values
+            const rawRows = await conn.query(`
+                SELECT date, search_starts, unique_sessions, unique_users
+                FROM daily
+                ORDER BY date DESC
+                LIMIT 5
+            `);
+            console.log('First 5 rows of daily data:', rawRows.toArray());
+
             // Debug: Show summary of daily data
             const debugResult = await conn.query(`
                 SELECT
