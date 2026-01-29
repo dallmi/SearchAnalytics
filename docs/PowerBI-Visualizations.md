@@ -4,6 +4,34 @@ This guide provides recommended visualizations for analyzing Intranet search beh
 
 ---
 
+## Table of Contents
+
+### 1. Setup & Configuration
+- [Data Sources Setup](#data-sources-setup) - Connecting to parquet files
+- [Rate and Average Calculations in DAX](#important-rate-and-average-calculations-in-dax) - Why DAX measures are required
+- [Building Block Columns](#building-block-columns) - Reference for correct calculations
+- [Component Columns Reference](#component-columns-reference) - Quick lookup table
+
+### 2. Dashboard Pages
+- [Page 1: Executive Dashboard](#page-1-executive-dashboard-daily-metrics) - KPIs, trends, click distribution
+- [Page 2: User Journey Analysis](#page-2-user-journey-analysis-session-metrics) - Session outcomes, timing, behavior
+- [Page 3: Deep Dive Analysis](#page-3-deep-dive-analysis) - Heatmaps, filters, detailed exploration
+- [Page 4: Search Terms Analysis](#page-4-search-terms-analysis) - Term performance, status, lifecycle
+
+### 3. DAX Measures Reference
+- [Rate Metrics](#rate-metrics---dax-formulas) - Click rate, null rate, session success
+- [Average Metrics](#average-metrics---dax-formulas) - Searches per session, term length
+- [Journey Measures](#dax-measures-for-journeys) - Outcomes, timing, complexity
+- [Term Measures](#dax-measures-for-search-terms) - CTR, null rate, effectiveness
+- [Term Status Classification](#term-status-classification-dynamic-dax-measures) - Dynamic status labels
+- [Term Age & Lifecycle](#term-age--lifecycle-classification) - New vs established terms
+- [Seasonality Analysis](#term-seasonality-analysis) - Concentration, data confidence
+
+### 4. Time-of-Day Analysis
+- [Time-of-Day Pattern Analysis](#time-of-day-pattern-analysis) - Regional business hours (CET-based)
+
+---
+
 ## Data Sources Setup
 
 ### Connecting to Parquet Files
