@@ -594,22 +594,7 @@ def export_parquet_files(con, output_dir):
                 MAX(d.sessions_with_results) as sessions_with_results,
                 MAX(d.sessions_with_clicks) as sessions_with_clicks,
                 MAX(d.sessions_abandoned) as sessions_abandoned,
-                -- Rate metrics (success = actual result clicks, not navigation/filter clicks)
-                ROUND(100.0 * COUNT(CASE WHEN s.is_success_click = true THEN 1 END)
-                    / NULLIF(COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' THEN 1 END), 0), 2) as click_rate_pct,
-                ROUND(100.0 * SUM(CASE WHEN s.is_null_result = true THEN 1 ELSE 0 END)
-                    / NULLIF(COUNT(CASE WHEN s.name = 'SEARCH_RESULT_COUNT' THEN 1 END), 0), 2) as null_rate_pct,
-                -- Session-based rates (always 0-100%)
-                ROUND(100.0 * MAX(d.sessions_with_clicks)
-                    / NULLIF(MAX(d.sessions_with_results), 0), 2) as session_success_rate_pct,
-                ROUND(100.0 * MAX(d.sessions_abandoned)
-                    / NULLIF(MAX(d.sessions_with_results), 0), 2) as session_abandonment_rate_pct,
-                -- Session metrics
-                ROUND(1.0 * COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' THEN 1 END)
-                    / NULLIF(COUNT(DISTINCT s.session_key), 0), 2) as avg_searches_per_session,
-                -- Search term metrics (includes SUM columns for weighted DAX calculations)
-                ROUND(AVG(s.search_term_length), 1) as avg_search_term_length,
-                ROUND(AVG(s.search_term_word_count), 1) as avg_search_term_words,
+                -- Search term metrics (SUM columns for weighted DAX calculations in Power BI)
                 SUM(s.search_term_length) as sum_search_term_length,
                 SUM(s.search_term_word_count) as sum_search_term_words,
                 COUNT(CASE WHEN s.search_term_length IS NOT NULL THEN 1 END) as search_term_count,
@@ -893,11 +878,7 @@ def export_parquet_files(con, output_dir):
                     COUNT(CASE WHEN click_category = 'Pagination_News' THEN 1 END) as clicks_pagination_news,
                     COUNT(CASE WHEN click_category = 'Pagination_GoTo' THEN 1 END) as clicks_pagination_goto,
                     COUNT(CASE WHEN click_category = 'Filter' THEN 1 END) as clicks_filter,
-                    -- Timing metrics (result to success click time for this term)
-                    ROUND(AVG(CASE
-                        WHEN is_success_click = true AND prev_event = 'SEARCH_RESULT_COUNT'
-                        THEN ms_since_prev_event / 1000.0
-                    END), 2) as avg_sec_to_click,
+                    -- Timing metrics (building blocks for DAX calculations in Power BI)
                     COUNT(CASE
                         WHEN is_success_click = true AND prev_event = 'SEARCH_RESULT_COUNT'
                         THEN 1

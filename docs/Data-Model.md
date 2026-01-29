@@ -667,13 +667,6 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `sessions_with_results` | Integer | Sessions that got results | From session_stats CTE |
 | `sessions_with_clicks` | Integer | Sessions with clicks | From session_stats CTE |
 | `sessions_abandoned` | Integer | Results but no click | sessions_with_results - sessions_with_clicks |
-| `click_rate_pct` | Float | Click rate | click_events / search_starts * 100 |
-| `null_rate_pct` | Float | Null result rate | null_results / result_events * 100 |
-| `session_success_rate_pct` | Float | Session success | sessions_with_clicks / sessions_with_results * 100 |
-| `session_abandonment_rate_pct` | Float | Session abandonment | sessions_abandoned / sessions_with_results * 100 |
-| `avg_searches_per_session` | Float | Avg searches per session | search_starts / unique_sessions |
-| `avg_search_term_length` | Float | Avg query char length | AVG(search_term_length) |
-| `avg_search_term_words` | Float | Avg query word count | AVG(search_term_word_count) |
 | `sum_search_term_length` | Integer | Sum of query lengths | SUM(search_term_length) - for weighted avg in DAX |
 | `sum_search_term_words` | Integer | Sum of word counts | SUM(search_term_word_count) - for weighted avg in DAX |
 | `search_term_count` | Integer | Count of queries | COUNT(search_term_length IS NOT NULL) |
@@ -725,7 +718,6 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `clicks_pagination_news` | Integer | News tab pagination | COUNT(click_category='Pagination_News') |
 | `clicks_pagination_goto` | Integer | GoTo tab pagination | COUNT(click_category='Pagination_GoTo') |
 | `clicks_filter` | Integer | SEARCH_FILTER_CLICK events | COUNT(click_category='Filter') |
-| `avg_sec_to_click` | Float | Avg decision time (success clicks only) | AVG(ms_result_to_click) / 1000 |
 | `clicks_with_timing` | Integer | Clicks with timing data | COUNT(click after SEARCH_RESULT_COUNT) |
 | `sum_sec_to_click` | Float | Sum of click times | SUM(ms_result_to_click) / 1000 - for weighted avg in DAX |
 | `searches_night` | Integer | Searches 03:00-09:00 CET (APAC) | Hour-based filter (CET) |
@@ -968,3 +960,4 @@ timestamp,name,user_Id,session_Id,CP_searchQuery,CP_totalResultCount
 | 1.6 | 2025-01-26 | Changed session_complexity to use user actions (searches + clicks) instead of all telemetry events. Renamed "Single Event" to "Single Action". |
 | 1.7 | 2025-01-26 | Added AppInsights Identifiers section explaining user_id (cookie-based) and session_id (30-min inactivity timeout) behavior and implications for metrics. |
 | 1.8 | 2025-01-29 | Updated time distribution buckets to align with regional business hours: APAC (03-09 CET), CET (09-16 CET), Americas (16-22 CET), Dead time (22-03 CET). Column names unchanged for Power BI compatibility. |
+| 1.9 | 2025-01-29 | Removed pre-calculated rate/average columns that cannot be aggregated: click_rate_pct, null_rate_pct, session_success_rate_pct, session_abandonment_rate_pct, avg_searches_per_session, avg_search_term_length, avg_search_term_words, avg_sec_to_click. Use DAX measures with building block columns instead. |

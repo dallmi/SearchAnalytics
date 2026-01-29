@@ -174,21 +174,15 @@ Four Parquet files are generated for Power BI (plus one for search term analysis
 - **Columns include**:
   - `total_events`, `unique_sessions`, `unique_users`, `unique_search_terms`
   - `search_starts`, `result_events`, `click_events`, `null_results`, `clickable_results`
-  - **Rate metrics**:
-    - `click_through_rate_pct` - Clicks / Searches × 100
-    - `null_rate_pct` - Null results / Results shown × 100
-    - `abandonment_rate_pct` - (Results without click) / Results × 100
-  - **Session metrics**:
-    - `avg_searches_per_session` - Average searches per session
-  - **Search term metrics** (includes SUM columns for weighted DAX calculations):
-    - `avg_search_term_length`, `avg_search_term_words` - Daily averages
-    - `sum_search_term_length`, `sum_search_term_words` - Daily sums for weighted avg in Power BI
+  - **Session metrics**: `sessions_with_results`, `sessions_with_clicks`, `sessions_abandoned`
+  - **Search term metrics** (building blocks for DAX calculations):
+    - `sum_search_term_length`, `sum_search_term_words` - Sums for weighted avg in Power BI
     - `search_term_count` - Count of search terms (denominator for weighted avg)
   - `first_searches_of_day`
-  - Click breakdowns by category (`clicks_general`, `clicks_all`, `clicks_news`, `clicks_goto`, `clicks_people`)
-  - **Time distribution (CET-based)**:
-    - `searches_morning` (6-12 CET), `searches_afternoon` (12-18 CET)
-    - `searches_evening` (18-24 CET), `searches_night` (0-6 CET)
+  - Click breakdowns by category (`clicks_result`, `clicks_trending`, `clicks_tab`, `clicks_filter`, `clicks_pagination`)
+  - **Time distribution (CET-based regional business hours)**:
+    - `searches_night` (03-09 CET, APAC), `searches_morning` (09-16 CET, CET)
+    - `searches_afternoon` (16-22 CET, Americas), `searches_evening` (22-03 CET, Dead time)
 
 #### 3. `searches_journeys.parquet`
 - **Content**: Session-level data with timing metrics (consolidated)
@@ -214,11 +208,12 @@ Four Parquet files are generated for Power BI (plus one for search term analysis
 - **Result metrics**:
   - `result_events`, `null_result_count`
 - **Click metrics**:
-  - `click_count`, `clicks_general`, `clicks_all`, `clicks_news`, `clicks_goto`, `clicks_people`
-- **Timing metrics**:
-  - `avg_sec_to_click` - Average time to click for this term
-- **Time distribution (CET-based)**:
-  - `searches_morning`, `searches_afternoon`, `searches_evening`, `searches_night`
+  - `click_count`, `success_click_count`, `clicks_result`, `clicks_trending`, `clicks_tab`, `clicks_filter`
+- **Timing metrics** (building blocks for DAX calculations):
+  - `clicks_with_timing`, `sum_sec_to_click` - For weighted avg calculation in Power BI
+- **Time distribution (CET-based regional business hours)**:
+  - `searches_night` (03-09 CET, APAC), `searches_morning` (09-16 CET, CET)
+  - `searches_afternoon` (16-22 CET, Americas), `searches_evening` (22-03 CET, Dead time)
 - **Trend detection**:
   - `first_seen_date`, `is_new_term`
 

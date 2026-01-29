@@ -16,33 +16,34 @@ This guide provides recommended visualizations for analyzing Intranet search beh
 
 ---
 
-## Important: Handling Pre-Calculated Rates and Averages
+## Important: Rate and Average Calculations in DAX
 
-### The Aggregation Problem
+### Why DAX Measures Are Required
 
-The daily parquet file contains pre-calculated rate and average columns for convenience when viewing single-day data. However, **these columns cannot be correctly aggregated across multiple days** using simple SUM or AVERAGE functions.
-
-**Why?** Averaging percentages or ratios gives mathematically incorrect results:
+Rates and averages must be calculated in Power BI using DAX measures, not pre-calculated columns. This is because averaging percentages or ratios gives mathematically incorrect results:
 - Day 1: 50 clicks / 100 searches = 50% CTR
 - Day 2: 10 clicks / 200 searches = 5% CTR
 - Wrong: Average of 50% and 5% = 27.5%
 - Correct: (50 + 10) / (100 + 200) = 20%
 
-### Columns That Cannot Be Directly Aggregated
+### Building Block Columns
 
-| Column | Type | Problem |
-|--------|------|---------|
-| `click_rate_pct` | Ratio | Cannot average percentages |
-| `null_rate_pct` | Ratio | Cannot average percentages |
-| `session_success_rate_pct` | Ratio | Cannot average percentages |
-| `session_abandonment_rate_pct` | Ratio | Cannot average percentages |
-| `avg_searches_per_session` | Average | Cannot average averages |
-| `avg_search_term_length` | Average | Cannot average averages |
-| `avg_search_term_words` | Average | Cannot average averages |
+The parquet files include all necessary component columns for correct calculations:
 
-### Solution: Create DAX Measures
+| Metric to Calculate | Numerator Column | Denominator Column |
+|---------------------|------------------|-------------------|
+| Success Click Rate % | `success_clicks` | `search_starts` |
+| Null Rate % | `null_results` | `result_events` |
+| Session Success Rate % | `sessions_with_clicks` | `sessions_with_results` |
+| Session Abandonment Rate % | `sessions_abandoned` | `sessions_with_results` |
+| Avg Searches per Session | `search_starts` | `unique_sessions` |
+| Avg Search Term Length | `sum_search_term_length` | `search_term_count` |
+| Avg Search Term Words | `sum_search_term_words` | `search_term_count` |
+| Avg Seconds to Click | `sum_sec_to_click` | `clicks_with_timing` |
 
-Instead of using the pre-calculated columns, create DAX measures that recalculate from the component columns. The daily file includes all necessary building blocks.
+### Required DAX Measures
+
+Create these DAX measures to calculate rates and averages correctly across any date range or filter context.
 
 #### Rate Metrics - DAX Formulas
 
@@ -718,13 +719,12 @@ The `searches_terms.parquet` file contains **one row per search term per day**. 
 | `sum_result_count` | Integer | Sum of result counts (for weighted avg in DAX) |
 | `click_count` | Integer | ALL clicks attributed to this term |
 | `success_click_count` | Integer | SUCCESS clicks only (SEARCH_RESULT_CLICK) |
-| `avg_sec_to_click` | Float | Average seconds from result to click |
 | `clicks_with_timing` | Integer | Clicks with timing data (for weighting) |
 | `sum_sec_to_click` | Float | Sum of seconds to click (for weighted avg) |
-| `searches_night` | Integer | Searches 0:00-8:00 CET (APAC peak) |
-| `searches_morning` | Integer | Searches 8:00-12:00 CET (EMEA peak) |
-| `searches_afternoon` | Integer | Searches 12:00-18:00 CET (EMEA+Americas) |
-| `searches_evening` | Integer | Searches 18:00-24:00 CET (Americas peak) |
+| `searches_night` | Integer | Searches 03:00-09:00 CET (APAC) |
+| `searches_morning` | Integer | Searches 09:00-16:00 CET (CET) |
+| `searches_afternoon` | Integer | Searches 16:00-22:00 CET (Americas) |
+| `searches_evening` | Integer | Searches 22:00-03:00 CET (Dead time) |
 | `first_seen_date` | Date | First date this term appeared in dataset |
 | `is_new_term` | Boolean | Is this the first day this term was searched? |
 
