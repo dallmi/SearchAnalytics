@@ -1558,10 +1558,9 @@ SWITCH(
 1. Create a measure:
 ```dax
 Show Term =
-IF(SUM(searches_terms[search_count]) >= [Min Search Threshold Value], 1, 0)
+IF(SUM(searches_terms[search_count]) >= 5, 1, 0)
 ```
-2. Add a numeric slicer for threshold (default: 5)
-3. Filter visuals where `Show Term = 1`
+2. Filter visuals where `Show Term = 1` to hide low-volume terms
 
 **Recommended Page Layout:**
 ```
