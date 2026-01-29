@@ -1124,7 +1124,14 @@ VAR PeakMonthNum =
         [month_num])
 VAR YearsInPeakMonth =
     CALCULATE(
-        DISTINCTCOUNT(YEAR(searches_terms[session_date])),
+        COUNTROWS(
+            DISTINCT(
+                SELECTCOLUMNS(
+                    searches_terms,
+                    "Year", YEAR(searches_terms[session_date])
+                )
+            )
+        ),
         searches_terms[month_num] = PeakMonthNum
     )
 RETURN
