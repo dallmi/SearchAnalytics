@@ -1252,10 +1252,10 @@
                                     <th class="text-right">Searches</th>
                                     <th class="text-right">Peak Period</th>
                                     <th class="text-right">Concentration</th>
-                                    <th class="text-right">Night (0-8)</th>
-                                    <th class="text-right">Morning (8-12)</th>
-                                    <th class="text-right">Afternoon (12-18)</th>
-                                    <th class="text-right">Evening (18-24)</th>
+                                    <th class="text-right">APAC (03-09)</th>
+                                    <th class="text-right">CET (09-16)</th>
+                                    <th class="text-right">Americas (16-22)</th>
+                                    <th class="text-right">Dead (22-03)</th>
                                 </tr>
                             </thead>
                             <tbody id="timeOfDayTermsBody"></tbody>
@@ -1815,11 +1815,11 @@
             charts.hourly = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['Night (0-8)\nAPAC', 'Morning (8-12)\nEMEA', 'Afternoon (12-18)\nOverlap', 'Evening (18-24)\nAmericas'],
+                    labels: ['APAC (03-09 CET)', 'CET (09-16 CET)', 'Americas (16-22 CET)', 'Dead Time (22-03 CET)'],
                     datasets: [{
                         label: 'Searches',
                         data: [Number(data.night), Number(data.morning), Number(data.afternoon), Number(data.evening)],
-                        backgroundColor: [COLORS.gray, COLORS.info, COLORS.primary, COLORS.warning]
+                        backgroundColor: [COLORS.info, COLORS.primary, COLORS.warning, COLORS.gray]
                     }]
                 },
                 options: {
@@ -2513,7 +2513,7 @@
                 charts.timeOfDay = new Chart(timeCtx, {
                     type: 'bar',
                     data: {
-                        labels: ['Night (0-8 CET)', 'Morning (8-12 CET)', 'Afternoon (12-18 CET)', 'Evening (18-24 CET)'],
+                        labels: ['APAC (03-09 CET)', 'CET (09-16 CET)', 'Americas (16-22 CET)', 'Dead Time (22-03 CET)'],
                         datasets: [{
                             label: 'Searches',
                             data: [
@@ -2522,7 +2522,7 @@
                                 Number(timeData.afternoon || 0),
                                 Number(timeData.evening || 0)
                             ],
-                            backgroundColor: [COLORS.info, COLORS.success, COLORS.warning, COLORS.primary]
+                            backgroundColor: [COLORS.info, COLORS.primary, COLORS.warning, COLORS.gray]
                         }]
                     },
                     options: {
@@ -2548,18 +2548,19 @@
             if (charts.regionalDist) charts.regionalDist.destroy();
             const regCtx = document.getElementById('regionalDistChart');
             if (regCtx) {
-                // Infer regional distribution based on time patterns
-                const apac = Number(timeData.night || 0); // Night CET = APAC business hours
-                const emea = Number(timeData.morning || 0) + Number(timeData.afternoon || 0) * 0.5;
-                const americas = Number(timeData.evening || 0) + Number(timeData.afternoon || 0) * 0.5;
+                // Regional distribution based on CET time buckets
+                const apac = Number(timeData.night || 0);     // 03-09 CET = APAC business hours
+                const cet = Number(timeData.morning || 0);    // 09-16 CET = European business hours
+                const americas = Number(timeData.afternoon || 0); // 16-22 CET = Americas business hours
+                const dead = Number(timeData.evening || 0);   // 22-03 CET = Dead time
 
                 charts.regionalDist = new Chart(regCtx, {
                     type: 'doughnut',
                     data: {
-                        labels: ['APAC (Night CET)', 'EMEA (Morning/Afternoon)', 'Americas (Afternoon/Evening)'],
+                        labels: ['APAC (03-09 CET)', 'CET (09-16 CET)', 'Americas (16-22 CET)', 'Dead Time (22-03 CET)'],
                         datasets: [{
-                            data: [apac, emea, americas],
-                            backgroundColor: [COLORS.info, COLORS.success, COLORS.primary]
+                            data: [apac, cet, americas, dead],
+                            backgroundColor: [COLORS.info, COLORS.primary, COLORS.warning, COLORS.gray]
                         }]
                     },
                     options: {
@@ -2602,17 +2603,17 @@
                 const termTotal = Number(d.night || 0) + Number(d.morning || 0) +
                                  Number(d.afternoon || 0) + Number(d.evening || 0);
 
-                const nightPct = termTotal > 0 ? (Number(d.night || 0) / termTotal * 100) : 0;
-                const morningPct = termTotal > 0 ? (Number(d.morning || 0) / termTotal * 100) : 0;
-                const afternoonPct = termTotal > 0 ? (Number(d.afternoon || 0) / termTotal * 100) : 0;
-                const eveningPct = termTotal > 0 ? (Number(d.evening || 0) / termTotal * 100) : 0;
+                const apacPct = termTotal > 0 ? (Number(d.night || 0) / termTotal * 100) : 0;
+                const cetPct = termTotal > 0 ? (Number(d.morning || 0) / termTotal * 100) : 0;
+                const americasPct = termTotal > 0 ? (Number(d.afternoon || 0) / termTotal * 100) : 0;
+                const deadPct = termTotal > 0 ? (Number(d.evening || 0) / termTotal * 100) : 0;
 
-                const maxPct = Math.max(nightPct, morningPct, afternoonPct, eveningPct);
-                let peakPeriod = 'Afternoon';
-                let peakColor = COLORS.warning;
-                if (nightPct === maxPct) { peakPeriod = 'Night'; peakColor = COLORS.info; }
-                else if (morningPct === maxPct) { peakPeriod = 'Morning'; peakColor = COLORS.success; }
-                else if (eveningPct === maxPct) { peakPeriod = 'Evening'; peakColor = COLORS.primary; }
+                const maxPct = Math.max(apacPct, cetPct, americasPct, deadPct);
+                let peakPeriod = 'CET';
+                let peakColor = COLORS.primary;
+                if (apacPct === maxPct) { peakPeriod = 'APAC'; peakColor = COLORS.info; }
+                else if (americasPct === maxPct) { peakPeriod = 'Americas'; peakColor = COLORS.warning; }
+                else if (deadPct === maxPct) { peakPeriod = 'Dead Time'; peakColor = COLORS.gray; }
 
                 const concentration = maxPct;
                 const concentrationClass = concentration > 40 ? 'danger' : concentration > 30 ? 'warning' : '';
@@ -2623,10 +2624,10 @@
                         <td class="text-right">${formatNumber(d.searches)}</td>
                         <td class="text-right"><span style="color: ${peakColor}; font-weight: 500;">${peakPeriod}</span></td>
                         <td class="text-right ${concentrationClass}">${concentration.toFixed(0)}%</td>
-                        <td class="text-right">${nightPct.toFixed(0)}%</td>
-                        <td class="text-right">${morningPct.toFixed(0)}%</td>
-                        <td class="text-right">${afternoonPct.toFixed(0)}%</td>
-                        <td class="text-right">${eveningPct.toFixed(0)}%</td>
+                        <td class="text-right">${apacPct.toFixed(0)}%</td>
+                        <td class="text-right">${cetPct.toFixed(0)}%</td>
+                        <td class="text-right">${americasPct.toFixed(0)}%</td>
+                        <td class="text-right">${deadPct.toFixed(0)}%</td>
                     </tr>
                 `;
             }).join('');

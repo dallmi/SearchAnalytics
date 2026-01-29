@@ -626,11 +626,11 @@ def export_parquet_files(con, output_dir):
                 -- Temporal patterns
                 DAYNAME(s.session_date) as day_of_week,
                 ISODOW(s.session_date) as day_of_week_num,
-                -- Hour distribution (searches by time of day, CET-based, regional alignment)
-                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 0 AND s.event_hour < 8 THEN 1 END) as searches_night,       -- 0-8 CET (APAC peak)
-                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 8 AND s.event_hour < 12 THEN 1 END) as searches_morning,    -- 8-12 CET (EMEA peak)
-                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 12 AND s.event_hour < 18 THEN 1 END) as searches_afternoon, -- 12-18 CET (EMEA+Americas overlap)
-                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 18 AND s.event_hour < 24 THEN 1 END) as searches_evening,   -- 18-24 CET (Americas peak)
+                -- Hour distribution (searches by time of day, CET-based, regional business hours)
+                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 3 AND s.event_hour < 9 THEN 1 END) as searches_night,       -- 03-09 CET (APAC)
+                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 9 AND s.event_hour < 16 THEN 1 END) as searches_morning,    -- 09-16 CET (CET)
+                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 16 AND s.event_hour < 22 THEN 1 END) as searches_afternoon, -- 16-22 CET (Americas)
+                COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND (s.event_hour >= 22 OR s.event_hour < 3) THEN 1 END) as searches_evening,   -- 22-03 CET (Dead time)
                 -- User cohort metrics
                 MAX(uc.new_users) as new_users,
                 MAX(uc.returning_users) as returning_users
@@ -907,11 +907,11 @@ def export_parquet_files(con, output_dir):
                         THEN ms_since_prev_event / 1000.0
                         ELSE 0
                     END) as sum_sec_to_click,
-                    -- Hour distribution (when is this term searched? CET-based, regional alignment)
-                    COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 0 AND event_hour < 8 THEN 1 END) as searches_night,       -- 0-8 CET (APAC peak)
-                    COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 8 AND event_hour < 12 THEN 1 END) as searches_morning,    -- 8-12 CET (EMEA peak)
-                    COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 12 AND event_hour < 18 THEN 1 END) as searches_afternoon, -- 12-18 CET (EMEA+Americas overlap)
-                    COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 18 AND event_hour < 24 THEN 1 END) as searches_evening,   -- 18-24 CET (Americas peak)
+                    -- Hour distribution (when is this term searched? CET-based, regional business hours)
+                    COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 3 AND event_hour < 9 THEN 1 END) as searches_night,       -- 03-09 CET (APAC)
+                    COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 9 AND event_hour < 16 THEN 1 END) as searches_morning,    -- 09-16 CET (CET)
+                    COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND event_hour >= 16 AND event_hour < 22 THEN 1 END) as searches_afternoon, -- 16-22 CET (Americas)
+                    COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' AND (event_hour >= 22 OR event_hour < 3) THEN 1 END) as searches_evening,   -- 22-03 CET (Dead time)
                     -- Trend detection columns
                     MAX(tfs.first_seen_date) as first_seen_date,
                     CASE WHEN stc.session_date = MAX(tfs.first_seen_date) THEN true ELSE false END as is_new_term,

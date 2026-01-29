@@ -689,10 +689,10 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `clicks_filter` | Integer | SEARCH_FILTER_CLICK events | COUNT(click_category='Filter') |
 | `day_of_week` | String | Day name | DAYNAME(session_date) |
 | `day_of_week_num` | Integer | ISO day number (1=Mon) | ISODOW(session_date) |
-| `searches_night` | Integer | Searches 0:00-8:00 CET (APAC peak) | Hour-based filter (CET) |
-| `searches_morning` | Integer | Searches 8:00-12:00 CET (EMEA peak) | Hour-based filter (CET) |
-| `searches_afternoon` | Integer | Searches 12:00-18:00 CET (EMEA+Americas) | Hour-based filter (CET) |
-| `searches_evening` | Integer | Searches 18:00-24:00 CET (Americas peak) | Hour-based filter (CET) |
+| `searches_night` | Integer | Searches 03:00-09:00 CET (APAC) | Hour-based filter (CET) |
+| `searches_morning` | Integer | Searches 09:00-16:00 CET (CET) | Hour-based filter (CET) |
+| `searches_afternoon` | Integer | Searches 16:00-22:00 CET (Americas) | Hour-based filter (CET) |
+| `searches_evening` | Integer | Searches 22:00-03:00 CET (Dead time) | Hour-based filter (CET) |
 | `new_users` | Integer | First-time users today | Users where first_seen = today |
 | `returning_users` | Integer | Repeat users today | Users where first_seen < today |
 
@@ -728,10 +728,10 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `avg_sec_to_click` | Float | Avg decision time (success clicks only) | AVG(ms_result_to_click) / 1000 |
 | `clicks_with_timing` | Integer | Clicks with timing data | COUNT(click after SEARCH_RESULT_COUNT) |
 | `sum_sec_to_click` | Float | Sum of click times | SUM(ms_result_to_click) / 1000 - for weighted avg in DAX |
-| `searches_night` | Integer | Searches 0:00-8:00 CET (APAC peak) | Hour-based filter (CET) |
-| `searches_morning` | Integer | Searches 8:00-12:00 CET (EMEA peak) | Hour-based filter (CET) |
-| `searches_afternoon` | Integer | Searches 12:00-18:00 CET (EMEA+Americas) | Hour-based filter (CET) |
-| `searches_evening` | Integer | Searches 18:00-24:00 CET (Americas peak) | Hour-based filter (CET) |
+| `searches_night` | Integer | Searches 03:00-09:00 CET (APAC) | Hour-based filter (CET) |
+| `searches_morning` | Integer | Searches 09:00-16:00 CET (CET) | Hour-based filter (CET) |
+| `searches_afternoon` | Integer | Searches 16:00-22:00 CET (Americas) | Hour-based filter (CET) |
+| `searches_evening` | Integer | Searches 22:00-03:00 CET (Dead time) | Hour-based filter (CET) |
 | `first_seen_date` | Date | First day term appeared | MIN(session_date) over all time |
 | `is_new_term` | Boolean | First appearance today | session_date = first_seen_date |
 | `month_num` | Integer | Month number (1-12) | For seasonality analysis |
@@ -967,3 +967,4 @@ timestamp,name,user_Id,session_Id,CP_searchQuery,CP_totalResultCount
 | 1.5 | 2025-01-26 | Added "Engaged" journey_outcome category for sessions with navigation clicks but no result clicks. Updated recovered_from_null to use success_click_count. Sort order: 1=Success, 2=Engaged, 3=Abandoned, 4=No Results. |
 | 1.6 | 2025-01-26 | Changed session_complexity to use user actions (searches + clicks) instead of all telemetry events. Renamed "Single Event" to "Single Action". |
 | 1.7 | 2025-01-26 | Added AppInsights Identifiers section explaining user_id (cookie-based) and session_id (30-min inactivity timeout) behavior and implications for metrics. |
+| 1.8 | 2025-01-29 | Updated time distribution buckets to align with regional business hours: APAC (03-09 CET), CET (09-16 CET), Americas (16-22 CET), Dead time (22-03 CET). Column names unchanged for Power BI compatibility. |

@@ -1281,12 +1281,12 @@ RETURN
 The `searches_terms` table includes pre-calculated time distribution columns (`searches_morning`, `searches_afternoon`, `searches_evening`, `searches_night`) that reveal when specific terms are being searched. This can indicate regional usage patterns and help identify terms associated with specific time zones.
 
 **Time Period Definitions:**
-| Period | Hours (CET) | Regional Alignment |
+| Column | Hours (CET) | Regional Alignment |
 |--------|-------------|-------------------|
-| Night | 0-8 | APAC peak (afternoon in Asia) |
-| Morning | 8-12 | EMEA peak |
-| Afternoon | 12-18 | EMEA+Americas overlap |
-| Evening | 18-24 | Americas peak (morning in US) |
+| searches_night | 03-09 | APAC business hours |
+| searches_morning | 09-16 | CET business hours |
+| searches_afternoon | 16-22 | Americas business hours |
+| searches_evening | 22-03 | Dead time (low activity) |
 
 #### DAX Measures for Time-of-Day Analysis
 
@@ -1304,10 +1304,10 @@ RETURN
 SWITCH(
     TRUE(),
     MaxVal = 0, "No Data",
-    NightTotal = MaxVal, "Night (0-8)",
-    MorningTotal = MaxVal, "Morning (8-12)",
-    AfternoonTotal = MaxVal, "Afternoon (12-18)",
-    EveningTotal = MaxVal, "Evening (18-24)",
+    NightTotal = MaxVal, "APAC (03-09)",
+    MorningTotal = MaxVal, "CET (09-16)",
+    AfternoonTotal = MaxVal, "Americas (16-22)",
+    EveningTotal = MaxVal, "Dead Time (22-03)",
     "Unknown"
 )
 ```
@@ -1383,17 +1383,17 @@ RETURN IF(Total > 0, DIVIDE(MorningTotal, Total) * 100, 0)
 
 #### Questions You Can Answer
 
-**Q: Which terms are "morning terms"?**
+**Q: Which terms are "CET terms" (European business hours)?**
 1. Create Table visual
 2. Add: `search_term`, `Total Searches`, `Morning Share %`, `Peak Time Period`
-3. Filter: `Peak Time Period = "Morning (8-12)"`
+3. Filter: `Peak Time Period = "CET (09-16)"`
 4. Sort by `Morning Share %` descending
 
 **Q: Which terms are Americas-focused?**
 1. Create Table visual
-2. Add: `search_term`, `Total Searches`, `Primary Region`, `Evening Share %`, `Night Share %`
+2. Add: `search_term`, `Total Searches`, `Primary Region`, `Afternoon Share %`
 3. Filter: `Primary Region = "Americas"`
-4. Sort by combined Evening + Night percentage
+4. Sort by `Afternoon Share %` descending
 
 **Q: What is the time distribution for a specific term?**
 1. Select term using slicer

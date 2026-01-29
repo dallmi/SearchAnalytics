@@ -123,11 +123,11 @@ BEGIN
                 ELSE 0
             END)::NUMERIC(12,2) as sum_sec_to_click,
 
-            -- Time distribution (CET-based hours, regional alignment)
-            COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 0 AND stc.event_hour < 8 THEN 1 END)::INTEGER as searches_night,       -- 0-8 CET (APAC evening)
-            COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 8 AND stc.event_hour < 12 THEN 1 END)::INTEGER as searches_morning,    -- 8-12 CET (EMEA morning)
-            COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 12 AND stc.event_hour < 18 THEN 1 END)::INTEGER as searches_afternoon, -- 12-18 CET (EMEA/Americas overlap)
-            COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 18 AND stc.event_hour < 24 THEN 1 END)::INTEGER as searches_evening,   -- 18-24 CET (Americas afternoon)
+            -- Time distribution (CET-based hours, regional business hours)
+            COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 3 AND stc.event_hour < 9 THEN 1 END)::INTEGER as searches_night,       -- 03-09 CET (APAC)
+            COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 9 AND stc.event_hour < 16 THEN 1 END)::INTEGER as searches_morning,    -- 09-16 CET (CET)
+            COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 16 AND stc.event_hour < 22 THEN 1 END)::INTEGER as searches_afternoon, -- 16-22 CET (Americas)
+            COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND (stc.event_hour >= 22 OR stc.event_hour < 3) THEN 1 END)::INTEGER as searches_evening,   -- 22-03 CET (Dead time)
 
             -- Trend detection columns
             MAX(tfs.first_seen_date) as first_seen_date,
@@ -257,10 +257,10 @@ BEGIN
             COUNT(CASE WHEN stc.is_success_click = true AND stc.prev_event = 'SEARCH_RESULT_COUNT' THEN 1 END)::INTEGER as clicks_with_timing,
             SUM(CASE WHEN stc.is_success_click = true AND stc.prev_event = 'SEARCH_RESULT_COUNT'
                 THEN stc.ms_since_prev_event / 1000.0 ELSE 0 END)::NUMERIC(12,2) as sum_sec_to_click,
-            COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 0 AND stc.event_hour < 8 THEN 1 END)::INTEGER as searches_night,
-            COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 8 AND stc.event_hour < 12 THEN 1 END)::INTEGER as searches_morning,
-            COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 12 AND stc.event_hour < 18 THEN 1 END)::INTEGER as searches_afternoon,
-            COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 18 AND stc.event_hour < 24 THEN 1 END)::INTEGER as searches_evening,
+            COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 3 AND stc.event_hour < 9 THEN 1 END)::INTEGER as searches_night,
+            COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 9 AND stc.event_hour < 16 THEN 1 END)::INTEGER as searches_morning,
+            COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND stc.event_hour >= 16 AND stc.event_hour < 22 THEN 1 END)::INTEGER as searches_afternoon,
+            COUNT(CASE WHEN stc.name = 'SEARCH_TRIGGERED' AND (stc.event_hour >= 22 OR stc.event_hour < 3) THEN 1 END)::INTEGER as searches_evening,
             MAX(tfs.first_seen_date) as first_seen_date,
             CASE WHEN stc.session_date = MAX(tfs.first_seen_date) THEN true ELSE false END as is_new_term,
             EXTRACT(MONTH FROM stc.session_date)::INTEGER as month_num

@@ -125,11 +125,11 @@ BEGIN
         TRIM(TO_CHAR(s.session_date, 'Day')) as day_of_week,
         EXTRACT(ISODOW FROM s.session_date)::INTEGER as day_of_week_num,
 
-        -- Time distribution (CET-based hours, regional alignment)
-        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 0 AND s.event_hour < 8 THEN 1 END)::INTEGER as searches_night,       -- 0-8 CET (APAC evening)
-        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 8 AND s.event_hour < 12 THEN 1 END)::INTEGER as searches_morning,    -- 8-12 CET (EMEA morning)
-        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 12 AND s.event_hour < 18 THEN 1 END)::INTEGER as searches_afternoon, -- 12-18 CET (EMEA/Americas overlap)
-        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 18 AND s.event_hour < 24 THEN 1 END)::INTEGER as searches_evening,   -- 18-24 CET (Americas afternoon)
+        -- Time distribution (CET-based hours, regional business hours)
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 3 AND s.event_hour < 9 THEN 1 END)::INTEGER as searches_night,       -- 03-09 CET (APAC)
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 9 AND s.event_hour < 16 THEN 1 END)::INTEGER as searches_morning,    -- 09-16 CET (CET)
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 16 AND s.event_hour < 22 THEN 1 END)::INTEGER as searches_afternoon, -- 16-22 CET (Americas)
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND (s.event_hour >= 22 OR s.event_hour < 3) THEN 1 END)::INTEGER as searches_evening,   -- 22-03 CET (Dead time)
 
         -- User cohort metrics
         MAX(uc.new_users)::INTEGER as new_users,
@@ -241,10 +241,10 @@ BEGIN
         COUNT(CASE WHEN s.is_success_click = true THEN 1 END)::INTEGER,
         TRIM(TO_CHAR(s.session_date, 'Day')),
         EXTRACT(ISODOW FROM s.session_date)::INTEGER,
-        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 0 AND s.event_hour < 8 THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 8 AND s.event_hour < 12 THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 12 AND s.event_hour < 18 THEN 1 END)::INTEGER,
-        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 18 AND s.event_hour < 24 THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 3 AND s.event_hour < 9 THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 9 AND s.event_hour < 16 THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND s.event_hour >= 16 AND s.event_hour < 22 THEN 1 END)::INTEGER,
+        COUNT(CASE WHEN s.name = 'SEARCH_TRIGGERED' AND (s.event_hour >= 22 OR s.event_hour < 3) THEN 1 END)::INTEGER,
         MAX(uc.new_users)::INTEGER,
         MAX(uc.returning_users)::INTEGER
     FROM searches s
