@@ -9,26 +9,45 @@ This guide provides recommended visualizations for analyzing Intranet search beh
 ### 1. Setup & Configuration
 - [Data Sources Setup](#data-sources-setup) - Connecting to parquet files
 - [Rate and Average Calculations in DAX](#important-rate-and-average-calculations-in-dax) - Why DAX measures are required
-- [Building Block Columns](#building-block-columns) - Reference for correct calculations
-- [Component Columns Reference](#component-columns-reference) - Quick lookup table
+  - [Building Block Columns](#building-block-columns) - Reference for correct calculations
+  - [Component Columns Reference](#component-columns-reference) - Quick lookup table
+  - [User Cohort Columns](#user-cohort-columns-daily-file) - New vs returning users
 
 ### 2. Dashboard Pages
 - [Page 1: Executive Dashboard](#page-1-executive-dashboard-daily-metrics) - KPIs, trends, click distribution
 - [Page 2: User Journey Analysis](#page-2-user-journey-analysis-session-metrics) - Session outcomes, timing, behavior
 - [Page 3: Deep Dive Analysis](#page-3-deep-dive-analysis) - Heatmaps, filters, detailed exploration
 - [Page 4: Search Terms Analysis](#page-4-search-terms-analysis) - Term performance, status, lifecycle
+- [Page 5: Advanced Analytics](#page-5-advanced-analytics) - Cohorts, recovery, trends
 
 ### 3. DAX Measures Reference
-- [Rate Metrics](#rate-metrics---dax-formulas) - Click rate, null rate, session success
-- [Average Metrics](#average-metrics---dax-formulas) - Searches per session, term length
-- [Journey Measures](#dax-measures-for-journeys) - Outcomes, timing, complexity
-- [Term Measures](#dax-measures-for-search-terms) - CTR, null rate, effectiveness
-- [Term Status Classification](#term-status-classification-dynamic-dax-measures) - Dynamic status labels
-- [Term Age & Lifecycle](#term-age--lifecycle-classification) - New vs established terms
-- [Seasonality Analysis](#term-seasonality-analysis) - Concentration, data confidence
 
-### 4. Time-of-Day Analysis
+#### Daily Metrics (searches_daily)
+- [Rate Metrics - DAX Formulas](#rate-metrics---dax-formulas) - Success Click Rate, Null Rate, Session Success/Abandonment
+- [Average Metrics - DAX Formulas](#average-metrics---dax-formulas) - Searches per Session, Term Length, Term Words
+- [DAX Measures for Correct Aggregation](#dax-measures-for-correct-aggregation) - KPI tile measures
+
+#### Journey Metrics (searches_journeys)
+- [DAX Measures for Journeys](#dax-measures-for-journeys) - Outcome rates, timing, complexity, reformulation
+- [Journey Types Analysis](#journey-types-analysis) - Outcome classification, complexity scoring
+
+#### Term Metrics (searches_terms)
+- [DAX Measures for Search Terms](#dax-measures-for-search-terms) - Term CTR, Null Rate, Avg Results, Effectiveness
+- [Term Status Classification](#term-status-classification-dynamic-dax-measures) - Status labels, sort order
+- [Term Age & Lifecycle](#term-age--lifecycle-classification) - Days since first seen, age category
+- [Term Seasonality Analysis](#term-seasonality-analysis)
+  - [Core Seasonality Measures](#core-seasonality-measures) - Concentration ratio, data confidence
+  - [Recurrence Detection Measures](#recurrence-detection-measures) - Day coverage, recurrence patterns
 - [Time-of-Day Pattern Analysis](#time-of-day-pattern-analysis) - Regional business hours (CET-based)
+  - [DAX Measures for Time-of-Day](#dax-measures-for-time-of-day-analysis) - Peak time period, regional share
+- [Query Length vs Success](#query-length-vs-success-analysis) - Word count impact on CTR
+- [Search Effectiveness Score](#advanced-search-effectiveness-score) - Combined quality metric
+
+### 4. Additional Resources
+- [Key Questions This Dashboard Answers](#key-questions-this-dashboard-answers) - Business questions by category
+- [Recommended Alerts](#recommended-alerts) - Threshold-based monitoring
+- [Color Scheme Recommendations](#color-scheme-recommendations) - Visual consistency
+- [Tips for Effective Analysis](#tips-for-effective-analysis) - Best practices
 
 ---
 
