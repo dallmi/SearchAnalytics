@@ -4,56 +4,6 @@ This guide provides recommended visualizations for analyzing Intranet search beh
 
 ---
 
-## ⚠️ Recent Changes Summary
-
-The following updates were made to reflect changes in the data model. Look for ⚠️ markers throughout the document.
-
-### Column Name Changes (Breaking)
-
-| Old Column | New Column | Table(s) | Notes |
-|------------|------------|----------|-------|
-| `clicks_general` | `clicks_result` | daily, terms | Now specifically for SEARCH_RESULT_CLICK |
-| `clicks_all` | `clicks_tab` | daily, terms | Now for SEARCH_TAB_CLICK |
-| `clicks_news` | `clicks_pagination_news` | daily, terms | Now pagination-specific |
-| `clicks_goto` | `clicks_pagination_goto` | daily, terms | Now pagination-specific |
-| `clicks_people` | *REMOVED* | daily, terms | No matching event type |
-| `general_clicks` | `result_clicks` | journeys | Now specifically for SEARCH_RESULT_CLICK |
-| `all_tab_clicks` | `tab_clicks` | journeys | Now for SEARCH_TAB_CLICK |
-| `news_clicks` | `pagination_news_clicks` | journeys | Now pagination-specific |
-| `goto_clicks` | `pagination_goto_clicks` | journeys | Now pagination-specific |
-| `people_clicks` | *REMOVED* | journeys | No matching event type |
-
-### New Columns Added
-
-| Column | Table(s) | Description |
-|--------|----------|-------------|
-| `success_clicks` | daily | Count of actual result clicks (SEARCH_RESULT_CLICK only) |
-| `success_click_count` | journeys, terms | Success clicks per session/term |
-| `clicks_trending` | daily, journeys, terms | SEARCH_TRENDING_CLICKED events |
-| `clicks_pagination` | daily, journeys, terms | Aggregate of all pagination clicks |
-| `clicks_pagination_all` | daily, journeys, terms | All tab pagination |
-| `clicks_filter` | daily, journeys, terms | SEARCH_FILTER_CLICK events |
-
-### DAX Measure Updates Required
-
-| Old Measure | New Measure | Change |
-|-------------|-------------|--------|
-| `Click Rate %` | `Success Click Rate %` | Use `success_clicks` instead of `click_events` |
-| `Term CTR %` | `Term Success CTR %` | Use `success_click_count` instead of `click_count` |
-| `Term Abandonment Rate %` | *updated* | Use `success_click_count` instead of `click_count` |
-| `Term_Outcome` column | *updated* | Use `success_click_count` instead of `click_count` |
-| `Search Effectiveness Score` | *updated* | Use `success_click_count` instead of `click_count` |
-
-### Key Concept: Success Clicks vs All Clicks
-
-- **Success Clicks** = User found content (SEARCH_RESULT_CLICK only)
-- **Trending Clicks** = User initiated search via suggestion (SEARCH_TRENDING_CLICKED) - tracked separately
-- **All Clicks** = Any interaction (includes tabs, pagination, filters, trending)
-- Use **success clicks** for measuring search effectiveness (actual content discovery)
-- Use **trending clicks** to measure suggestion feature usage
-
----
-
 ## Data Sources Setup
 
 ### Connecting to Parquet Files
@@ -97,7 +47,7 @@ Instead of using the pre-calculated columns, create DAX measures that recalculat
 #### Rate Metrics - DAX Formulas
 
 ```dax
-// ⚠️ UPDATED: Success Click Rate (actual result clicks per search)
+// Success Click Rate (actual result clicks per search)
 // Uses success_clicks which only counts SEARCH_RESULT_CLICK (not trending)
 // Can exceed 100% if users click multiple results per search
 Success Click Rate % =
@@ -126,7 +76,7 @@ DIVIDE(
 
 // Session Success Rate (sessions with at least one SUCCESS click / sessions with results)
 // Always 0-100% - recommended for KPIs
-// ⚠️ NOTE: sessions_with_clicks is pre-calculated in the parquet using is_success_click
+// Note: sessions_with_clicks is pre-calculated in the parquet using is_success_click
 // (only counts SEARCH_RESULT_CLICK and SEARCH_TRENDING_CLICKED, not navigation clicks)
 Session Success Rate % =
 DIVIDE(
@@ -137,7 +87,7 @@ DIVIDE(
 
 // Session Abandonment Rate (sessions with results but no SUCCESS clicks / sessions with results)
 // Always 0-100% - recommended for KPIs
-// ⚠️ NOTE: sessions_abandoned is pre-calculated using is_success_click
+// Note: sessions_abandoned is pre-calculated using is_success_click
 Session Abandonment Rate % =
 DIVIDE(
     SUM(searches_daily[sessions_abandoned]),
@@ -183,11 +133,9 @@ DIVIDE(
 
 ### Component Columns Reference
 
-> ⚠️ **UPDATED**: Click metrics now distinguish between success clicks and all clicks
-
 | Metric to Calculate | Numerator Column | Denominator Column |
 |---------------------|------------------|-------------------|
-| Success Click Rate % | `success_clicks` ⚠️ | `search_starts` |
+| Success Click Rate % | `success_clicks` | `search_starts` |
 | All Clicks Rate % | `click_events` | `search_starts` |
 | Null Rate % | `null_results` | `result_events` |
 | Session Success Rate % | `sessions_with_clicks` | `sessions_with_results` |
@@ -196,7 +144,7 @@ DIVIDE(
 | Avg Search Term Length | `sum_search_term_length` | `search_term_count` |
 | Avg Search Term Words | `sum_search_term_words` | `search_term_count` |
 
-**Click Column Types (⚠️ UPDATED):**
+**Click Column Types:**
 - `success_clicks` = Result clicks only (SEARCH_RESULT_CLICK - user found content)
 - `clicks_trending` = Trending suggestion clicks (search initiation, not content discovery)
 - `click_events` = All clicks including navigation (tabs, pagination, filters, trending)
@@ -288,7 +236,7 @@ DIVIDE(
     0
 ) * 100
 
-// ⚠️ UPDATED: Success Click Rate (actual result clicks only)
+// Success Click Rate (actual result clicks only)
 // Uses success_clicks (SEARCH_RESULT_CLICK only, not trending)
 Success Click Rate % =
 DIVIDE(
@@ -342,16 +290,16 @@ DIVIDE(
 
 #### Chart 3: Clicks by Category
 - **Type**: Stacked Bar Chart or Donut
-- **Values** (⚠️ UPDATED column names):
-  - `clicks_result` - Actual search result clicks ⚠️
-  - `clicks_trending` - Trending item clicks ⚠️
-  - `clicks_tab` - Tab navigation clicks ⚠️
-  - `clicks_pagination` - All pagination clicks (aggregate) ⚠️
-  - `clicks_filter` - Filter clicks ⚠️
+- **Values**:
+  - `clicks_result` - Actual search result clicks
+  - `clicks_trending` - Trending item clicks
+  - `clicks_tab` - Tab navigation clicks
+  - `clicks_pagination` - All pagination clicks (aggregate)
+  - `clicks_filter` - Filter clicks
 - **Detailed pagination breakdown** (optional):
-  - `clicks_pagination_all` - All tab pagination ⚠️
-  - `clicks_pagination_news` - News tab pagination ⚠️
-  - `clicks_pagination_goto` - GoTo tab pagination ⚠️
+  - `clicks_pagination_all` - All tab pagination
+  - `clicks_pagination_news` - News tab pagination
+  - `clicks_pagination_goto` - GoTo tab pagination
 
 #### Chart 4: Daily Activity Table
 - **Type**: Table
@@ -371,11 +319,11 @@ DIVIDE(
 #### Chart 6: Search Time Distribution
 - **Type**: Stacked Bar or Pie Chart
 - **Values** (all from daily file):
-  - `searches_morning` (6:00-12:00)
-  - `searches_afternoon` (12:00-18:00)
-  - `searches_evening` (18:00-24:00)
-  - `searches_night` (0:00-6:00)
-- **Insight**: When do users search most? Morning rush, lunch break, end of day?
+  - `searches_night` (0:00-8:00 CET - APAC peak)
+  - `searches_morning` (8:00-12:00 CET - EMEA peak)
+  - `searches_afternoon` (12:00-18:00 CET - EMEA+Americas overlap)
+  - `searches_evening` (18:00-24:00 CET - Americas peak)
+- **Insight**: When do users search most? Time periods align with regional business hours.
 
 ---
 
@@ -394,7 +342,7 @@ The `searches_journeys.parquet` file contains **one row per session**. Each row 
 | `search_count_in_session` | Integer | Number of searches in this session |
 | `result_count` | Integer | Number of SEARCH_RESULT_COUNT events |
 | `click_count` | Integer | Number of ALL clicks (including navigation) |
-| `success_click_count` | Integer | Number of SUCCESS clicks (SEARCH_RESULT_CLICK only) ⚠️ |
+| `success_click_count` | Integer | Number of SUCCESS clicks (SEARCH_RESULT_CLICK only) |
 | `null_result_count` | Integer | Number of searches with 0 results |
 | `had_reformulation` | Boolean | Did user search multiple different terms? |
 | `session_complexity` | String | Single Action, Simple, Medium, Complex (based on user actions: searches + clicks) |
@@ -416,18 +364,18 @@ The `searches_journeys.parquet` file contains **one row per session**. Each row 
 | `distinct_click_categories` | Integer | Number of different click types in session |
 | `had_tab_switch` | Boolean | Did user click on multiple tabs/categories? |
 
-**Click breakdown columns (⚠️ UPDATED):**
+**Click breakdown columns:**
 
 | Column | Description |
 |--------|-------------|
-| `result_clicks` | SEARCH_RESULT_CLICK events ⚠️ |
-| `trending_clicks` | SEARCH_TRENDING_CLICKED events ⚠️ |
-| `tab_clicks` | SEARCH_TAB_CLICK events ⚠️ |
-| `pagination_clicks` | All pagination clicks (aggregate) ⚠️ |
-| `pagination_all_clicks` | All tab pagination ⚠️ |
-| `pagination_news_clicks` | News tab pagination ⚠️ |
-| `pagination_goto_clicks` | GoTo tab pagination ⚠️ |
-| `filter_clicks` | SEARCH_FILTER_CLICK events ⚠️ |
+| `result_clicks` | SEARCH_RESULT_CLICK events |
+| `trending_clicks` | SEARCH_TRENDING_CLICKED events |
+| `tab_clicks` | SEARCH_TAB_CLICK events |
+| `pagination_clicks` | All pagination clicks (aggregate) |
+| `pagination_all_clicks` | All tab pagination |
+| `pagination_news_clicks` | News tab pagination |
+| `pagination_goto_clicks` | GoTo tab pagination |
+| `filter_clicks` | SEARCH_FILTER_CLICK events |
 
 ### DAX Measures for Journeys
 
@@ -738,7 +686,7 @@ Add slicers for:
 ### Chart 2: Click Category by Outcome
 - **Type**: Stacked Bar Chart
 - **Axis**: `journey_outcome`
-- **Legend**: Click type columns (⚠️ use new column names: `result_clicks`, `trending_clicks`, `tab_clicks`, `pagination_clicks`, `filter_clicks`)
+- **Legend**: Click type columns (`result_clicks`, `trending_clicks`, `tab_clicks`, `pagination_clicks`, `filter_clicks`)
 - **Values**: Sum of click counts
 
 ### Chart 3: Sessions with Multiple Searches
@@ -769,29 +717,29 @@ The `searches_terms.parquet` file contains **one row per search term per day**. 
 | `null_result_count` | Integer | Searches returning 0 results |
 | `sum_result_count` | Integer | Sum of result counts (for weighted avg in DAX) |
 | `click_count` | Integer | ALL clicks attributed to this term |
-| `success_click_count` | Integer | SUCCESS clicks only (SEARCH_RESULT_CLICK) ⚠️ |
+| `success_click_count` | Integer | SUCCESS clicks only (SEARCH_RESULT_CLICK) |
 | `avg_sec_to_click` | Float | Average seconds from result to click |
 | `clicks_with_timing` | Integer | Clicks with timing data (for weighting) |
 | `sum_sec_to_click` | Float | Sum of seconds to click (for weighted avg) |
-| `searches_morning` | Integer | Searches 6:00-12:00 CET |
-| `searches_afternoon` | Integer | Searches 12:00-18:00 CET |
-| `searches_evening` | Integer | Searches 18:00-24:00 CET |
-| `searches_night` | Integer | Searches 0:00-6:00 CET |
+| `searches_night` | Integer | Searches 0:00-8:00 CET (APAC peak) |
+| `searches_morning` | Integer | Searches 8:00-12:00 CET (EMEA peak) |
+| `searches_afternoon` | Integer | Searches 12:00-18:00 CET (EMEA+Americas) |
+| `searches_evening` | Integer | Searches 18:00-24:00 CET (Americas peak) |
 | `first_seen_date` | Date | First date this term appeared in dataset |
 | `is_new_term` | Boolean | Is this the first day this term was searched? |
 
-**Click breakdown columns (⚠️ UPDATED):**
+**Click breakdown columns:**
 
 | Column | Description |
 |--------|-------------|
-| `clicks_result` | Actual result clicks ⚠️ |
-| `clicks_trending` | Trending item clicks ⚠️ |
-| `clicks_tab` | Tab navigation clicks ⚠️ |
-| `clicks_pagination` | All pagination (aggregate) ⚠️ |
-| `clicks_pagination_all` | All tab pagination ⚠️ |
-| `clicks_pagination_news` | News tab pagination ⚠️ |
-| `clicks_pagination_goto` | GoTo tab pagination ⚠️ |
-| `clicks_filter` | Filter clicks ⚠️ |
+| `clicks_result` | Actual result clicks |
+| `clicks_trending` | Trending item clicks |
+| `clicks_tab` | Tab navigation clicks |
+| `clicks_pagination` | All pagination (aggregate) |
+| `clicks_pagination_all` | All tab pagination |
+| `clicks_pagination_news` | News tab pagination |
+| `clicks_pagination_goto` | GoTo tab pagination |
+| `clicks_filter` | Filter clicks |
 
 ### DAX Measures for Search Terms
 
@@ -799,7 +747,7 @@ The `searches_terms.parquet` file contains **one row per search term per day**. 
 // Total searches for all terms
 Total Term Searches = SUM(searches_terms[search_count])
 
-// ⚠️ UPDATED: Term Success CTR (actual result clicks only)
+// Term Success CTR (actual result clicks only)
 // Uses success_click_count (SEARCH_RESULT_CLICK only, not trending)
 Term Success CTR % =
 DIVIDE(
@@ -824,7 +772,7 @@ DIVIDE(
     0
 ) * 100
 
-// ⚠️ UPDATED: Term Abandonment Rate (had results but no SUCCESS click)
+// Term Abandonment Rate (had results but no SUCCESS click)
 Term Abandonment Rate % =
 DIVIDE(
     SUM(searches_terms[result_events]) - SUM(searches_terms[null_result_count]) - SUM(searches_terms[success_click_count]),
@@ -1335,10 +1283,10 @@ The `searches_terms` table includes pre-calculated time distribution columns (`s
 **Time Period Definitions:**
 | Period | Hours (CET) | Regional Alignment |
 |--------|-------------|-------------------|
-| Morning | 6-12 | APAC peak (afternoon in Asia) |
-| Afternoon | 12-18 | EMEA peak |
+| Night | 0-8 | APAC peak (afternoon in Asia) |
+| Morning | 8-12 | EMEA peak |
+| Afternoon | 12-18 | EMEA+Americas overlap |
 | Evening | 18-24 | Americas peak (morning in US) |
-| Night | 0-6 | Americas late (evening in US West) |
 
 #### DAX Measures for Time-of-Day Analysis
 
@@ -1356,10 +1304,10 @@ RETURN
 SWITCH(
     TRUE(),
     MaxVal = 0, "No Data",
-    MorningTotal = MaxVal, "Morning (6-12)",
+    NightTotal = MaxVal, "Night (0-8)",
+    MorningTotal = MaxVal, "Morning (8-12)",
     AfternoonTotal = MaxVal, "Afternoon (12-18)",
     EveningTotal = MaxVal, "Evening (18-24)",
-    NightTotal = MaxVal, "Night (0-6)",
     "Unknown"
 )
 ```
@@ -1438,7 +1386,7 @@ RETURN IF(Total > 0, DIVIDE(MorningTotal, Total) * 100, 0)
 **Q: Which terms are "morning terms"?**
 1. Create Table visual
 2. Add: `search_term`, `Total Searches`, `Morning Share %`, `Peak Time Period`
-3. Filter: `Peak Time Period = "Morning (6-12)"`
+3. Filter: `Peak Time Period = "Morning (8-12)"`
 4. Sort by `Morning Share %` descending
 
 **Q: Which terms are Americas-focused?**
@@ -1538,7 +1486,7 @@ Now your bar charts will sort correctly: 1 word → 2 words → 3 words → 4 wo
 - **Type**: Bar Chart
 - **Setup**:
   1. Drag `Query_Length_Bucket` to **Axis**
-  2. Drag `Term Success CTR %` measure to **Values** ⚠️
+  2. Drag `Term Success CTR %` measure to **Values**
 - **Sort**: Already configured via "Sort by column"
 - **Insight**: Do longer, more specific queries have higher CTR?
 
@@ -1564,7 +1512,7 @@ Now your bar charts will sort correctly: 1 word → 2 words → 3 words → 4 wo
 Create a combined metric that shows overall query performance:
 
 ```dax
-// ⚠️ UPDATED: Uses success_click_count instead of click_count
+// Uses success_click_count for actual content discovery measurement
 Search Effectiveness Score =
 VAR ctr = DIVIDE(SUM(searches_terms[success_click_count]), SUM(searches_terms[search_count]), 0)
 VAR nullRate = DIVIDE(SUM(searches_terms[null_result_count]), SUM(searches_terms[result_events]), 0)
@@ -1579,7 +1527,7 @@ RETURN
 Create a calculated column to classify search terms by their outcome (Model view → `searches_terms` → New Column):
 
 ```dax
-// ⚠️ UPDATED: Uses success_click_count instead of click_count
+// Uses success_click_count for actual content discovery measurement
 Term_Outcome =
 VAR nullRate = DIVIDE([null_result_count], [result_events], 0)
 VAR ctr = DIVIDE([success_click_count], [search_count], 0)
@@ -1665,7 +1613,7 @@ IF(SUM(searches_terms[search_count]) >= [Min Search Threshold Value], 1, 0)
 
 #### Chart 4: High Volume + Low CTR Terms
 - **Type**: Table
-- **Columns**: `search_term`, Sum of `search_count`, `Term Success CTR %` ⚠️
+- **Columns**: `search_term`, Sum of `search_count`, `Term Success CTR %`
 - **Filter**: `Term Success CTR %` < 20 AND Sum of `search_count` > 10 AND `Term Zero Result Rate %` < 50
 - **Insight**: Relevance problems - results exist but don't match user intent
 
@@ -1673,7 +1621,7 @@ IF(SUM(searches_terms[search_count]) >= [Min Search Threshold Value], 1, 0)
 
 #### Chart 5: High Performing Terms
 - **Type**: Table
-- **Columns**: `search_term`, Sum of `search_count`, `Term Success CTR %` ⚠️
+- **Columns**: `search_term`, Sum of `search_count`, `Term Success CTR %`
 - **Filter**: `Term Success CTR %` > 50 AND Sum of `search_count` > 10
 - **Insight**: Learn from these - what makes them successful?
 
@@ -1690,7 +1638,7 @@ IF(SUM(searches_terms[search_count]) >= [Min Search Threshold Value], 1, 0)
 | Card | Measure | Description |
 |------|---------|-------------|
 | Unique Terms | `Unique Terms` | Total distinct search terms |
-| Avg CTR | `Term Success CTR %` ⚠️ | Overall success click-through rate |
+| Avg CTR | `Term Success CTR %` | Overall success click-through rate |
 | Zero Result Rate | `Term Zero Result Rate %` | % of searches with no results |
 | Top Term | First value of `search_term` sorted by `search_count` | Most searched term |
 
@@ -1776,7 +1724,7 @@ CALCULATE(COUNTROWS(searches_journeys), searches_journeys[recovered_from_null] =
 
 #### Chart 8: Recently Emerged Terms Table
 - **Type**: Table
-- **Columns**: `search_term`, `first_seen_date`, Sum of `search_count`, `Term Success CTR %` ⚠️
+- **Columns**: `search_term`, `first_seen_date`, Sum of `search_count`, `Term Success CTR %`
 - **Filter**: `first_seen_date` >= DATE (recent, e.g., last 7 days)
 - **Sort**: By Sum of `search_count` descending
 - **Insight**: Identify trending new topics that may need content attention
@@ -1848,7 +1796,7 @@ Set up Power BI alerts for:
 | Session Success Rate % | > 40% (Green) | 25-40% (Yellow) | < 25% (Red) |
 | Null Rate % | < 5% (Green) | 5-15% (Yellow) | > 15% (Red) |
 | Session Abandonment % | < 50% (Green) | 50-70% (Yellow) | > 70% (Red) |
-| Success Click Rate % ⚠️ | > 30% (Green) | 15-30% (Yellow) | < 15% (Red) |
+| Success Click Rate % | > 30% (Green) | 15-30% (Yellow) | < 15% (Red) |
 
 ---
 
