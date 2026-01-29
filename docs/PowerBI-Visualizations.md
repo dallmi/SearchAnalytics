@@ -1094,7 +1094,14 @@ RETURN
 ```dax
 // Years Active - how many different years the term appeared
 Years Active =
-DISTINCTCOUNT(YEAR(searches_terms[session_date]))
+COUNTROWS(
+    DISTINCT(
+        SELECTCOLUMNS(
+            searches_terms,
+            "Year", YEAR(searches_terms[session_date])
+        )
+    )
+)
 
 // Peak Month - which month has highest volume
 Peak Month =
