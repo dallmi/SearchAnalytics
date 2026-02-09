@@ -373,8 +373,23 @@ def add_calculated_columns(con):
     has_session_id = 'session_id' in col_names
     has_timestamp = 'timestamp' in col_names
 
+    # --- Dynamic column resolution ---
+    # Column names vary depending on event type and nesting level in App Insights.
+    # Build COALESCE expressions based on which columns actually exist in the CSV.
+
+    # Search term: SEARCH_TRIGGERED has flat CP_queryText, others have CP_searchQuery_queryText
+    search_term_candidates = [c for c in ['CP_searchQuery_queryText', 'CP_queryText', 'CP_searchQuery', 'searchQuery', 'query'] if c in col_names]
+    search_term_expr = f"COALESCE({', '.join(search_term_candidates)})" if search_term_candidates else 'NULL'
+    search_term_sql = f"LOWER(TRIM({search_term_expr}))"
+
+    # Total result count: new structure has L4 path, old structure had flat CP_totalResultCount
+    result_count_candidates = [c for c in ['CP_searchResultsInteraction_totalResultCount_totalResultCount', 'CP_totalResultCount'] if c in col_names]
+    result_count_expr = f"CAST(COALESCE({', '.join(result_count_candidates)}) AS INTEGER)" if result_count_candidates else 'NULL::INTEGER'
+
+    log(f"  Column resolution: search_term from [{', '.join(search_term_candidates)}], result_count from [{', '.join(result_count_candidates)}]")
+
     # Build the main query with all calculated columns
-    con.execute("""
+    con.execute(f"""
         CREATE TABLE searches AS
         SELECT
             r.* EXCLUDE(name),
@@ -397,43 +412,36 @@ def add_calculated_columns(con):
             NULL::BIGINT as ms_since_prev_event,
             NULL::DOUBLE as sec_since_prev_event,
             NULL::VARCHAR as time_since_prev_bucket,
-            -- Search term columns
-            -- Note: queryText lives at different levels depending on event type:
-            --   SEARCH_TRIGGERED: flat under CustomProps → CP_queryText
-            --   Other events: nested in searchQuery → CP_searchQuery_queryText
-            LOWER(TRIM(COALESCE(CP_searchQuery_queryText, CP_queryText))) as search_term_normalized,
-            LENGTH(LOWER(TRIM(COALESCE(CP_searchQuery_queryText, CP_queryText)))) as search_term_length,
+            -- Search term columns (resolved dynamically based on available columns)
+            {search_term_sql} as search_term_normalized,
+            LENGTH({search_term_sql}) as search_term_length,
             CASE
-                WHEN LOWER(TRIM(COALESCE(CP_searchQuery_queryText, CP_queryText))) IS NULL
-                     OR LOWER(TRIM(COALESCE(CP_searchQuery_queryText, CP_queryText))) = '' THEN 0
-                ELSE LENGTH(LOWER(TRIM(COALESCE(CP_searchQuery_queryText, CP_queryText)))) -
-                     LENGTH(REPLACE(LOWER(TRIM(COALESCE(CP_searchQuery_queryText, CP_queryText))), ' ', '')) + 1
+                WHEN {search_term_sql} IS NULL OR {search_term_sql} = '' THEN 0
+                ELSE LENGTH({search_term_sql}) - LENGTH(REPLACE({search_term_sql}, ' ', '')) + 1
             END as search_term_word_count,
             -- Time extraction (CET-based)
             EXTRACT(HOUR FROM (timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Berlin')::INTEGER as event_hour,
             DAYNAME((timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Berlin') as event_weekday,
             ISODOW((timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Berlin') as event_weekday_num,
-            -- Flags
-            -- Note: totalResultCount is now at Level 4:
-            --   searchResultsInteraction.totalResultCount.totalResultCount
+            -- Flags (result count resolved dynamically based on available columns)
             CASE
-                WHEN name = 'SEARCH_RESULT_COUNT' AND CAST(CP_searchResultsInteraction_totalResultCount_totalResultCount AS INTEGER) = 0 THEN true
-                WHEN name = 'SEARCH_RESULT_COUNT' AND CAST(CP_searchResultsInteraction_totalResultCount_totalResultCount AS INTEGER) > 0 THEN false
+                WHEN name = 'SEARCH_RESULT_COUNT' AND {result_count_expr} = 0 THEN true
+                WHEN name = 'SEARCH_RESULT_COUNT' AND {result_count_expr} > 0 THEN false
                 ELSE NULL
             END as is_null_result,
             CASE
-                WHEN name = 'SEARCH_RESULT_COUNT' AND CAST(CP_searchResultsInteraction_totalResultCount_totalResultCount AS INTEGER) > 0 THEN true
+                WHEN name = 'SEARCH_RESULT_COUNT' AND {result_count_expr} > 0 THEN true
                 WHEN name = 'SEARCH_RESULT_COUNT' THEN false
                 ELSE NULL
             END as is_clickable_result,
             -- Store result count for aggregation (sum/count pattern for weighted avg)
             CASE
-                WHEN name = 'SEARCH_RESULT_COUNT' THEN CAST(CP_searchResultsInteraction_totalResultCount_totalResultCount AS INTEGER)
+                WHEN name = 'SEARCH_RESULT_COUNT' THEN {result_count_expr}
                 ELSE NULL
             END as cp_total_result_count,
             -- Click category: categorizes ALL click events for analysis
             CASE
-                WHEN name = 'SEARCH_RESULT_CLICKED' THEN 'Result'
+                WHEN name IN ('SEARCH_RESULT_CLICK', 'SEARCH_RESULT_CLICKED') THEN 'Result'
                 WHEN name = 'SEARCH_VIEW_MORE_LINK' THEN 'Result'
                 WHEN name = 'SEARCH_TRENDING_CLICKED' THEN 'Trending'
                 WHEN name = 'SEARCH_TAB_CLICK' THEN 'Tab'
@@ -446,7 +454,7 @@ def add_calculated_columns(con):
             -- Success click: TRUE only for actual result clicks (content found)
             -- Note: SEARCH_TRENDING_CLICKED is NOT a success - it's a search initiation via suggestion
             CASE
-                WHEN name IN ('SEARCH_RESULT_CLICKED', 'SEARCH_VIEW_MORE_LINK') THEN true
+                WHEN name IN ('SEARCH_RESULT_CLICK', 'SEARCH_RESULT_CLICKED', 'SEARCH_VIEW_MORE_LINK') THEN true
                 ELSE false
             END as is_success_click
         FROM searches_raw r
