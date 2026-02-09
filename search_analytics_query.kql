@@ -1,24 +1,32 @@
 // ============================================================================
-// Search Analytics Query - Dynamic JSON Flattening (3 levels)
+// Search Analytics Query - Dynamic JSON Flattening (4 levels)
 // ============================================================================
 // Purpose: Extract and flatten search analytics data from Application Insights
 //          customEvents table with dynamic column generation.
 //
-// Data Structure (3 nesting levels):
-//   Level 1 - customDimensions contains flat key-value pairs:
-//     query, message, searchQuery, userDetails, deviceType, userAgent, os,
-//     browser, osName, browserName, osVersion, browserVersion, platform,
-//     error code, totalSuggestionsCount, suggestionsCount, totalTrendingCount,
-//     trendingCount
-//   Level 2 - customDimensions.CustomProps (nested JSON object):
-//     tab, searchQuery, totalResultCount, searchPerformance, ...
-//   Level 3 - CustomProps may contain further nested JSON objects:
-//     e.g. searchPerformance: { searchAccuracy, searchLatency, ... }
+// Data Structure (4 nesting levels):
+//   Level 1 - customDimensions → contains CustomProps (typically the only key)
+//   Level 2 - CustomProps sub-objects and flat values:
+//     deviceType (flat), searchQuery, searchPerformance,
+//     searchResultsInteraction, userDetails (nested objects)
+//   Level 3 - Sub-object fields:
+//     searchQuery: { queryText, queryLanguage, queryLengthChars, queryLengthWords }
+//     searchPerformance: { searchLatency, searchAccuracy }
+//     searchResultsInteraction: { clickedTAB, appliedFilter, clickedResult,
+//                                 clickedPosition, totalResultCount }
+//     userDetails: { department, jobTitle, location }
+//   Level 4 - Deeply nested fields (varies by event type):
+//     searchResultsInteraction.totalResultCount: { totalResultCount, newsResultCount, ... }
+//     searchResultsInteraction.clickedResult: { resultTitle, resultUrl }
 //
 // Output: All keys become columns dynamically.
-//   - Level 2 keys are prefixed with "CP_" (e.g. CP_tab)
-//   - Level 3 keys are prefixed with "CP_parent_" (e.g. CP_searchPerformance_searchAccuracy)
-//   - Flat CP values that are not nested objects remain as "CP_key"
+//   - Level 2 flat:  CP_key (e.g. CP_deviceType)
+//   - Level 3:       CP_parent_child (e.g. CP_searchQuery_queryText)
+//   - Level 4:       CP_parent_child_grandchild (e.g. CP_searchResultsInteraction_totalResultCount_totalResultCount)
+//
+// NOTE: Some fields appear at different levels depending on event type:
+//   - SEARCH_TRIGGERED: queryText is flat at Level 2 → CP_queryText
+//   - Other events: queryText is nested in searchQuery → CP_searchQuery_queryText
 //
 // HOW TO USE: Copy from "set truncationmaxrecords" to "order by"
 //
@@ -33,7 +41,7 @@ let TimeRange = 90d;
 let CustomPropsPrefix = "CP_";
 let SearchData = customEvents
     | where timestamp >= ago(TimeRange)
-    | where name startswith "Search"
+    | where name startswith "Search" or name has "SEARCH"
     | extend cd = todynamic(customDimensions)
     | serialize
     | extend rowId = row_number()
@@ -47,20 +55,30 @@ let SearchData = customEvents
     | mv-expand cpKey = cpKeys to typeof(string)
     | extend cpValue = tostring(CP[cpKey])
     // --- Level 3: Check if CP values contain nested JSON objects ---
-    | extend isNested = cpKey != "__no_cp__" and isnotempty(cpValue) and cpValue startswith "{"
-    | extend nestedBag = iff(isNested, coalesce(todynamic(cpValue), dynamic({})), dynamic({}))
-    | extend subKeys = bag_keys(nestedBag)
+    | extend isNestedL3 = cpKey != "__no_cp__" and isnotempty(cpValue) and cpValue startswith "{"
+    | extend L3Bag = iff(isNestedL3, coalesce(todynamic(cpValue), dynamic({})), dynamic({}))
+    | extend subKeys = bag_keys(L3Bag)
     | extend subKeys = iff(array_length(subKeys) == 0, dynamic(["__no_sub__"]), subKeys)
     | mv-expand subKey = subKeys to typeof(string)
+    | extend subValue = iff(subKey != "__no_sub__", tostring(L3Bag[subKey]), "")
+    // --- Level 4: Check if Level 3 values contain nested JSON objects ---
+    | extend isNestedL4 = subKey != "__no_sub__" and isnotempty(subValue) and subValue startswith "{"
+    | extend L4Bag = iff(isNestedL4, coalesce(todynamic(subValue), dynamic({})), dynamic({}))
+    | extend subSubKeys = bag_keys(L4Bag)
+    | extend subSubKeys = iff(array_length(subSubKeys) == 0, dynamic(["__no_subsub__"]), subSubKeys)
+    | mv-expand subSubKey = subSubKeys to typeof(string)
     // --- Build flattened key-value pairs ---
-    // Flat CP value:   CP_key → value
-    // Nested CP value: CP_key_subKey → value
-    // Fallback:        if nested but empty/unparseable, keep raw value as CP_key
+    // Flat CP value (L2):       CP_key → value
+    // Nested L3 value:          CP_key_subKey → value
+    // Nested L4 value:          CP_key_subKey_subSubKey → value
+    // Fallback:                 if nested but empty/unparseable, keep raw value
     | extend kvBag = case(
         cpKey == "__no_cp__", dynamic({}),
-        not(isNested), pack(strcat(CustomPropsPrefix, cpKey), cpValue),
+        not(isNestedL3), pack(strcat(CustomPropsPrefix, cpKey), cpValue),
         subKey == "__no_sub__", pack(strcat(CustomPropsPrefix, cpKey), cpValue),
-        pack(strcat(CustomPropsPrefix, cpKey, "_", subKey), tostring(nestedBag[subKey]))
+        not(isNestedL4), pack(strcat(CustomPropsPrefix, cpKey, "_", subKey), subValue),
+        subSubKey == "__no_subsub__", pack(strcat(CustomPropsPrefix, cpKey, "_", subKey), subValue),
+        pack(strcat(CustomPropsPrefix, cpKey, "_", subKey, "_", subSubKey), tostring(L4Bag[subSubKey]))
       )
     // --- Reaggregate back to one row per event ---
     | summarize take_any(timestamp), take_any(name), take_any(client_CountryOrRegion), take_any(user_Id), take_any(session_Id), take_any(mainBag), merged = make_bag(kvBag) by rowId

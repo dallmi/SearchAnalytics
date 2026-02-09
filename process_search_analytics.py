@@ -398,37 +398,43 @@ def add_calculated_columns(con):
             NULL::DOUBLE as sec_since_prev_event,
             NULL::VARCHAR as time_since_prev_bucket,
             -- Search term columns
-            LOWER(TRIM(COALESCE(CP_searchQuery, searchQuery, query))) as search_term_normalized,
-            LENGTH(LOWER(TRIM(COALESCE(CP_searchQuery, searchQuery, query)))) as search_term_length,
+            -- Note: queryText lives at different levels depending on event type:
+            --   SEARCH_TRIGGERED: flat under CustomProps → CP_queryText
+            --   Other events: nested in searchQuery → CP_searchQuery_queryText
+            LOWER(TRIM(COALESCE(CP_searchQuery_queryText, CP_queryText))) as search_term_normalized,
+            LENGTH(LOWER(TRIM(COALESCE(CP_searchQuery_queryText, CP_queryText)))) as search_term_length,
             CASE
-                WHEN LOWER(TRIM(COALESCE(CP_searchQuery, searchQuery, query))) IS NULL
-                     OR LOWER(TRIM(COALESCE(CP_searchQuery, searchQuery, query))) = '' THEN 0
-                ELSE LENGTH(LOWER(TRIM(COALESCE(CP_searchQuery, searchQuery, query)))) -
-                     LENGTH(REPLACE(LOWER(TRIM(COALESCE(CP_searchQuery, searchQuery, query))), ' ', '')) + 1
+                WHEN LOWER(TRIM(COALESCE(CP_searchQuery_queryText, CP_queryText))) IS NULL
+                     OR LOWER(TRIM(COALESCE(CP_searchQuery_queryText, CP_queryText))) = '' THEN 0
+                ELSE LENGTH(LOWER(TRIM(COALESCE(CP_searchQuery_queryText, CP_queryText)))) -
+                     LENGTH(REPLACE(LOWER(TRIM(COALESCE(CP_searchQuery_queryText, CP_queryText))), ' ', '')) + 1
             END as search_term_word_count,
             -- Time extraction (CET-based)
             EXTRACT(HOUR FROM (timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Berlin')::INTEGER as event_hour,
             DAYNAME((timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Berlin') as event_weekday,
             ISODOW((timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Berlin') as event_weekday_num,
             -- Flags
+            -- Note: totalResultCount is now at Level 4:
+            --   searchResultsInteraction.totalResultCount.totalResultCount
             CASE
-                WHEN name = 'SEARCH_RESULT_COUNT' AND CAST(CP_totalResultCount AS INTEGER) = 0 THEN true
-                WHEN name = 'SEARCH_RESULT_COUNT' AND CAST(CP_totalResultCount AS INTEGER) > 0 THEN false
+                WHEN name = 'SEARCH_RESULT_COUNT' AND CAST(CP_searchResultsInteraction_totalResultCount_totalResultCount AS INTEGER) = 0 THEN true
+                WHEN name = 'SEARCH_RESULT_COUNT' AND CAST(CP_searchResultsInteraction_totalResultCount_totalResultCount AS INTEGER) > 0 THEN false
                 ELSE NULL
             END as is_null_result,
             CASE
-                WHEN name = 'SEARCH_RESULT_COUNT' AND CAST(CP_totalResultCount AS INTEGER) > 0 THEN true
+                WHEN name = 'SEARCH_RESULT_COUNT' AND CAST(CP_searchResultsInteraction_totalResultCount_totalResultCount AS INTEGER) > 0 THEN true
                 WHEN name = 'SEARCH_RESULT_COUNT' THEN false
                 ELSE NULL
             END as is_clickable_result,
             -- Store result count for aggregation (sum/count pattern for weighted avg)
             CASE
-                WHEN name = 'SEARCH_RESULT_COUNT' THEN CAST(CP_totalResultCount AS INTEGER)
+                WHEN name = 'SEARCH_RESULT_COUNT' THEN CAST(CP_searchResultsInteraction_totalResultCount_totalResultCount AS INTEGER)
                 ELSE NULL
             END as cp_total_result_count,
             -- Click category: categorizes ALL click events for analysis
             CASE
-                WHEN name = 'SEARCH_RESULT_CLICK' THEN 'Result'
+                WHEN name = 'SEARCH_RESULT_CLICKED' THEN 'Result'
+                WHEN name = 'SEARCH_VIEW_MORE_LINK' THEN 'Result'
                 WHEN name = 'SEARCH_TRENDING_CLICKED' THEN 'Trending'
                 WHEN name = 'SEARCH_TAB_CLICK' THEN 'Tab'
                 WHEN name = 'SEARCH_ALL_TAB_PAGE_CLICK' THEN 'Pagination_All'
@@ -440,7 +446,7 @@ def add_calculated_columns(con):
             -- Success click: TRUE only for actual result clicks (content found)
             -- Note: SEARCH_TRENDING_CLICKED is NOT a success - it's a search initiation via suggestion
             CASE
-                WHEN name = 'SEARCH_RESULT_CLICK' THEN true
+                WHEN name IN ('SEARCH_RESULT_CLICKED', 'SEARCH_VIEW_MORE_LINK') THEN true
                 ELSE false
             END as is_success_click
         FROM searches_raw r
@@ -656,7 +662,7 @@ def export_parquet_files(con, output_dir):
                     COUNT(DISTINCT search_term_normalized) as unique_search_terms,
                     SUM(CASE WHEN is_null_result = true THEN 1 ELSE 0 END) as null_result_count,
                     -- Result metrics
-                    MAX(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN CAST(CP_totalResultCount AS INTEGER) END) as max_total_results,
+                    MAX(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN cp_total_result_count END) as max_total_results,
                     -- Time of day
                     MIN(event_hour) as first_event_hour,
                     MAX(event_hour) as last_event_hour,
