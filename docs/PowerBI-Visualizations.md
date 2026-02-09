@@ -68,6 +68,7 @@ The parquet files include all necessary component columns for correct calculatio
 | Avg Search Term Length | `sum_search_term_length` | `search_term_count` |
 | Avg Search Term Words | `sum_search_term_words` | `search_term_count` |
 | Avg Seconds to Click | `sum_sec_to_click` | `clicks_with_timing` |
+| Avg Click Position | `sum_click_position` | `click_position_count` |
 | Avg Search Latency | `sum_search_latency_ms` | `latency_event_count` |
 | Avg News Results | `sum_news_result_count` | `result_events_with_results` |
 | ViewMore Click Rate | `clicks_viewmore` | `click_events` |
@@ -162,6 +163,14 @@ DIVIDE(
     SUM(searches_daily[search_term_count]),
     0
 )
+
+// Average Click Position (weighted average using SUM columns)
+Avg Click Position =
+DIVIDE(
+    SUM(searches_daily[sum_click_position]),
+    SUM(searches_daily[click_position_count]),
+    BLANK()
+)
 ```
 
 ### Component Columns Reference
@@ -176,6 +185,7 @@ DIVIDE(
 | Avg Searches/Session | `search_starts` | `unique_sessions` |
 | Avg Search Term Length | `sum_search_term_length` | `search_term_count` |
 | Avg Search Term Words | `sum_search_term_words` | `search_term_count` |
+| Avg Click Position | `sum_click_position` | `click_position_count` |
 | Avg Search Latency | `sum_search_latency_ms` | `latency_event_count` |
 | Avg News Results | `sum_news_result_count` | `result_events_with_results` |
 | ViewMore Click Rate | `clicks_viewmore` | `click_events` |
@@ -816,12 +826,9 @@ The `searches_terms.parquet` file contains **one row per search term per day**. 
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `avg_click_position` | Float | Average position of result clicks for this term |
-| `min_click_position` | Integer | Best (lowest) click position for this term |
+| `sum_click_position` | Integer | Sum of click positions for result clicks (for weighted avg in DAX) |
+| `click_position_count` | Integer | Result clicks with position data (denominator for avg) |
 | `sum_news_result_count` | Integer | Sum of news result counts (for weighted avg) |
-| `unique_departments` | Integer | Distinct departments searching this term |
-| `unique_device_types` | Integer | Distinct device types searching this term |
-| `unique_languages` | Integer | Distinct query languages for this term |
 | `sum_search_latency_ms` | Float | Sum of search latency (for weighted avg in DAX) |
 | `latency_event_count` | Integer | Events with latency data (denominator for avg) |
 
@@ -918,9 +925,13 @@ DIVIDE(
     0
 ) * 100
 
-// Average Click Position for terms (already pre-averaged per day)
+// Average Click Position for terms (weighted average using SUM columns)
 Term Avg Click Position =
-AVERAGE(searches_terms[avg_click_position])
+DIVIDE(
+    SUM(searches_terms[sum_click_position]),
+    SUM(searches_terms[click_position_count]),
+    BLANK()
+)
 ```
 
 ### Term Status Classification (Dynamic DAX Measures)

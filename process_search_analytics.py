@@ -695,20 +695,14 @@ def export_parquet_files(con, output_dir):
                 COUNT(CASE WHEN s.click_category = 'Pagination_GoTo' THEN 1 END) as clicks_pagination_goto,
                 COUNT(CASE WHEN s.click_category = 'Filter' THEN 1 END) as clicks_filter,
                 COUNT(CASE WHEN s.click_category = 'ViewMore' THEN 1 END) as clicks_viewmore,
-                -- Click position analysis (only for result clicks)
-                AVG(CASE WHEN s.click_category = 'Result' THEN s.clicked_position END) as avg_click_position,
+                -- Click position analysis (building blocks for Power BI weighted average, result clicks only)
+                SUM(CASE WHEN s.click_category = 'Result' AND s.clicked_position IS NOT NULL THEN s.clicked_position ELSE 0 END) as sum_click_position,
+                COUNT(CASE WHEN s.click_category = 'Result' AND s.clicked_position IS NOT NULL THEN 1 END) as click_position_count,
                 -- News results
                 SUM(CASE WHEN s.name = 'SEARCH_RESULT_COUNT' THEN COALESCE(s.news_result_count, 0) ELSE 0 END) as sum_news_result_count,
-                -- Device type breakdown
-                COUNT(DISTINCT s.device_type) as unique_device_types,
-                -- User detail breakdowns
-                COUNT(DISTINCT s.department) as unique_departments,
-                COUNT(DISTINCT s.location) as unique_locations,
                 -- Search latency (building blocks for Power BI weighted average)
                 SUM(CASE WHEN s.search_latency IS NOT NULL THEN s.search_latency ELSE 0 END) as sum_search_latency_ms,
                 COUNT(CASE WHEN s.search_latency IS NOT NULL THEN 1 END) as latency_event_count,
-                -- Language
-                COUNT(DISTINCT s.query_language) as unique_languages,
                 -- Temporal patterns
                 DAYNAME(s.session_date) as day_of_week,
                 ISODOW(s.session_date) as day_of_week_num,
@@ -1022,16 +1016,11 @@ def export_parquet_files(con, output_dir):
                     COUNT(CASE WHEN click_category = 'Pagination_GoTo' THEN 1 END) as clicks_pagination_goto,
                     COUNT(CASE WHEN click_category = 'Filter' THEN 1 END) as clicks_filter,
                     COUNT(CASE WHEN click_category = 'ViewMore' THEN 1 END) as clicks_viewmore,
-                    -- Click position per term (result clicks only)
-                    AVG(CASE WHEN click_category = 'Result' THEN clicked_position END) as avg_click_position,
-                    MIN(CASE WHEN click_category = 'Result' THEN clicked_position END) as min_click_position,
+                    -- Click position per term (building blocks for Power BI weighted average, result clicks only)
+                    SUM(CASE WHEN click_category = 'Result' AND clicked_position IS NOT NULL THEN clicked_position ELSE 0 END) as sum_click_position,
+                    COUNT(CASE WHEN click_category = 'Result' AND clicked_position IS NOT NULL THEN 1 END) as click_position_count,
                     -- News results per term
                     SUM(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN COALESCE(news_result_count, 0) ELSE 0 END) as sum_news_result_count,
-                    -- User detail breakdowns per term
-                    COUNT(DISTINCT department) as unique_departments,
-                    COUNT(DISTINCT device_type) as unique_device_types,
-                    -- Language per term
-                    COUNT(DISTINCT query_language) as unique_languages,
                     -- Search latency per term (building blocks for weighted average)
                     SUM(CASE WHEN search_latency IS NOT NULL THEN search_latency ELSE 0 END) as sum_search_latency_ms,
                     COUNT(CASE WHEN search_latency IS NOT NULL THEN 1 END) as latency_event_count,

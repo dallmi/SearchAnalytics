@@ -713,14 +713,11 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `clicks_pagination_goto` | Integer | GoTo tab pagination | COUNT(click_category='Pagination_GoTo') |
 | `clicks_filter` | Integer | SEARCH_FILTER_CLICK events | COUNT(click_category='Filter') |
 | `clicks_viewmore` | Integer | SEARCH_VIEW_MORE_LINK events | COUNT(click_category='ViewMore') |
-| `avg_click_position` | Float | Avg position of result clicks | AVG(clicked_position) for Result clicks |
+| `sum_click_position` | Integer | Sum of click positions | SUM(clicked_position) for Result clicks - for weighted avg in DAX |
+| `click_position_count` | Integer | Result clicks with position | COUNT(clicked_position IS NOT NULL) for Result clicks |
 | `sum_news_result_count` | Integer | Sum of news result counts | SUM(news_result_count) for result events |
-| `unique_device_types` | Integer | Distinct device types | COUNT(DISTINCT device_type) |
-| `unique_departments` | Integer | Distinct departments | COUNT(DISTINCT department) |
-| `unique_locations` | Integer | Distinct locations | COUNT(DISTINCT location) |
 | `sum_search_latency_ms` | Float | Sum of search latency | SUM(search_latency) - for weighted avg in DAX |
 | `latency_event_count` | Integer | Events with latency data | COUNT(search_latency IS NOT NULL) |
-| `unique_languages` | Integer | Distinct query languages | COUNT(DISTINCT query_language) |
 | `day_of_week` | String | Day name | DAYNAME(session_date) |
 | `day_of_week_num` | Integer | ISO day number (1=Mon) | ISODOW(session_date) |
 | `searches_night` | Integer | Searches 03:00-09:00 CET (APAC) | Hour-based filter (CET) |
@@ -760,12 +757,9 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `clicks_pagination_goto` | Integer | GoTo tab pagination | COUNT(click_category='Pagination_GoTo') |
 | `clicks_filter` | Integer | SEARCH_FILTER_CLICK events | COUNT(click_category='Filter') |
 | `clicks_viewmore` | Integer | SEARCH_VIEW_MORE_LINK events | COUNT(click_category='ViewMore') |
-| `avg_click_position` | Float | Avg position of result clicks | AVG(clicked_position) for Result clicks |
-| `min_click_position` | Integer | Best click position | MIN(clicked_position) for Result clicks |
+| `sum_click_position` | Integer | Sum of click positions | SUM(clicked_position) for Result clicks - for weighted avg in DAX |
+| `click_position_count` | Integer | Result clicks with position | COUNT(clicked_position IS NOT NULL) for Result clicks |
 | `sum_news_result_count` | Integer | Sum of news result counts | SUM(news_result_count) for result events |
-| `unique_departments` | Integer | Distinct departments | COUNT(DISTINCT department) |
-| `unique_device_types` | Integer | Distinct device types | COUNT(DISTINCT device_type) |
-| `unique_languages` | Integer | Distinct query languages | COUNT(DISTINCT query_language) |
 | `sum_search_latency_ms` | Float | Sum of search latency | SUM(search_latency) - for weighted avg in DAX |
 | `latency_event_count` | Integer | Events with latency data | COUNT(search_latency IS NOT NULL) |
 | `clicks_with_timing` | Integer | Clicks with timing data | COUNT(click after SEARCH_RESULT_COUNT) |
@@ -1015,6 +1009,19 @@ DIVIDE(
     SUM(searches_daily[click_events]),
     0
 ) * 100
+```
+
+### Weighted Avg Click Position
+
+Correctly weighted average click position across days/terms (for daily and terms tables).
+
+```dax
+Avg Click Position =
+DIVIDE(
+    SUM(searches_daily[sum_click_position]),
+    SUM(searches_daily[click_position_count]),
+    BLANK()
+)
 ```
 
 ### Weighted Avg Sec to Click
