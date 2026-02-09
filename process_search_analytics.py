@@ -442,7 +442,7 @@ def add_calculated_columns(con):
             -- Click category: categorizes ALL click events for analysis
             CASE
                 WHEN name IN ('SEARCH_RESULT_CLICK', 'SEARCH_RESULT_CLICKED') THEN 'Result'
-                WHEN name = 'SEARCH_VIEW_MORE_LINK' THEN 'Result'
+                WHEN name = 'SEARCH_VIEW_MORE_LINK' THEN 'ViewMore'
                 WHEN name = 'SEARCH_TRENDING_CLICKED' THEN 'Trending'
                 WHEN name = 'SEARCH_TAB_CLICK' THEN 'Tab'
                 WHEN name = 'SEARCH_ALL_TAB_PAGE_CLICK' THEN 'Pagination_All'
@@ -454,7 +454,7 @@ def add_calculated_columns(con):
             -- Success click: TRUE only for actual result clicks (content found)
             -- Note: SEARCH_TRENDING_CLICKED is NOT a success - it's a search initiation via suggestion
             CASE
-                WHEN name IN ('SEARCH_RESULT_CLICK', 'SEARCH_RESULT_CLICKED', 'SEARCH_VIEW_MORE_LINK') THEN true
+                WHEN name IN ('SEARCH_RESULT_CLICK', 'SEARCH_RESULT_CLICKED') THEN true
                 ELSE false
             END as is_success_click
         FROM searches_raw r
