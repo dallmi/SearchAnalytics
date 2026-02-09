@@ -1,22 +1,26 @@
 // ============================================================================
-// Search Analytics Query - Dynamic JSON Flattening
+// Search Analytics Query - Dynamic JSON Flattening (3 levels)
 // ============================================================================
 // Purpose: Extract and flatten search analytics data from Application Insights
 //          customEvents table with dynamic column generation.
 //
-// Data Structure:
-//   - customDimensions contains flat key-value pairs:
+// Data Structure (3 nesting levels):
+//   Level 1 - customDimensions contains flat key-value pairs:
 //     query, message, searchQuery, userDetails, deviceType, userAgent, os,
 //     browser, osName, browserName, osVersion, browserVersion, platform,
 //     error code, totalSuggestionsCount, suggestionsCount, totalTrendingCount,
 //     trendingCount
-//   - customDimensions also contains a nested JSON object:
-//     CustomProps (with its own dynamic key-value pairs)
+//   Level 2 - customDimensions.CustomProps (nested JSON object):
+//     tab, searchQuery, totalResultCount, searchPerformance, ...
+//   Level 3 - CustomProps may contain further nested JSON objects:
+//     e.g. searchPerformance: { searchAccuracy, searchLatency, ... }
 //
-// Output: All keys become columns dynamically. CustomProps keys are prefixed
-//         with "CP_" to distinguish them from top-level keys.
+// Output: All keys become columns dynamically.
+//   - Level 2 keys are prefixed with "CP_" (e.g. CP_tab)
+//   - Level 3 keys are prefixed with "CP_parent_" (e.g. CP_searchPerformance_searchAccuracy)
+//   - Flat CP values that are not nested objects remain as "CP_key"
 //
-// HOW TO USE: Copy from "set truncationmaxrecords" to "order by" (lines 27-51)
+// HOW TO USE: Copy from "set truncationmaxrecords" to "order by"
 //
 // NOTE: 'timestamp [UTC]' is formatted as 'dd/MM/yyyy HH:mm:ss.fffffff' to preserve
 //       millisecond precision for CSV export (Excel truncates the native format).
@@ -33,18 +37,37 @@ let SearchData = customEvents
     | extend cd = todynamic(customDimensions)
     | serialize
     | extend rowId = row_number()
+    // --- Level 1: Separate CustomProps from top-level customDimensions ---
     | extend CustomPropsRaw = tostring(cd.CustomProps)
     | extend CP = iff(isnotempty(CustomPropsRaw) and CustomPropsRaw startswith "{", todynamic(CustomPropsRaw), dynamic({}))
     | extend mainBag = bag_remove_keys(cd, dynamic(["CustomProps"]))
+    // --- Level 2: Expand CustomProps keys ---
     | extend cpKeys = bag_keys(CP)
     | extend cpKeys = iff(array_length(cpKeys) == 0, dynamic(["__no_cp__"]), cpKeys)
     | mv-expand cpKey = cpKeys to typeof(string)
-    | extend cpBag = iff(cpKey == "__no_cp__", dynamic({}), pack(strcat(CustomPropsPrefix, cpKey), tostring(CP[cpKey])))
-    | summarize take_any(timestamp), take_any(name), take_any(client_CountryOrRegion), take_any(user_Id), take_any(session_Id), take_any(mainBag), cpMerged = make_bag(cpBag) by rowId
-    | extend finalBag = bag_merge(mainBag, coalesce(cpMerged, dynamic({})));
+    | extend cpValue = tostring(CP[cpKey])
+    // --- Level 3: Check if CP values contain nested JSON objects ---
+    | extend isNested = cpKey != "__no_cp__" and isnotempty(cpValue) and cpValue startswith "{"
+    | extend nestedBag = iff(isNested, coalesce(todynamic(cpValue), dynamic({})), dynamic({}))
+    | extend subKeys = bag_keys(nestedBag)
+    | extend subKeys = iff(array_length(subKeys) == 0, dynamic(["__no_sub__"]), subKeys)
+    | mv-expand subKey = subKeys to typeof(string)
+    // --- Build flattened key-value pairs ---
+    // Flat CP value:   CP_key → value
+    // Nested CP value: CP_key_subKey → value
+    // Fallback:        if nested but empty/unparseable, keep raw value as CP_key
+    | extend kvBag = case(
+        cpKey == "__no_cp__", dynamic({}),
+        not(isNested), pack(strcat(CustomPropsPrefix, cpKey), cpValue),
+        subKey == "__no_sub__", pack(strcat(CustomPropsPrefix, cpKey), cpValue),
+        pack(strcat(CustomPropsPrefix, cpKey, "_", subKey), tostring(nestedBag[subKey]))
+      )
+    // --- Reaggregate back to one row per event ---
+    | summarize take_any(timestamp), take_any(name), take_any(client_CountryOrRegion), take_any(user_Id), take_any(session_Id), take_any(mainBag), merged = make_bag(kvBag) by rowId
+    | extend finalBag = bag_merge(mainBag, coalesce(merged, dynamic({})));
 SearchData
 | evaluate bag_unpack(finalBag)
-| project-away rowId, mainBag, cpMerged
+| project-away rowId, mainBag, merged
 | extend ['timestamp [UTC]'] = format_datetime(timestamp, 'dd/MM/yyyy HH:mm:ss.fffffff')
 | project-away timestamp
 | project-reorder ['timestamp [UTC]'], name, client_CountryOrRegion, user_Id, session_Id
