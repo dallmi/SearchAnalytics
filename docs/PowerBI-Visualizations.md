@@ -68,6 +68,9 @@ The parquet files include all necessary component columns for correct calculatio
 | Avg Search Term Length | `sum_search_term_length` | `search_term_count` |
 | Avg Search Term Words | `sum_search_term_words` | `search_term_count` |
 | Avg Seconds to Click | `sum_sec_to_click` | `clicks_with_timing` |
+| Avg Search Latency | `sum_search_latency_ms` | `latency_event_count` |
+| Avg News Results | `sum_news_result_count` | `result_events_with_results` |
+| ViewMore Click Rate | `clicks_viewmore` | `click_events` |
 
 ### Required DAX Measures
 
@@ -126,9 +129,10 @@ DIVIDE(
 ```
 
 **Note on Click Types:**
-- **Success clicks** (`success_clicks`): Only actual result clicks (`SEARCH_RESULT_CLICK`)
+- **Success clicks** (`success_clicks`): Only actual result clicks (`SEARCH_RESULT_CLICK` / `SEARCH_RESULT_CLICKED`)
+- **ViewMore clicks** (`clicks_viewmore`): "View more" link clicks (`SEARCH_VIEW_MORE_LINK`) - navigation, not content discovery
 - **Trending clicks** (`clicks_trending`): Search initiation via suggestion (`SEARCH_TRENDING_CLICKED`) - tracked separately
-- **All clicks** (`click_events`): Includes navigation (tabs, pagination, filters, trending)
+- **All clicks** (`click_events`): Includes navigation (tabs, pagination, filters, trending, viewmore)
 - `Session Success Rate %` is session-based and always 0-100% (did the session have any success clicks?)
 - Use **Session Success/Abandonment rates** for executive KPIs
 
@@ -172,11 +176,15 @@ DIVIDE(
 | Avg Searches/Session | `search_starts` | `unique_sessions` |
 | Avg Search Term Length | `sum_search_term_length` | `search_term_count` |
 | Avg Search Term Words | `sum_search_term_words` | `search_term_count` |
+| Avg Search Latency | `sum_search_latency_ms` | `latency_event_count` |
+| Avg News Results | `sum_news_result_count` | `result_events_with_results` |
+| ViewMore Click Rate | `clicks_viewmore` | `click_events` |
 
 **Click Column Types:**
-- `success_clicks` = Result clicks only (SEARCH_RESULT_CLICK - user found content)
+- `success_clicks` = Result clicks only (SEARCH_RESULT_CLICK / SEARCH_RESULT_CLICKED - user found content)
+- `clicks_viewmore` = ViewMore link clicks (SEARCH_VIEW_MORE_LINK - navigation, not content discovery)
 - `clicks_trending` = Trending suggestion clicks (search initiation, not content discovery)
-- `click_events` = All clicks including navigation (tabs, pagination, filters, trending)
+- `click_events` = All clicks including navigation (tabs, pagination, filters, trending, viewmore)
 
 ### User Cohort Columns (Daily File)
 
@@ -321,6 +329,7 @@ DIVIDE(
 - **Type**: Stacked Bar Chart or Donut
 - **Values**:
   - `clicks_result` - Actual search result clicks
+  - `clicks_viewmore` - View more link clicks
   - `clicks_trending` - Trending item clicks
   - `clicks_tab` - Tab navigation clicks
   - `clicks_pagination` - All pagination clicks (aggregate)
@@ -392,6 +401,18 @@ The `searches_journeys.parquet` file contains **one row per session**. Each row 
 | `is_users_first_session` | Boolean | Is this the user's first session in dataset? |
 | `distinct_click_categories` | Integer | Number of different click types in session |
 | `had_tab_switch` | Boolean | Did user click on multiple tabs/categories? |
+| `viewmore_clicks` | Integer | SEARCH_VIEW_MORE_LINK events in session |
+| `device_type` | String | User's device type |
+| `department` | String | User's department |
+| `location` | String | User's location |
+| `job_title` | String | User's job title |
+| `query_language` | String | Query language |
+| `avg_click_position` | Float | Average position of result clicks |
+| `min_click_position` | Integer | Best (lowest) click position |
+| `max_news_results` | Integer | Max news results shown in session |
+| `avg_search_latency_ms` | Float | Average search latency (ms) |
+| `distinct_tabs_clicked` | Integer | Unique tabs clicked |
+| `distinct_filters_used` | Integer | Unique filters used |
 
 **Click breakdown columns:**
 
@@ -405,6 +426,7 @@ The `searches_journeys.parquet` file contains **one row per session**. Each row 
 | `pagination_news_clicks` | News tab pagination |
 | `pagination_goto_clicks` | GoTo tab pagination |
 | `filter_clicks` | SEARCH_FILTER_CLICK events |
+| `viewmore_clicks` | SEARCH_VIEW_MORE_LINK events |
 
 ### DAX Measures for Journeys
 
@@ -522,6 +544,22 @@ DIVIDE(
 Tab Switch Rate % =
 DIVIDE(
     CALCULATE(COUNTROWS(searches_journeys), searches_journeys[had_tab_switch] = TRUE()),
+    COUNTROWS(searches_journeys),
+    0
+) * 100
+
+// Average Click Position (result clicks only)
+Avg Click Position =
+AVERAGE(searches_journeys[avg_click_position])
+
+// Average Search Latency
+Avg Search Latency (ms) =
+AVERAGE(searches_journeys[avg_search_latency_ms])
+
+// ViewMore Rate (sessions with viewmore clicks)
+ViewMore Rate % =
+DIVIDE(
+    CALCULATE(COUNTROWS(searches_journeys), searches_journeys[viewmore_clicks] > 0),
     COUNTROWS(searches_journeys),
     0
 ) * 100
@@ -704,6 +742,10 @@ Add slicers for:
 - `journey_outcome`
 - `session_complexity`
 - `search_to_result_bucket`
+- `device_type` (new)
+- `department` (new)
+- `location` (new)
+- `query_language` (new)
 
 ### Chart 1: Heatmap - Hour of Day Activity
 - **Type**: Matrix
@@ -761,6 +803,7 @@ The `searches_terms.parquet` file contains **one row per search term per day**. 
 | Column | Description |
 |--------|-------------|
 | `clicks_result` | Actual result clicks |
+| `clicks_viewmore` | View more link clicks |
 | `clicks_trending` | Trending item clicks |
 | `clicks_tab` | Tab navigation clicks |
 | `clicks_pagination` | All pagination (aggregate) |
@@ -768,6 +811,19 @@ The `searches_terms.parquet` file contains **one row per search term per day**. 
 | `clicks_pagination_news` | News tab pagination |
 | `clicks_pagination_goto` | GoTo tab pagination |
 | `clicks_filter` | Filter clicks |
+
+**New metric columns:**
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `avg_click_position` | Float | Average position of result clicks for this term |
+| `min_click_position` | Integer | Best (lowest) click position for this term |
+| `sum_news_result_count` | Integer | Sum of news result counts (for weighted avg) |
+| `unique_departments` | Integer | Distinct departments searching this term |
+| `unique_device_types` | Integer | Distinct device types searching this term |
+| `unique_languages` | Integer | Distinct query languages for this term |
+| `sum_search_latency_ms` | Float | Sum of search latency (for weighted avg in DAX) |
+| `latency_event_count` | Integer | Events with latency data (denominator for avg) |
 
 ### DAX Measures for Search Terms
 
@@ -837,6 +893,34 @@ DIVIDE(
     COUNTROWS(searches_terms),
     0
 ) * 100
+
+// Weighted Avg Search Latency for terms
+Term Avg Search Latency (ms) =
+DIVIDE(
+    SUM(searches_terms[sum_search_latency_ms]),
+    SUM(searches_terms[latency_event_count]),
+    BLANK()
+)
+
+// Avg News Results per term
+Term Avg News Results =
+DIVIDE(
+    SUM(searches_terms[sum_news_result_count]),
+    SUM(searches_terms[result_events]),
+    BLANK()
+)
+
+// ViewMore Click Rate for terms
+Term ViewMore Rate % =
+DIVIDE(
+    SUM(searches_terms[clicks_viewmore]),
+    SUM(searches_terms[click_count]),
+    0
+) * 100
+
+// Average Click Position for terms (already pre-averaged per day)
+Term Avg Click Position =
+AVERAGE(searches_terms[avg_click_position])
 ```
 
 ### Term Status Classification (Dynamic DAX Measures)

@@ -50,7 +50,9 @@ Events fired when users interact with search results:
 | Event | Description | When Fired |
 |-------|-------------|------------|
 | `SEARCH_TAB_CLICK` | Tab clicked | Any tab (All, News, GOTO) is clicked |
-| `SEARCH_RESULT_CLICK` | Result clicked | Any item from search results is clicked |
+| `SEARCH_RESULT_CLICK` | Result clicked (legacy) | Any item from search results is clicked |
+| `SEARCH_RESULT_CLICKED` | Result clicked (new) | Any item from search results is clicked (new event name) |
+| `SEARCH_VIEW_MORE_LINK` | View more clicked | User clicks "view more" link in results |
 | `SEARCH_ALL_TAB_PAGE_CLICK` | All tab pagination | User on ALL tab clicks page in pagination |
 | `SEARCH_NEWS_TAB_PAGE_CLICK` | News tab pagination | User on NEWS tab clicks page in pagination |
 | `SEARCH_GOTO_TAB_PAGE_CLICK` | GoTo tab pagination | User on GOTO tab clicks page in pagination |
@@ -96,7 +98,8 @@ SEARCH_RESULT_COUNT  <-- Results displayed to user (10:30:15.567)
     v
 [User interacts with results - independent events]
     |
-    +-- SEARCH_TAB_CLICK / SEARCH_RESULT_CLICK
+    +-- SEARCH_TAB_CLICK / SEARCH_RESULT_CLICK / SEARCH_RESULT_CLICKED
+    +-- SEARCH_VIEW_MORE_LINK
     +-- SEARCH_ALL_TAB_PAGE_CLICK / SEARCH_NEWS_TAB_PAGE_CLICK / SEARCH_GOTO_TAB_PAGE_CLICK
     +-- SEARCH_TRENDING_CLICKED
     +-- SEARCH_FILTER_CLICK
@@ -254,7 +257,10 @@ event_hour:     0                        (midnight hour in CEST)
 Search terms are cleaned for consistent aggregation:
 
 ```sql
-search_term_normalized = LOWER(TRIM(COALESCE(CP_searchQuery, searchQuery, query)))
+-- Column names vary by event type and nesting level (resolved dynamically):
+-- New structure: CP_searchQuery_queryText (L3) or CP_queryText (L2 for SEARCH_TRIGGERED)
+-- Old structure: CP_searchQuery, searchQuery, query
+search_term_normalized = LOWER(TRIM(COALESCE(CP_searchQuery_queryText, CP_queryText, CP_searchQuery, searchQuery, query)))
 -- Input:  "  Budget Report  "
 -- Output: "budget report"
 ```
@@ -387,7 +393,8 @@ Event: SEARCH_RESULT_COUNT with CP_totalResultCount = 15
 
 ```sql
 click_category = CASE
-    WHEN name = 'SEARCH_RESULT_CLICK' THEN 'Result'
+    WHEN name IN ('SEARCH_RESULT_CLICK', 'SEARCH_RESULT_CLICKED') THEN 'Result'
+    WHEN name = 'SEARCH_VIEW_MORE_LINK' THEN 'ViewMore'
     WHEN name = 'SEARCH_TRENDING_CLICKED' THEN 'Trending'
     WHEN name = 'SEARCH_TAB_CLICK' THEN 'Tab'
     WHEN name = 'SEARCH_ALL_TAB_PAGE_CLICK' THEN 'Pagination_All'
@@ -404,12 +411,12 @@ END
 
 ```sql
 is_success_click = CASE
-    WHEN name = 'SEARCH_RESULT_CLICK' THEN true
+    WHEN name IN ('SEARCH_RESULT_CLICK', 'SEARCH_RESULT_CLICKED') THEN true
     ELSE false
 END
 ```
 
-**Note:** `SEARCH_TRENDING_CLICKED` is NOT a success click - it's a search initiation via suggestion (the user hasn't found content yet, they've just started a search journey).
+**Note:** `SEARCH_TRENDING_CLICKED` is NOT a success click - it's a search initiation via suggestion. `SEARCH_VIEW_MORE_LINK` is also NOT a success click - it's navigation to see more results, classified as `ViewMore` in click_category.
 
 ### journey_outcome (Session-Level)
 
@@ -588,8 +595,21 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `ms_since_prev_event` | Integer | Milliseconds since previous event | 333 |
 | `search_term_normalized` | String | Cleaned search query | budget report |
 | `is_null_result` | Boolean | True if zero results returned | false |
-| `click_category` | String | Click type (General/All/News/GoTo/People) | General |
+| `click_category` | String | Click type (Result/ViewMore/Trending/Tab/Pagination_*/Filter) | Result |
+| `is_success_click` | Boolean | True for actual result clicks | true |
 | `last_search_started_ts` | Timestamp | Most recent SEARCH_TRIGGERED timestamp | 2025-01-15 10:30:15.123 |
+| `clicked_position` | Integer | Position of clicked result in result list | 3 |
+| `clicked_tab` | String | Which tab was clicked | All |
+| `applied_filter` | String | Which filter was applied | Date |
+| `clicked_result_title` | String | Title of clicked result | Budget Report Q4 |
+| `clicked_result_url` | String | URL of clicked result | https://intranet/... |
+| `news_result_count` | Integer | News results in result count | 5 |
+| `query_language` | String | Detected query language | en |
+| `device_type` | String | User's device type | Desktop |
+| `department` | String | User's department | Finance |
+| `location` | String | User's location | Berlin |
+| `job_title` | String | User's job title | Analyst |
+| `search_latency` | Double | Search latency in milliseconds | 234.5 |
 
 ---
 
@@ -643,6 +663,18 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `is_users_first_session` | Boolean | First time user | user_session_number = 1 |
 | `distinct_click_categories` | Integer | Tab types clicked | COUNT(DISTINCT click_category) |
 | `had_tab_switch` | Boolean | Clicked multiple tabs | distinct_click_categories > 1 |
+| `viewmore_clicks` | Integer | SEARCH_VIEW_MORE_LINK events | COUNT(click_category='ViewMore') |
+| `device_type` | String | User's device type | MIN(device_type) per session |
+| `department` | String | User's department | MIN(department) per session |
+| `location` | String | User's location | MIN(location) per session |
+| `job_title` | String | User's job title | MIN(job_title) per session |
+| `query_language` | String | Query language | MIN(query_language) per session |
+| `avg_click_position` | Float | Avg position of result clicks | AVG(clicked_position) for Result clicks |
+| `min_click_position` | Integer | Best (lowest) click position | MIN(clicked_position) for Result clicks |
+| `max_news_results` | Integer | Max news results shown | MAX(news_result_count) |
+| `avg_search_latency_ms` | Float | Avg search latency (ms) | AVG(search_latency) |
+| `distinct_tabs_clicked` | Integer | Unique tabs clicked | COUNT(DISTINCT clicked_tab) |
+| `distinct_filters_used` | Integer | Unique filters used | COUNT(DISTINCT applied_filter) |
 
 ---
 
@@ -680,6 +712,15 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `clicks_pagination_news` | Integer | News tab pagination | COUNT(click_category='Pagination_News') |
 | `clicks_pagination_goto` | Integer | GoTo tab pagination | COUNT(click_category='Pagination_GoTo') |
 | `clicks_filter` | Integer | SEARCH_FILTER_CLICK events | COUNT(click_category='Filter') |
+| `clicks_viewmore` | Integer | SEARCH_VIEW_MORE_LINK events | COUNT(click_category='ViewMore') |
+| `avg_click_position` | Float | Avg position of result clicks | AVG(clicked_position) for Result clicks |
+| `sum_news_result_count` | Integer | Sum of news result counts | SUM(news_result_count) for result events |
+| `unique_device_types` | Integer | Distinct device types | COUNT(DISTINCT device_type) |
+| `unique_departments` | Integer | Distinct departments | COUNT(DISTINCT department) |
+| `unique_locations` | Integer | Distinct locations | COUNT(DISTINCT location) |
+| `sum_search_latency_ms` | Float | Sum of search latency | SUM(search_latency) - for weighted avg in DAX |
+| `latency_event_count` | Integer | Events with latency data | COUNT(search_latency IS NOT NULL) |
+| `unique_languages` | Integer | Distinct query languages | COUNT(DISTINCT query_language) |
 | `day_of_week` | String | Day name | DAYNAME(session_date) |
 | `day_of_week_num` | Integer | ISO day number (1=Mon) | ISODOW(session_date) |
 | `searches_night` | Integer | Searches 03:00-09:00 CET (APAC) | Hour-based filter (CET) |
@@ -718,6 +759,15 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `clicks_pagination_news` | Integer | News tab pagination | COUNT(click_category='Pagination_News') |
 | `clicks_pagination_goto` | Integer | GoTo tab pagination | COUNT(click_category='Pagination_GoTo') |
 | `clicks_filter` | Integer | SEARCH_FILTER_CLICK events | COUNT(click_category='Filter') |
+| `clicks_viewmore` | Integer | SEARCH_VIEW_MORE_LINK events | COUNT(click_category='ViewMore') |
+| `avg_click_position` | Float | Avg position of result clicks | AVG(clicked_position) for Result clicks |
+| `min_click_position` | Integer | Best click position | MIN(clicked_position) for Result clicks |
+| `sum_news_result_count` | Integer | Sum of news result counts | SUM(news_result_count) for result events |
+| `unique_departments` | Integer | Distinct departments | COUNT(DISTINCT department) |
+| `unique_device_types` | Integer | Distinct device types | COUNT(DISTINCT device_type) |
+| `unique_languages` | Integer | Distinct query languages | COUNT(DISTINCT query_language) |
+| `sum_search_latency_ms` | Float | Sum of search latency | SUM(search_latency) - for weighted avg in DAX |
+| `latency_event_count` | Integer | Events with latency data | COUNT(search_latency IS NOT NULL) |
 | `clicks_with_timing` | Integer | Clicks with timing data | COUNT(click after SEARCH_RESULT_COUNT) |
 | `sum_sec_to_click` | Float | Sum of click times | SUM(ms_result_to_click) / 1000 - for weighted avg in DAX |
 | `searches_night` | Integer | Searches 03:00-09:00 CET (APAC) | Hour-based filter (CET) |
@@ -797,6 +847,36 @@ SWITCH(
 | Success | Good performance | Monitor |
 
 ### searches_journeys Table
+
+#### Latency_Bucket
+Categorizes search latency for visualization.
+
+```dax
+Latency_Bucket =
+SWITCH(
+    TRUE(),
+    ISBLANK(searches_journeys[avg_search_latency_ms]), "No Data",
+    searches_journeys[avg_search_latency_ms] < 500, "< 0.5s",
+    searches_journeys[avg_search_latency_ms] < 1000, "0.5-1s",
+    searches_journeys[avg_search_latency_ms] < 2000, "1-2s",
+    "> 2s"
+)
+```
+
+#### Click_Position_Bucket
+Categorizes click position for visualization.
+
+```dax
+Click_Position_Bucket =
+SWITCH(
+    TRUE(),
+    ISBLANK(searches_journeys[avg_click_position]), "No Click",
+    searches_journeys[avg_click_position] <= 1, "Position 1",
+    searches_journeys[avg_click_position] <= 3, "Top 3",
+    searches_journeys[avg_click_position] <= 5, "Top 5",
+    "Below 5"
+)
+```
 
 #### Journey_Type
 Combines outcome and behavior flags for segmentation.
@@ -898,6 +978,45 @@ DIVIDE(
 )
 ```
 
+### Weighted Avg Search Latency
+
+Correctly weighted average search latency across days (for daily and terms tables).
+
+```dax
+Avg Search Latency (ms) =
+DIVIDE(
+    SUM(searches_daily[sum_search_latency_ms]),
+    SUM(searches_daily[latency_event_count]),
+    BLANK()
+)
+```
+
+### Avg News Results per Search
+
+Average news results per result event.
+
+```dax
+Avg News Results =
+DIVIDE(
+    SUM(searches_daily[sum_news_result_count]),
+    SUM(searches_daily[result_events_with_results]),
+    BLANK()
+)
+```
+
+### ViewMore Click Rate
+
+Percentage of clicks that are "view more" navigations.
+
+```dax
+ViewMore Click Rate % =
+DIVIDE(
+    SUM(searches_daily[clicks_viewmore]),
+    SUM(searches_daily[click_events]),
+    0
+) * 100
+```
+
 ### Weighted Avg Sec to Click
 
 Correctly weighted average click time (for terms aggregation).
@@ -961,3 +1080,4 @@ timestamp,name,user_Id,session_Id,CP_searchQuery,CP_totalResultCount
 | 1.7 | 2025-01-26 | Added AppInsights Identifiers section explaining user_id (cookie-based) and session_id (30-min inactivity timeout) behavior and implications for metrics. |
 | 1.8 | 2025-01-29 | Updated time distribution buckets to align with regional business hours: APAC (03-09 CET), CET (09-16 CET), Americas (16-22 CET), Dead time (22-03 CET). Column names unchanged for Power BI compatibility. |
 | 1.9 | 2025-01-29 | Removed pre-calculated rate/average columns that cannot be aggregated: click_rate_pct, null_rate_pct, session_success_rate_pct, session_abandonment_rate_pct, avg_searches_per_session, avg_search_term_length, avg_search_term_words, avg_sec_to_click. Use DAX measures with building block columns instead. |
+| 2.0 | 2025-02-09 | Adapted to new App Insights 4-level nesting structure. Added SEARCH_RESULT_CLICKED and SEARCH_VIEW_MORE_LINK events. Added ViewMore click category. Added 12 new fields from dynamic column resolution: clicked_position, clicked_tab, applied_filter, clicked_result_title, clicked_result_url, news_result_count, query_language, device_type, department, location, job_title, search_latency. Updated all three aggregation files (daily, journeys, terms) with new metrics. Added new Power BI measures (Avg Search Latency, Avg News Results, ViewMore Click Rate) and calculated columns (Latency_Bucket, Click_Position_Bucket). |

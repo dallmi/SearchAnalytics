@@ -157,8 +157,25 @@ The script creates a `searches` table with all calculated analytics columns:
 |--------|-------------|
 | `is_null_result` | True if search returned 0 results |
 | `is_clickable_result` | True if search returned >0 results (user could click) |
-| `click_category` | Simplified click type (`General`, `All`, `News`, `GoTo`, `People`) |
+| `click_category` | Click type (`Result`, `ViewMore`, `Trending`, `Tab`, `Pagination_*`, `Filter`) |
+| `is_success_click` | True for actual result clicks (SEARCH_RESULT_CLICK/SEARCH_RESULT_CLICKED) |
 | `is_first_search_of_day` | True if this is user's first search of the day |
+
+#### New Dimension Fields (from App Insights 4-level nesting)
+| Column | Description |
+|--------|-------------|
+| `clicked_position` | Position of clicked result in result list |
+| `clicked_tab` | Which tab was clicked |
+| `applied_filter` | Which filter was applied |
+| `clicked_result_title` | Title of the clicked result |
+| `clicked_result_url` | URL of the clicked result |
+| `news_result_count` | Number of news results |
+| `query_language` | Detected query language |
+| `device_type` | User's device type |
+| `department` | User's department |
+| `location` | User's location |
+| `job_title` | User's job title |
+| `search_latency` | Search latency in milliseconds |
 
 ### Step 5: Export Parquet Files
 
@@ -179,7 +196,8 @@ Four Parquet files are generated for Power BI (plus one for search term analysis
     - `sum_search_term_length`, `sum_search_term_words` - Sums for weighted avg in Power BI
     - `search_term_count` - Count of search terms (denominator for weighted avg)
   - `first_searches_of_day`
-  - Click breakdowns by category (`clicks_result`, `clicks_trending`, `clicks_tab`, `clicks_filter`, `clicks_pagination`)
+  - Click breakdowns by category (`clicks_result`, `clicks_trending`, `clicks_tab`, `clicks_filter`, `clicks_pagination`, `clicks_viewmore`)
+  - **New field metrics**: `avg_click_position`, `sum_news_result_count`, `unique_device_types`, `unique_departments`, `unique_locations`, `sum_search_latency_ms`, `latency_event_count`, `unique_languages`
   - **Time distribution (CET-based regional business hours)**:
     - `searches_night` (03-09 CET, APAC), `searches_morning` (09-16 CET, CET)
     - `searches_afternoon` (16-22 CET, Americas), `searches_evening` (22-03 CET, Dead time)
@@ -199,7 +217,9 @@ Four Parquet files are generated for Power BI (plus one for search term analysis
   - `journey_outcome` (`Success`, `Engaged`, `Abandoned`, `No Results`, `Unknown`)
   - `had_reformulation` (user modified search query)
   - `session_complexity` (`Single Action`, `Simple`, `Medium`, `Complex`) - based on user actions (searches + clicks)
-- **Click breakdown**: `general_clicks`, `all_tab_clicks`, `news_clicks`, etc.
+- **Click breakdown**: `result_clicks`, `trending_clicks`, `tab_clicks`, `pagination_clicks`, `filter_clicks`, `viewmore_clicks`
+- **New dimension fields**: `device_type`, `department`, `location`, `job_title`, `query_language`
+- **New metrics**: `avg_click_position`, `min_click_position`, `max_news_results`, `avg_search_latency_ms`, `distinct_tabs_clicked`, `distinct_filters_used`
 
 #### 4. `searches_terms.parquet`
 - **Content**: Search term analysis aggregated by term and day
@@ -208,7 +228,8 @@ Four Parquet files are generated for Power BI (plus one for search term analysis
 - **Result metrics**:
   - `result_events`, `null_result_count`
 - **Click metrics**:
-  - `click_count`, `success_click_count`, `clicks_result`, `clicks_trending`, `clicks_tab`, `clicks_filter`
+  - `click_count`, `success_click_count`, `clicks_result`, `clicks_trending`, `clicks_tab`, `clicks_filter`, `clicks_viewmore`
+- **New field metrics**: `avg_click_position`, `min_click_position`, `sum_news_result_count`, `unique_departments`, `unique_device_types`, `unique_languages`, `sum_search_latency_ms`, `latency_event_count`
 - **Timing metrics** (building blocks for DAX calculations):
   - `clicks_with_timing`, `sum_sec_to_click` - For weighted avg calculation in Power BI
 - **Time distribution (CET-based regional business hours)**:
@@ -361,7 +382,9 @@ The telemetry captures these events in the search flow:
 | Event | Description |
 |-------|-------------|
 | `SEARCH_TAB_CLICK` | Click on any tab (All, News, GOTO) |
-| `SEARCH_RESULT_CLICK` | Click on any search result item |
+| `SEARCH_RESULT_CLICK` | Click on any search result item (legacy event name) |
+| `SEARCH_RESULT_CLICKED` | Click on any search result item (new event name) |
+| `SEARCH_VIEW_MORE_LINK` | Click on "view more" link in results |
 | `SEARCH_ALL_TAB_PAGE_CLICK` | Click on "All" tab pagination |
 | `SEARCH_NEWS_TAB_PAGE_CLICK` | Click on "News" tab pagination |
 | `SEARCH_GOTO_TAB_PAGE_CLICK` | Click on "GoTo" tab pagination |
