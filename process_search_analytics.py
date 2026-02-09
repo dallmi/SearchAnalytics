@@ -386,7 +386,66 @@ def add_calculated_columns(con):
     result_count_candidates = [c for c in ['CP_searchResultsInteraction_totalResultCount_totalResultCount', 'CP_totalResultCount'] if c in col_names]
     result_count_expr = f"CAST(COALESCE({', '.join(result_count_candidates)}) AS INTEGER)" if result_count_candidates else 'NULL::INTEGER'
 
+    # Clicked position: position of clicked result in result list
+    clicked_pos_candidates = [c for c in ['CP_searchResultsInteraction_clickedPosition'] if c in col_names]
+    clicked_pos_expr = f"TRY_CAST(COALESCE({', '.join(clicked_pos_candidates)}) AS INTEGER)" if clicked_pos_candidates else 'NULL::INTEGER'
+
+    # Clicked tab: which tab was clicked
+    clicked_tab_candidates = [c for c in ['CP_searchResultsInteraction_clickedTAB', 'CP_clickedTAB'] if c in col_names]
+    clicked_tab_expr = f"COALESCE({', '.join(clicked_tab_candidates)})" if clicked_tab_candidates else 'NULL'
+
+    # Applied filter
+    applied_filter_candidates = [c for c in ['CP_searchResultsInteraction_appliedFilter', 'CP_appliedFilter'] if c in col_names]
+    applied_filter_expr = f"COALESCE({', '.join(applied_filter_candidates)})" if applied_filter_candidates else 'NULL'
+
+    # Clicked result title (L4)
+    result_title_candidates = [c for c in ['CP_searchResultsInteraction_clickedResult_resultTitle'] if c in col_names]
+    result_title_expr = f"COALESCE({', '.join(result_title_candidates)})" if result_title_candidates else 'NULL'
+
+    # Clicked result URL (L4)
+    result_url_candidates = [c for c in ['CP_searchResultsInteraction_clickedResult_resultUrl'] if c in col_names]
+    result_url_expr = f"COALESCE({', '.join(result_url_candidates)})" if result_url_candidates else 'NULL'
+
+    # News result count (L4)
+    news_count_candidates = [c for c in ['CP_searchResultsInteraction_totalResultCount_newsResultCount'] if c in col_names]
+    news_count_expr = f"TRY_CAST(COALESCE({', '.join(news_count_candidates)}) AS INTEGER)" if news_count_candidates else 'NULL::INTEGER'
+
+    # Query language
+    query_lang_candidates = [c for c in ['CP_searchQuery_queryLanguage', 'CP_queryLanguage'] if c in col_names]
+    query_lang_expr = f"COALESCE({', '.join(query_lang_candidates)})" if query_lang_candidates else 'NULL'
+
+    # Device type
+    device_type_candidates = [c for c in ['CP_deviceType'] if c in col_names]
+    device_type_expr = f"COALESCE({', '.join(device_type_candidates)})" if device_type_candidates else 'NULL'
+
+    # Department
+    department_candidates = [c for c in ['CP_userDetails_department'] if c in col_names]
+    department_expr = f"COALESCE({', '.join(department_candidates)})" if department_candidates else 'NULL'
+
+    # Location
+    location_candidates = [c for c in ['CP_userDetails_location'] if c in col_names]
+    location_expr = f"COALESCE({', '.join(location_candidates)})" if location_candidates else 'NULL'
+
+    # Job title
+    job_title_candidates = [c for c in ['CP_userDetails_jobTitle'] if c in col_names]
+    job_title_expr = f"COALESCE({', '.join(job_title_candidates)})" if job_title_candidates else 'NULL'
+
+    # Search latency
+    latency_candidates = [c for c in ['CP_searchPerformance_searchLatency'] if c in col_names]
+    latency_expr = f"TRY_CAST(COALESCE({', '.join(latency_candidates)}) AS DOUBLE)" if latency_candidates else 'NULL::DOUBLE'
+
+    # Log resolution summary
+    new_field_candidates = {
+        'clicked_position': clicked_pos_candidates, 'clicked_tab': clicked_tab_candidates,
+        'applied_filter': applied_filter_candidates, 'result_title': result_title_candidates,
+        'result_url': result_url_candidates, 'news_result_count': news_count_candidates,
+        'query_language': query_lang_candidates, 'device_type': device_type_candidates,
+        'department': department_candidates, 'location': location_candidates,
+        'job_title': job_title_candidates, 'search_latency': latency_candidates,
+    }
+    resolved_fields = [k for k, v in new_field_candidates.items() if v]
     log(f"  Column resolution: search_term from [{', '.join(search_term_candidates)}], result_count from [{', '.join(result_count_candidates)}]")
+    log(f"  New fields resolved ({len(resolved_fields)}/{len(new_field_candidates)}): {', '.join(resolved_fields) if resolved_fields else 'none'}")
 
     # Build the main query with all calculated columns
     con.execute(f"""
@@ -456,7 +515,20 @@ def add_calculated_columns(con):
             CASE
                 WHEN name IN ('SEARCH_RESULT_CLICK', 'SEARCH_RESULT_CLICKED') THEN true
                 ELSE false
-            END as is_success_click
+            END as is_success_click,
+            -- New fields (dynamically resolved from available columns)
+            {clicked_pos_expr} as clicked_position,
+            {clicked_tab_expr} as clicked_tab,
+            {applied_filter_expr} as applied_filter,
+            {result_title_expr} as clicked_result_title,
+            {result_url_expr} as clicked_result_url,
+            {news_count_expr} as news_result_count,
+            {query_lang_expr} as query_language,
+            {device_type_expr} as device_type,
+            {department_expr} as department,
+            {location_expr} as location,
+            {job_title_expr} as job_title,
+            {latency_expr} as search_latency
         FROM searches_raw r
     """)
 
@@ -622,6 +694,21 @@ def export_parquet_files(con, output_dir):
                 COUNT(CASE WHEN s.click_category = 'Pagination_News' THEN 1 END) as clicks_pagination_news,
                 COUNT(CASE WHEN s.click_category = 'Pagination_GoTo' THEN 1 END) as clicks_pagination_goto,
                 COUNT(CASE WHEN s.click_category = 'Filter' THEN 1 END) as clicks_filter,
+                COUNT(CASE WHEN s.click_category = 'ViewMore' THEN 1 END) as clicks_viewmore,
+                -- Click position analysis (only for result clicks)
+                AVG(CASE WHEN s.click_category = 'Result' THEN s.clicked_position END) as avg_click_position,
+                -- News results
+                SUM(CASE WHEN s.name = 'SEARCH_RESULT_COUNT' THEN COALESCE(s.news_result_count, 0) ELSE 0 END) as sum_news_result_count,
+                -- Device type breakdown
+                COUNT(DISTINCT s.device_type) as unique_device_types,
+                -- User detail breakdowns
+                COUNT(DISTINCT s.department) as unique_departments,
+                COUNT(DISTINCT s.location) as unique_locations,
+                -- Search latency (building blocks for Power BI weighted average)
+                SUM(CASE WHEN s.search_latency IS NOT NULL THEN s.search_latency ELSE 0 END) as sum_search_latency_ms,
+                COUNT(CASE WHEN s.search_latency IS NOT NULL THEN 1 END) as latency_event_count,
+                -- Language
+                COUNT(DISTINCT s.query_language) as unique_languages,
                 -- Temporal patterns
                 DAYNAME(s.session_date) as day_of_week,
                 ISODOW(s.session_date) as day_of_week_num,
@@ -685,7 +772,25 @@ def export_parquet_files(con, output_dir):
                     COUNT(CASE WHEN click_category = 'Filter' THEN 1 END) as filter_clicks,
                     MAX(CASE WHEN is_first_search_of_day = true THEN 1 ELSE 0 END) as includes_first_search_of_day,
                     -- Session flow: distinct click categories used
-                    COUNT(DISTINCT click_category) as distinct_click_categories
+                    COUNT(DISTINCT click_category) as distinct_click_categories,
+                    -- ViewMore clicks
+                    COUNT(CASE WHEN click_category = 'ViewMore' THEN 1 END) as viewmore_clicks,
+                    -- New dimension fields (first non-null value per session)
+                    MIN(device_type) as device_type,
+                    MIN(department) as department,
+                    MIN(location) as location,
+                    MIN(job_title) as job_title,
+                    MIN(query_language) as query_language,
+                    -- Click position metrics (result clicks only)
+                    AVG(CASE WHEN click_category = 'Result' THEN clicked_position END) as avg_click_position,
+                    MIN(CASE WHEN click_category = 'Result' THEN clicked_position END) as min_click_position,
+                    -- News results
+                    MAX(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN news_result_count END) as max_news_results,
+                    -- Search latency
+                    AVG(search_latency) as avg_search_latency_ms,
+                    -- Tab and filter usage
+                    COUNT(DISTINCT clicked_tab) as distinct_tabs_clicked,
+                    COUNT(DISTINCT applied_filter) as distinct_filters_used
                 FROM searches
                 GROUP BY session_key, session_date, user_id
             ),
@@ -815,7 +920,24 @@ def export_parquet_files(con, output_dir):
                 CASE WHEN user_session_number = 1 THEN true ELSE false END as is_users_first_session,
                 -- Session flow analysis
                 distinct_click_categories,
-                CASE WHEN distinct_click_categories > 1 THEN true ELSE false END as had_tab_switch
+                CASE WHEN distinct_click_categories > 1 THEN true ELSE false END as had_tab_switch,
+                viewmore_clicks,
+                -- New dimension fields
+                device_type,
+                department,
+                location,
+                job_title,
+                query_language,
+                -- Click position metrics
+                ROUND(avg_click_position, 1) as avg_click_position,
+                min_click_position,
+                -- News results
+                max_news_results,
+                -- Search latency
+                ROUND(avg_search_latency_ms, 0) as avg_search_latency_ms,
+                -- Tab and filter usage
+                distinct_tabs_clicked,
+                distinct_filters_used
             FROM session_with_user_rank
             ORDER BY session_date, session_start
         ) TO '{journeys_file}' (FORMAT PARQUET, COMPRESSION SNAPPY)
@@ -844,6 +966,13 @@ def export_parquet_files(con, output_dir):
                     prev_event,
                     ms_since_prev_event,
                     event_hour,
+                    -- New fields
+                    clicked_position,
+                    query_language,
+                    department,
+                    device_type,
+                    news_result_count,
+                    search_latency,
                     -- Forward-fill search term to clicks and result events
                     LAST_VALUE(search_term_normalized IGNORE NULLS) OVER (
                         PARTITION BY session_key
@@ -892,6 +1021,20 @@ def export_parquet_files(con, output_dir):
                     COUNT(CASE WHEN click_category = 'Pagination_News' THEN 1 END) as clicks_pagination_news,
                     COUNT(CASE WHEN click_category = 'Pagination_GoTo' THEN 1 END) as clicks_pagination_goto,
                     COUNT(CASE WHEN click_category = 'Filter' THEN 1 END) as clicks_filter,
+                    COUNT(CASE WHEN click_category = 'ViewMore' THEN 1 END) as clicks_viewmore,
+                    -- Click position per term (result clicks only)
+                    AVG(CASE WHEN click_category = 'Result' THEN clicked_position END) as avg_click_position,
+                    MIN(CASE WHEN click_category = 'Result' THEN clicked_position END) as min_click_position,
+                    -- News results per term
+                    SUM(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN COALESCE(news_result_count, 0) ELSE 0 END) as sum_news_result_count,
+                    -- User detail breakdowns per term
+                    COUNT(DISTINCT department) as unique_departments,
+                    COUNT(DISTINCT device_type) as unique_device_types,
+                    -- Language per term
+                    COUNT(DISTINCT query_language) as unique_languages,
+                    -- Search latency per term (building blocks for weighted average)
+                    SUM(CASE WHEN search_latency IS NOT NULL THEN search_latency ELSE 0 END) as sum_search_latency_ms,
+                    COUNT(CASE WHEN search_latency IS NOT NULL THEN 1 END) as latency_event_count,
                     -- Timing metrics (building blocks for DAX calculations in Power BI)
                     COUNT(CASE
                         WHEN is_success_click = true AND prev_event = 'SEARCH_RESULT_COUNT'
