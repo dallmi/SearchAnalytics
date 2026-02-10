@@ -1059,28 +1059,75 @@ def export_parquet_files(con, output_dir):
     log(f"  searches_terms.parquet ({terms_count:,} term-day combinations)")
 
 
-def print_summary(con):
-    """Print processing summary."""
-    row_count = con.execute("SELECT COUNT(*) as n FROM searches").df()['n'][0]
+def print_summary(con, output_dir=None):
+    """Print comprehensive processing summary."""
+    log("")
+    log("=" * 64)
+    log("  PROCESSING SUMMARY")
+    log("=" * 64)
 
-    # Date range
-    date_range = con.execute("""
+    # --- Table overview ---
+    log("\n  TABLES CREATED")
+    log("  " + "-" * 60)
+    tables = con.execute("SHOW TABLES").df()['name'].tolist()
+    for table in sorted(tables):
+        row_count = con.execute(f"SELECT COUNT(*) as n FROM {table}").df()['n'][0]
+        col_count = len(con.execute(f"DESCRIBE {table}").df())
+        log(f"    {table:<30s} {row_count:>10,} rows  ({col_count} columns)")
+
+    # --- Parquet file sizes (if output_dir provided) ---
+    if output_dir:
+        parquet_files = sorted(Path(output_dir).glob('*.parquet'))
+        if parquet_files:
+            log("\n  PARQUET FILES EXPORTED")
+            log("  " + "-" * 60)
+            for pf in parquet_files:
+                size_mb = os.path.getsize(pf) / (1024 * 1024)
+                pq_rows = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{pf}')").df()['n'][0]
+                log(f"    {pf.name:<40s} {pq_rows:>8,} rows  ({size_mb:.1f} MB)")
+
+    # --- Date range & volume ---
+    overview = con.execute("""
         SELECT
             MIN(session_date) as first_date,
             MAX(session_date) as last_date,
-            COUNT(DISTINCT session_date) as days
+            COUNT(DISTINCT session_date) as days,
+            COUNT(*) as total_events,
+            COUNT(DISTINCT user_id) as unique_users,
+            COUNT(DISTINCT session_key) as unique_sessions,
+            COUNT(DISTINCT search_term_normalized) as unique_terms,
+            COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' THEN 1 END) as total_searches
         FROM searches
-    """).df()
+    """).df().iloc[0]
 
-    log("="*60)
-    log("SUMMARY")
-    log("="*60)
-    log(f"Total rows: {row_count:,}")
+    log("\n  DATA OVERVIEW")
+    log("  " + "-" * 60)
+    if overview['first_date'] is not None:
+        log(f"    Date range:        {overview['first_date']} to {overview['last_date']} ({int(overview['days'])} days)")
+    log(f"    Total events:      {int(overview['total_events']):,}")
+    log(f"    Total searches:    {int(overview['total_searches']):,}")
+    log(f"    Unique users:      {int(overview['unique_users']):,}")
+    log(f"    Unique sessions:   {int(overview['unique_sessions']):,}")
+    log(f"    Unique terms:      {int(overview['unique_terms']):,}")
 
-    if len(date_range) > 0 and date_range['first_date'][0] is not None:
-        log(f"Date range: {date_range['first_date'][0]} to {date_range['last_date'][0]} ({date_range['days'][0]} days)")
+    # --- Quality metrics ---
+    quality = con.execute("""
+        SELECT
+            ROUND(100.0 * SUM(CASE WHEN is_null_result THEN 1 ELSE 0 END)
+                / NULLIF(COUNT(CASE WHEN name = 'SEARCH_RESULT_COUNT' THEN 1 END), 0), 1) as null_result_rate,
+            ROUND(100.0 * COUNT(CASE WHEN is_success_click THEN 1 END)
+                / NULLIF(COUNT(CASE WHEN name = 'SEARCH_TRIGGERED' THEN 1 END), 0), 1) as click_through_rate
+        FROM searches
+    """).df().iloc[0]
 
-    # Journey outcomes (success = actual result click, not navigation/filter clicks)
+    log("\n  QUALITY METRICS")
+    log("  " + "-" * 60)
+    if not pd.isna(quality['null_result_rate']):
+        log(f"    Null result rate:  {quality['null_result_rate']:.1f}%")
+    if not pd.isna(quality['click_through_rate']):
+        log(f"    Click-through rate:{quality['click_through_rate']:.1f}%")
+
+    # Journey outcomes
     outcomes = con.execute("""
         WITH session_summary AS (
             SELECT
@@ -1105,9 +1152,56 @@ def print_summary(con):
         ORDER BY 2 DESC
     """).df()
 
-    log("\nJourney Outcomes:")
+    log("\n  JOURNEY OUTCOMES")
+    log("  " + "-" * 60)
     for _, row in outcomes.iterrows():
-        log(f"  {row['outcome']:12} {row['sessions']:>8,} ({row['pct']}%)")
+        log(f"    {row['outcome']:<16s} {int(row['sessions']):>8,} sessions  ({row['pct']:.1f}%)")
+
+    # --- New field coverage ---
+    coverage = con.execute("""
+        SELECT
+            COUNT(*) as total,
+            COUNT(department) as department,
+            COUNT(location) as location,
+            COUNT(job_title) as job_title,
+            COUNT(device_type) as device_type,
+            COUNT(query_language) as query_language,
+            COUNT(clicked_position) as clicked_position,
+            COUNT(search_latency) as search_latency,
+            COUNT(clicked_result_title) as clicked_result_title,
+            COUNT(clicked_tab) as clicked_tab,
+            COUNT(applied_filter) as applied_filter,
+            COUNT(news_result_count) as news_result_count
+        FROM searches
+    """).df().iloc[0]
+
+    total = int(coverage['total'])
+    log("\n  FIELD COVERAGE (non-null values)")
+    log("  " + "-" * 60)
+    for field in ['department', 'location', 'job_title', 'device_type',
+                  'query_language', 'clicked_position', 'search_latency',
+                  'clicked_result_title', 'clicked_tab', 'applied_filter',
+                  'news_result_count']:
+        val = int(coverage[field])
+        pct = 100.0 * val / total if total > 0 else 0
+        bar = "#" * int(pct / 5) if pct > 0 else ""
+        log(f"    {field:<25s} {val:>8,} / {total:,}  ({pct:5.1f}%)  {bar}")
+
+    # --- Event type breakdown ---
+    events = con.execute("""
+        SELECT name, COUNT(*) as cnt,
+               ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER(), 1) as pct
+        FROM searches
+        GROUP BY name
+        ORDER BY cnt DESC
+    """).df()
+
+    log("\n  EVENT TYPES")
+    log("  " + "-" * 60)
+    for _, row in events.iterrows():
+        log(f"    {row['name']:<35s} {int(row['cnt']):>8,}  ({row['pct']:.1f}%)")
+
+    log("\n" + "=" * 64)
 
 
 def process_search_analytics(input_file=None, full_refresh=False):
@@ -1189,7 +1283,7 @@ def process_search_analytics(input_file=None, full_refresh=False):
     export_parquet_files(con, output_dir)
 
     # Print summary
-    print_summary(con)
+    print_summary(con, output_dir)
 
     log(f"\nDatabase: {db_path}")
     log(f"Parquet files: {output_dir}")
