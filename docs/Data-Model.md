@@ -604,7 +604,7 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `clicked_result_title` | String | Title of clicked result | Budget Report Q4 |
 | `clicked_result_url` | String | URL of clicked result | https://intranet/... |
 | `news_result_count` | Integer | News results in result count | 5 |
-| `query_language` | String | Detected query language | en |
+| `query_language` | String | Detected query language (UPPER, or "Unknown") | EN |
 | `device_type` | String | User's device type | Desktop |
 | `department` | String | User's department | Finance |
 | `location` | String | User's location | Berlin |
@@ -668,7 +668,7 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `department` | String | User's department | MIN(department) per session |
 | `location` | String | User's location | MIN(location) per session |
 | `job_title` | String | User's job title | MIN(job_title) per session |
-| `query_language` | String | Query language | MIN(query_language) per session |
+| `query_language` | String | Query language (UPPER, or "Unknown") | MIN(query_language) per session |
 | `avg_click_position` | Float | Avg position of result clicks | AVG(clicked_position) for Result clicks |
 | `min_click_position` | Integer | Best (lowest) click position | MIN(clicked_position) for Result clicks |
 | `max_news_results` | Integer | Max news results shown | MAX(news_result_count) |
