@@ -774,6 +774,38 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 
 ---
 
+### searches_term_clicks.parquet
+
+**Granularity:** One row per search term × clicked content (title + URL) per day
+
+**Use case:** Understanding what content users actually click after searching — maps search intent to content discovery. Enables "What do people click when they search for X?" analysis.
+
+| Column | Type | Description | Calculation |
+|--------|------|-------------|-------------|
+| `session_date` | Date | The day | |
+| `search_term` | String | Normalized search query | Forward-filled from SEARCH_TRIGGERED |
+| `clicked_result_title` | String | Title of the clicked result | From SEARCH_RESULT_CLICK event |
+| `clicked_result_url` | String | URL of the clicked result | From SEARCH_RESULT_CLICK event |
+| `click_count` | Integer | Times this content was clicked for this term | COUNT(*) |
+| `unique_users` | Integer | Distinct users who clicked this | COUNT(DISTINCT user_id) |
+| `unique_sessions` | Integer | Sessions with this click | COUNT(DISTINCT session_key) |
+| `sum_click_position` | Integer | Sum of click positions | SUM(clicked_position) - for weighted avg in DAX |
+| `click_position_count` | Integer | Clicks with position data | COUNT(clicked_position IS NOT NULL) |
+| `top_department` | String | Most common department | MODE(department) |
+| `top_device_type` | String | Most common device type | MODE(device_type) |
+
+**Relationship to other tables:**
+- Joins to `searches_terms` on `session_date` + `search_term` (many-to-one: each term can have multiple clicked results)
+- Joins to `searches_daily` on `session_date` (many-to-one)
+
+**Key analysis patterns:**
+- **Content discovery:** "When users search for 'expense report', what do they actually click?"
+- **Content gaps:** Terms with many searches in `searches_terms` but few/no rows in `searches_term_clicks`
+- **Content consolidation:** Multiple URLs clicked for the same search term suggests scattered content
+- **Click position quality:** Low `sum_click_position / click_position_count` = content ranks well for this term
+
+---
+
 ## 6. Power BI Calculated Columns
 
 These columns are created in Power BI using DAX and are not present in the parquet files.

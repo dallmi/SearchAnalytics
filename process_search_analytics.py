@@ -1059,6 +1059,60 @@ def export_parquet_files(con, output_dir):
     terms_count = con.execute("SELECT COUNT(*) as n FROM searches_terms").df()['n'][0]
     log(f"  searches_terms.parquet ({terms_count:,} term-day combinations)")
 
+    # Search term → clicked content mapping — create as DuckDB table, then export to parquet
+    term_clicks_file = output_dir / 'searches_term_clicks.parquet'
+    if term_clicks_file.exists():
+        term_clicks_file.unlink()
+    con.execute("""
+        CREATE OR REPLACE TABLE searches_term_clicks AS
+            WITH click_events AS (
+                -- Get all result click events with their forward-filled search term
+                SELECT
+                    session_date,
+                    session_key,
+                    user_id,
+                    clicked_position,
+                    clicked_result_title,
+                    clicked_result_url,
+                    department,
+                    device_type,
+                    -- Forward-fill search term to click events
+                    LAST_VALUE(search_term_normalized IGNORE NULLS) OVER (
+                        PARTITION BY session_key
+                        ORDER BY timestamp
+                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                    ) as search_term
+                FROM searches
+                WHERE name IN ('SEARCH_TRIGGERED', 'SEARCH_RESULT_CLICK', 'SEARCH_RESULT_CLICKED')
+            )
+            SELECT
+                session_date,
+                search_term,
+                clicked_result_title,
+                clicked_result_url,
+                -- Volume metrics
+                COUNT(*) as click_count,
+                COUNT(DISTINCT user_id) as unique_users,
+                COUNT(DISTINCT session_key) as unique_sessions,
+                -- Click position (building blocks for weighted average in DAX)
+                SUM(CASE WHEN clicked_position IS NOT NULL THEN clicked_position ELSE 0 END) as sum_click_position,
+                COUNT(CASE WHEN clicked_position IS NOT NULL THEN 1 END) as click_position_count,
+                -- Demographic context (most common values for this term→content pair)
+                MODE(department) as top_department,
+                MODE(device_type) as top_device_type
+            FROM click_events
+            WHERE search_term IS NOT NULL
+              AND search_term != ''
+              AND clicked_result_title IS NOT NULL
+              -- Only actual click events (not the SEARCH_TRIGGERED rows used for forward-fill)
+              AND clicked_result_url IS NOT NULL
+            GROUP BY session_date, search_term, clicked_result_title, clicked_result_url
+            ORDER BY session_date, click_count DESC
+    """)
+    con.execute(f"COPY searches_term_clicks TO '{term_clicks_file}' (FORMAT PARQUET, COMPRESSION SNAPPY)")
+    tc_count = con.execute("SELECT COUNT(*) as n FROM searches_term_clicks").df()['n'][0]
+    log(f"  searches_term_clicks.parquet ({tc_count:,} term-content combinations)")
+
 
 def print_summary(con, output_dir=None):
     """Print comprehensive processing summary."""

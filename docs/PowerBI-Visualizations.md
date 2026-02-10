@@ -18,7 +18,10 @@ This guide provides recommended visualizations for analyzing Intranet search beh
 - [Page 3: Deep Dive Analysis](#page-3-deep-dive-analysis) - Heatmaps, filters, detailed exploration
 - [Page 4: Search Terms Analysis](#page-4-search-terms-analysis) - Term performance, status, lifecycle
 
-### 3. DAX Measures Reference
+### 3. Content Discovery Analysis
+- [Page 6: Content Discovery](#page-6-content-discovery-term--clicked-content) - Term → clicked content mapping
+
+### 4. DAX Measures Reference
 - [Rate Metrics](#rate-metrics---dax-formulas) - Click rate, null rate, session success
 - [Average Metrics](#average-metrics---dax-formulas) - Searches per session, term length
 - [Journey Measures](#dax-measures-for-journeys) - Outcomes, timing, complexity
@@ -27,7 +30,7 @@ This guide provides recommended visualizations for analyzing Intranet search beh
 - [Term Age & Lifecycle](#term-age--lifecycle-classification) - New vs established terms
 - [Seasonality Analysis](#term-seasonality-analysis) - Concentration, data confidence
 
-### 4. Time-of-Day Analysis
+### 5. Time-of-Day Analysis
 - [Time-of-Day Pattern Analysis](#time-of-day-pattern-analysis) - Regional business hours (CET-based)
 
 ---
@@ -37,10 +40,11 @@ This guide provides recommended visualizations for analyzing Intranet search beh
 ### Connecting to Parquet Files
 1. **Get Data** > **Parquet**
 2. Navigate to `output/` folder
-3. Load all three files:
+3. Load all four files:
    - `searches_daily.parquet` - Daily aggregated metrics (1 row per day)
    - `searches_journeys.parquet` - Session-level data (1 row per search session)
    - `searches_terms.parquet` - Search term analytics (1 row per term per day)
+   - `searches_term_clicks.parquet` - Term → clicked content mapping (1 row per term × content per day)
 
 ---
 
@@ -1829,6 +1833,137 @@ CALCULATE(COUNTROWS(searches_journeys), searches_journeys[recovered_from_null] =
 
 ---
 
+## Page 6: Content Discovery (Term → Clicked Content)
+
+This page uses the `searches_term_clicks.parquet` file to analyze **what content users actually click** after searching for specific terms. It bridges the gap between search intent (what users type) and content discovery (what users find).
+
+### Understanding the Term Clicks File
+
+The `searches_term_clicks.parquet` file contains **one row per search term × clicked content (title + URL) per day**. It enables analysis of which content satisfies which search queries.
+
+**Key columns:**
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `session_date` | Date | Date |
+| `search_term` | String | The normalized search query |
+| `clicked_result_title` | String | Title of the clicked result |
+| `clicked_result_url` | String | URL of the clicked result |
+| `click_count` | Integer | Times this content was clicked for this term |
+| `unique_users` | Integer | Distinct users who clicked this |
+| `unique_sessions` | Integer | Sessions with this click |
+| `sum_click_position` | Integer | Sum of click positions (for weighted avg in DAX) |
+| `click_position_count` | Integer | Clicks with position data (denominator for avg) |
+| `top_department` | String | Most common department clicking this |
+| `top_device_type` | String | Most common device type |
+
+### Relationships
+
+Set up the following relationship in Power BI Model view:
+
+| From | To | Cardinality | Key Columns |
+|------|----|-------------|-------------|
+| `searches_term_clicks` | `searches_terms` | Many-to-One | `session_date` + `search_term` |
+| `searches_term_clicks` | `searches_daily` | Many-to-One | `session_date` |
+
+### DAX Measures for Content Discovery
+
+```dax
+// Total content clicks across all term-content pairs
+Total Content Clicks = SUM(searches_term_clicks[click_count])
+
+// Unique content items clicked
+Unique Content Items = DISTINCTCOUNT(searches_term_clicks[clicked_result_url])
+
+// Average click position for term→content (weighted average)
+Content Avg Click Position =
+DIVIDE(
+    SUM(searches_term_clicks[sum_click_position]),
+    SUM(searches_term_clicks[click_position_count]),
+    BLANK()
+)
+
+// Content diversity per term (how many different URLs are clicked)
+Content URLs per Term =
+DIVIDE(
+    DISTINCTCOUNT(searches_term_clicks[clicked_result_url]),
+    DISTINCTCOUNT(searches_term_clicks[search_term]),
+    0
+)
+
+// Content concentration (does one result dominate clicks for a term?)
+Top Result Click Share % =
+VAR CurrentTerm = SELECTEDVALUE(searches_term_clicks[search_term])
+VAR TopResultClicks =
+    MAXX(
+        VALUES(searches_term_clicks[clicked_result_url]),
+        CALCULATE(SUM(searches_term_clicks[click_count]))
+    )
+VAR TotalClicks = SUM(searches_term_clicks[click_count])
+RETURN
+DIVIDE(TopResultClicks, TotalClicks, 0) * 100
+```
+
+### Row 1: Top Clicked Content
+
+#### Chart 1: Most Clicked Content Items
+- **Type**: Table
+- **Columns**: `clicked_result_title`, Sum of `click_count`, Sum of `unique_users`, `Content Avg Click Position`
+- **Sort**: By Sum of `click_count` descending
+- **Top N**: 20
+- **Insight**: Which content items are most discovered through search?
+
+#### Chart 2: Top Search Term → Content Pairs
+- **Type**: Table
+- **Columns**: `search_term`, `clicked_result_title`, Sum of `click_count`, `Content Avg Click Position`
+- **Sort**: By Sum of `click_count` descending
+- **Top N**: 20
+- **Insight**: The most common search-to-content pathways
+
+### Row 2: Content Gap Analysis
+
+#### Chart 3: Terms with High Searches but Low Content Clicks
+- **Type**: Table (cross-reference with `searches_terms`)
+- **Setup**: Create a measure to identify gaps:
+```dax
+Content Gap Score =
+VAR TermSearches = CALCULATE(SUM(searches_terms[search_count]), ALLEXCEPT(searches_terms, searches_terms[search_term]))
+VAR TermContentClicks = CALCULATE(SUM(searches_term_clicks[click_count]), ALLEXCEPT(searches_term_clicks, searches_term_clicks[search_term]))
+RETURN
+TermSearches - COALESCE(TermContentClicks, 0)
+```
+- **Filter**: Sort by `Content Gap Score` descending
+- **Insight**: Terms where users search frequently but rarely click results — indicating content or relevance issues
+
+#### Chart 4: Content Scatter (URLs per Term)
+- **Type**: Scatter Plot
+- **Setup**:
+  1. X-axis: Sum of `click_count`
+  2. Y-axis: Count of distinct `clicked_result_url`
+  3. Details: `search_term`
+- **Insight**: Terms with many URLs clicked suggest scattered content that could be consolidated
+
+### Row 3: Department-Level Content Discovery
+
+#### Chart 5: Top Content by Department
+- **Type**: Matrix
+- **Rows**: `top_department`
+- **Columns**: `clicked_result_title` (Top 5 by click_count)
+- **Values**: Sum of `click_count`
+- **Insight**: Different departments may search for and click on different content
+
+### Key Questions This Page Answers
+
+| Question | Metric | Action |
+|----------|--------|--------|
+| What content do users find via search? | Top clicked content items | Ensure popular content is easy to find |
+| What content is missing? | Content Gap Score | Create content for high-search, low-click terms |
+| Is content scattered? | URLs per term | Consolidate multiple pages into single authoritative source |
+| Do results rank well? | Content Avg Click Position | Low position = good ranking; optimize high-position items |
+| What content do different departments need? | Top content by department | Tailor content strategy by audience |
+
+---
+
 ## Key Questions This Dashboard Answers
 
 ### Daily Trends
@@ -1862,6 +1997,12 @@ CALCULATE(COUNTROWS(searches_journeys), searches_journeys[recovered_from_null] =
 1. **What new topics are emerging?** - Filter by `is_new_term = TRUE`, sort by volume
 2. **When did a term first appear?** - `first_seen_date` in terms file
 3. **Is search vocabulary expanding?** - `New Terms Count` measure over time
+
+### Content Discovery
+1. **What content do users actually click?** - Top clicked results in `searches_term_clicks`
+2. **What content matches which search term?** - Term → content pairs by click volume
+3. **Where is content missing or scattered?** - Content Gap Score, URLs per term
+4. **How well does content rank for a term?** - Content Avg Click Position
 
 ---
 
