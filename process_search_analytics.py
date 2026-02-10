@@ -851,8 +851,9 @@ def export_parquet_files(con, output_dir):
                 END as session_duration_bucket,
                 -- Classifications (success = actual result click, not navigation/filter clicks)
                 -- Engaged = user interacted (tabs/pagination/filters) but didn't click actual content
+                -- Success requires both: clickable results were shown AND user clicked a result
                 CASE
-                    WHEN success_click_count > 0 THEN 'Success'
+                    WHEN success_click_count > 0 AND result_count > null_result_count THEN 'Success'
                     WHEN click_count > 0 AND success_click_count = 0 THEN 'Engaged'
                     WHEN result_count > 0 AND null_result_count = result_count THEN 'No Results'
                     WHEN result_count > 0 AND click_count = 0 THEN 'Abandoned'
@@ -894,7 +895,7 @@ def export_parquet_files(con, output_dir):
                     ELSE 6
                 END as session_duration_sort,
                 CASE
-                    WHEN success_click_count > 0 THEN 1
+                    WHEN success_click_count > 0 AND result_count > null_result_count THEN 1
                     WHEN click_count > 0 AND success_click_count = 0 THEN 2
                     WHEN result_count > 0 AND null_result_count = result_count THEN 4
                     WHEN result_count > 0 AND click_count = 0 THEN 3
@@ -1141,7 +1142,7 @@ def print_summary(con, output_dir=None):
         )
         SELECT
             CASE
-                WHEN success_clicks > 0 THEN 'Success'
+                WHEN success_clicks > 0 AND results > null_results THEN 'Success'
                 WHEN results > 0 AND null_results = results AND success_clicks = 0 THEN 'No Results'
                 WHEN results > 0 AND success_clicks = 0 THEN 'Abandoned'
                 ELSE 'Unknown'
