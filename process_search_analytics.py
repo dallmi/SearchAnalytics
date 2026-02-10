@@ -523,7 +523,11 @@ def add_calculated_columns(con):
             {result_title_expr} as clicked_result_title,
             {result_url_expr} as clicked_result_url,
             {news_count_expr} as news_result_count,
-            {query_lang_expr} as query_language,
+            CASE
+                WHEN LOWER({query_lang_expr}) = 'unknown' THEN 'Unknown'
+                WHEN {query_lang_expr} IS NOT NULL THEN UPPER({query_lang_expr})
+                ELSE NULL
+            END as query_language,
             {device_type_expr} as device_type,
             {department_expr} as department,
             {location_expr} as location,
