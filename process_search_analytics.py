@@ -1066,16 +1066,14 @@ def print_summary(con, output_dir=None):
     log("  PROCESSING SUMMARY")
     log("=" * 64)
 
-    # --- Table overview ---
-    log("\n  TABLES CREATED")
+    # --- DuckDB table ---
+    row_count = con.execute("SELECT COUNT(*) as n FROM searches").df()['n'][0]
+    col_count = len(con.execute("DESCRIBE searches").df())
+    log(f"\n  DATABASE TABLE: searches")
     log("  " + "-" * 60)
-    tables = con.execute("SHOW TABLES").df()['name'].tolist()
-    for table in sorted(tables):
-        row_count = con.execute(f"SELECT COUNT(*) as n FROM {table}").df()['n'][0]
-        col_count = len(con.execute(f"DESCRIBE {table}").df())
-        log(f"    {table:<30s} {row_count:>10,} rows  ({col_count} columns)")
+    log(f"    {row_count:,} rows, {col_count} columns")
 
-    # --- Parquet file sizes (if output_dir provided) ---
+    # --- Parquet files (the main outputs) ---
     if output_dir:
         parquet_files = sorted(Path(output_dir).glob('*.parquet'))
         if parquet_files:
@@ -1084,7 +1082,8 @@ def print_summary(con, output_dir=None):
             for pf in parquet_files:
                 size_mb = os.path.getsize(pf) / (1024 * 1024)
                 pq_rows = con.execute(f"SELECT COUNT(*) as n FROM read_parquet('{pf}')").df()['n'][0]
-                log(f"    {pf.name:<40s} {pq_rows:>8,} rows  ({size_mb:.1f} MB)")
+                pq_cols = len(con.execute(f"DESCRIBE SELECT * FROM read_parquet('{pf}') LIMIT 0").df())
+                log(f"    {pf.name:<36s} {pq_rows:>8,} rows  {pq_cols:>3} cols  ({size_mb:.1f} MB)")
 
     # --- Date range & volume ---
     overview = con.execute("""
