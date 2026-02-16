@@ -731,14 +731,18 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 
 ### searches_terms.parquet
 
-**Granularity:** One row per search term per day
+**Granularity:** One row per search term per day per demographic combination (department, location, device_type, query_language)
 
-**Use case:** Search term performance analysis, content gap identification
+**Use case:** Search term performance analysis, content gap identification, demographic segmentation
 
 | Column | Type | Description | Calculation |
 |--------|------|-------------|-------------|
 | `session_date` | Date | The day | |
 | `search_term` | String | Normalized search query | LOWER(TRIM(query)) |
+| `department` | String | User's department | Dimension for slicing |
+| `location` | String | User's location | Dimension for slicing |
+| `device_type` | String | User's device type | Dimension for slicing |
+| `query_language` | String | Query language (UPPER, or "Unknown") | Dimension for slicing |
 | `word_count` | Integer | Words in query | COUNT of spaces + 1 |
 | `search_count` | Integer | Times searched today | COUNT(SEARCH_TRIGGERED) |
 | `unique_users` | Integer | Users who searched this | COUNT(DISTINCT user_id) |
@@ -771,6 +775,8 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `first_seen_date` | Date | First day term appeared | MIN(session_date) over all time |
 | `is_new_term` | Boolean | First appearance today | session_date = first_seen_date |
 | `month_num` | Integer | Month number (1-12) | For seasonality analysis |
+
+**Granularity note:** Each unique combination of (session_date, search_term, department, location, device_type, query_language) produces a separate row. To get totals for a term across all demographics, use `SUM()` in your queries or DAX measures — all metric columns (search_count, click_count, etc.) are additive and aggregate correctly. `unique_users` and `unique_sessions` are per-demographic-combo counts and may overcount when summed across dimensions.
 
 ---
 
@@ -1173,3 +1179,4 @@ timestamp,name,user_Id,session_Id,CP_searchQuery,CP_totalResultCount
 | 1.9 | 2025-01-29 | Removed pre-calculated rate/average columns that cannot be aggregated: click_rate_pct, null_rate_pct, session_success_rate_pct, session_abandonment_rate_pct, avg_searches_per_session, avg_search_term_length, avg_search_term_words, avg_sec_to_click. Use DAX measures with building block columns instead. |
 | 2.0 | 2025-02-09 | Adapted to new App Insights 4-level nesting structure. Added SEARCH_RESULT_CLICKED and SEARCH_VIEW_MORE_LINK events. Added ViewMore click category. Added 12 new fields from dynamic column resolution: clicked_position, clicked_tab, applied_filter, clicked_result_title, clicked_result_url, news_result_count, query_language, device_type, department, location, job_title, search_latency. Updated all three aggregation files (daily, journeys, terms) with new metrics. Added new Power BI measures (Avg Search Latency, Avg News Results, ViewMore Click Rate) and calculated columns (Latency_Bucket, Click_Position_Bucket). |
 | 2.1 | 2025-02-10 | Added searches_term_clicks.parquet (term → clicked content mapping). Normalized query_language to UPPER with "Unknown" title case. Added Term Lifecycle Filter and Term Lifecycle Filter Sort calculated columns for slicer usage. |
+| 2.2 | 2025-02-10 | Added demographic dimensions (department, location, device_type, query_language) to searches_terms.parquet. Granularity changed from "term per day" to "term per day per demographic combination" to enable slicing by user demographics in Power BI. |

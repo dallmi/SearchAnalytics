@@ -969,6 +969,7 @@ def export_parquet_files(con, output_dir):
                     clicked_position,
                     query_language,
                     department,
+                    location,
                     device_type,
                     news_result_count,
                     search_latency,
@@ -996,6 +997,11 @@ def export_parquet_files(con, output_dir):
                 SELECT
                     session_date,
                     active_search_term as search_term,
+                    -- Demographic dimensions (for Power BI slicing)
+                    stc.department,
+                    stc.location,
+                    stc.device_type,
+                    stc.query_language,
                     -- Word count for query length analysis
                     CASE
                         WHEN active_search_term IS NULL OR active_search_term = '' THEN 0
@@ -1053,7 +1059,7 @@ def export_parquet_files(con, output_dir):
                 LEFT JOIN term_first_seen tfs ON stc.active_search_term = tfs.search_term_normalized
                 WHERE stc.active_search_term IS NOT NULL
                   AND stc.active_search_term != ''
-                GROUP BY stc.session_date, stc.active_search_term
+                GROUP BY stc.session_date, stc.active_search_term, stc.department, stc.location, stc.device_type, stc.query_language
             )
             SELECT t.*
             FROM term_aggregates t
@@ -1061,7 +1067,7 @@ def export_parquet_files(con, output_dir):
     """)
     con.execute(f"COPY searches_terms TO '{terms_file}' (FORMAT PARQUET, COMPRESSION SNAPPY)")
     terms_count = con.execute("SELECT COUNT(*) as n FROM searches_terms").df()['n'][0]
-    log(f"  searches_terms.parquet ({terms_count:,} term-day combinations)")
+    log(f"  searches_terms.parquet ({terms_count:,} term-day-demographic combinations)")
 
     # Search term → clicked content mapping — create as DuckDB table, then export to parquet
     term_clicks_file = output_dir / 'searches_term_clicks.parquet'

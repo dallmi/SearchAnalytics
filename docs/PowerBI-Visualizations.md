@@ -786,7 +786,7 @@ Add slicers for:
 
 ### Understanding the Terms File
 
-The `searches_terms.parquet` file contains **one row per search term per day**. It enables analysis of which terms users search for and how successful those searches are.
+The `searches_terms.parquet` file contains **one row per search term per day per demographic combination**. It enables analysis of which terms users search for, how successful those searches are, and how search behavior varies by department, location, device type, and language.
 
 **Key columns:**
 
@@ -794,6 +794,10 @@ The `searches_terms.parquet` file contains **one row per search term per day**. 
 |--------|------|-------------|
 | `session_date` | Date | Date |
 | `search_term` | String | The normalized search query |
+| `department` | String | User's department (slicer/filter dimension) |
+| `location` | String | User's location (slicer/filter dimension) |
+| `device_type` | String | User's device type (slicer/filter dimension) |
+| `query_language` | String | Query language — UPPER or "Unknown" (slicer/filter dimension) |
 | `word_count` | Integer | Number of words in search term |
 | `search_count` | Integer | Times this term was searched |
 | `unique_users` | Integer | Distinct users who searched this |
@@ -937,6 +941,38 @@ DIVIDE(
     BLANK()
 )
 ```
+
+### Demographic Slicing
+
+The `searches_terms` table includes `department`, `location`, `device_type`, and `query_language` as dimension columns. Use these as **slicers or filters** in Power BI to segment term analysis by audience.
+
+**Slicer setup:** Drag any demographic column to a Slicer visual. All SUM-based measures (search_count, click_count, etc.) aggregate correctly across demographic dimensions.
+
+```dax
+// Desktop vs Mobile search split
+Desktop Search % =
+DIVIDE(
+    CALCULATE(SUM(searches_terms[search_count]), searches_terms[device_type] = "Desktop"),
+    SUM(searches_terms[search_count]),
+    0
+) * 100
+
+Mobile Search % =
+DIVIDE(
+    CALCULATE(SUM(searches_terms[search_count]), searches_terms[device_type] = "Mobile"),
+    SUM(searches_terms[search_count]),
+    0
+) * 100
+```
+
+**Example analyses:**
+| Question | Slicer/Filter | Metric |
+|----------|--------------|--------|
+| What does Finance search for? | `department` = Finance | Top terms by search_count |
+| Do mobile users search differently? | `device_type` slicer | Compare top terms Desktop vs Mobile |
+| What languages are used? | `query_language` slicer | Search volume by language |
+| Regional search patterns? | `location` slicer | Compare terms across offices |
+| Department-specific success rates? | `department` slicer | Term Success CTR % per department |
 
 ### Term Status Classification (Dynamic DAX Measures)
 
