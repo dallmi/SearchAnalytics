@@ -872,6 +872,58 @@ SWITCH(
 | Low CTR | <20% click rate | Suboptimal - review content |
 | Success | Good performance | Monitor |
 
+#### Term Lifecycle Filter
+Classifies term age into lifecycle stages. Use as a slicer/filter (measures cannot be used as slicers).
+
+```dax
+Term Lifecycle Filter =
+VAR Age =
+    DATEDIFF(
+        searches_terms[first_seen_date],
+        searches_terms[session_date],
+        DAY
+    ) + 1
+RETURN
+    SWITCH(
+        TRUE(),
+        Age <= 3, "New (≤ 3 days)",
+        Age <= 7, "Emerging (4-7 days)",
+        Age <= 14, "Establishing (8-14 days)",
+        Age <= 30, "Established (15-30 days)",
+        "Mature (31+ days)"
+    )
+```
+
+#### Term Lifecycle Filter Sort
+Sort order for Term Lifecycle Filter. Set "Sort by column" in Power BI.
+
+```dax
+Term Lifecycle Filter Sort =
+VAR Age =
+    DATEDIFF(
+        searches_terms[first_seen_date],
+        searches_terms[session_date],
+        DAY
+    ) + 1
+RETURN
+    SWITCH(
+        TRUE(),
+        Age <= 3, 1,
+        Age <= 7, 2,
+        Age <= 14, 3,
+        Age <= 30, 4,
+        5
+    )
+```
+
+| Stage | Days Since First Seen | Sort | Interpretation |
+|-------|----------------------|------|----------------|
+| New (≤ 3 days) | 1-3 | 1 | Just emerged, monitor for trending |
+| Emerging (4-7 days) | 4-7 | 2 | Past initial spike, validate staying power |
+| Establishing (8-14 days) | 8-14 | 3 | Building consistent usage pattern |
+| Established (15-30 days) | 15-30 | 4 | Regular part of user vocabulary |
+| Mature (31+ days) | 31+ | 5 | Long-standing, stable terms |
+
 ### searches_journeys Table
 
 #### Latency_Bucket

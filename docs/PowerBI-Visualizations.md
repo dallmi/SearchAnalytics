@@ -1063,10 +1063,56 @@ RETURN
 | Established | 15-30 days | 4 | Regular part of user vocabulary |
 | Mature | 31+ days | 5 | Long-standing, stable terms |
 
+**Calculated Columns for Slicer/Filter** (Model view → `searches_terms` → New Column):
+
+Measures cannot be used as slicers in Power BI. These calculated columns provide the same lifecycle classification as filterable columns:
+
+```dax
+// Calculated Column: Term Lifecycle Filter
+// Can be used as a slicer or visual-level filter
+Term Lifecycle Filter =
+VAR Age =
+    DATEDIFF(
+        searches_terms[first_seen_date],
+        searches_terms[session_date],
+        DAY
+    ) + 1
+RETURN
+    SWITCH(
+        TRUE(),
+        Age <= 3, "New (≤ 3 days)",
+        Age <= 7, "Emerging (4-7 days)",
+        Age <= 14, "Establishing (8-14 days)",
+        Age <= 30, "Established (15-30 days)",
+        "Mature (31+ days)"
+    )
+
+// Calculated Column: Term Lifecycle Filter Sort
+// Set "Sort by column" on Term Lifecycle Filter to use this for correct ordering
+Term Lifecycle Filter Sort =
+VAR Age =
+    DATEDIFF(
+        searches_terms[first_seen_date],
+        searches_terms[session_date],
+        DAY
+    ) + 1
+RETURN
+    SWITCH(
+        TRUE(),
+        Age <= 3, 1,
+        Age <= 7, 2,
+        Age <= 14, 3,
+        Age <= 30, 4,
+        5
+    )
+```
+
+**Setup:** Model view → select `Term Lifecycle Filter` → Column tools → **Sort by column** → `Term Lifecycle Filter Sort`
+
 **Usage Notes:**
 - `Term Age` gives the number of days from when the term first appeared to the latest date in the current filter context
-- Use `Term Lifecycle` for badges, icons, or conditional formatting in tables
-- Filter by lifecycle stage to focus analysis (e.g., only "New" terms to spot trends)
+- Use `Term Lifecycle` (measure) for badges, icons, or conditional formatting in tables
+- Use `Term Lifecycle Filter` (calculated column) as a slicer or filter to focus analysis (e.g., only "New" terms to spot trends)
 - The calculation is relative to the filtered date range, making it safe for any slicer selection
 - Set "Sort by column" on `Term Lifecycle` to use `Term Lifecycle Sort` for correct ordering
 
