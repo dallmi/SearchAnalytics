@@ -1704,6 +1704,8 @@ Create a calculated column to classify search terms by their outcome (Model view
 
 ```dax
 // Uses success_click_count for actual content discovery measurement
+// Note: Check success_click_count before CTR to avoid false "No Clicks" when
+// search_count = 0 (clicks can exist without a SEARCH_TRIGGERED in same demographic group)
 Term_Outcome =
 VAR nullRate = DIVIDE([null_result_count], [result_events], 0)
 VAR ctr = DIVIDE([success_click_count], [search_count], 0)
@@ -1712,9 +1714,9 @@ SWITCH(
     TRUE(),
     nullRate = 1, "Zero Results",
     nullRate > 0.5, "Mostly No Results",
-    ctr = 0, "No Clicks",
+    [success_click_count] > 0, "Success",
     ctr < 0.2, "Low CTR",
-    "Success"
+    "No Clicks"
 )
 ```
 
