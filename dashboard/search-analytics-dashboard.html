@@ -1217,7 +1217,6 @@
                     <div class="chart-card full-width">
                         <div class="chart-title">
                             Daily Trends
-                            <span class="chart-subtitle">Click on chart to filter by date</span>
                         </div>
                         <div class="chart-container tall">
                             <canvas id="dailyTrendsChart"></canvas>
@@ -1231,8 +1230,11 @@
                         <div class="chart-title">Journey Outcomes</div>
                         <div id="journeyFunnel" class="funnel"></div>
                     </div>
-                    <div class="chart-card">
-                        <div class="chart-title">Outcome Distribution</div>
+                    <div class="chart-card clickable">
+                        <div class="chart-title">
+                            Outcome Distribution
+                            <span class="chart-subtitle">Click to filter</span>
+                        </div>
                         <div class="chart-container">
                             <canvas id="outcomeChart"></canvas>
                         </div>
@@ -1241,11 +1243,8 @@
 
                 <!-- Charts Row 3 -->
                 <div class="charts-grid">
-                    <div class="chart-card clickable">
-                        <div class="chart-title">
-                            Regional Activity (CET)
-                            <span class="chart-subtitle">Click to filter</span>
-                        </div>
+                    <div class="chart-card">
+                        <div class="chart-title">Regional Activity (CET)</div>
                         <div class="chart-container">
                             <canvas id="hourlyChart"></canvas>
                         </div>
@@ -1388,14 +1387,20 @@
             <!-- User Journeys Tab -->
             <div class="nav-content" id="navJourneys">
                 <div class="charts-grid">
-                    <div class="chart-card">
-                        <div class="chart-title">Session Complexity</div>
+                    <div class="chart-card clickable">
+                        <div class="chart-title">
+                            Session Complexity
+                            <span class="chart-subtitle">Click to filter</span>
+                        </div>
                         <div class="chart-container">
                             <canvas id="complexityChart"></canvas>
                         </div>
                     </div>
-                    <div class="chart-card">
-                        <div class="chart-title">Session Duration Distribution</div>
+                    <div class="chart-card clickable">
+                        <div class="chart-title">
+                            Session Duration Distribution
+                            <span class="chart-subtitle">Click to filter</span>
+                        </div>
                         <div class="chart-container">
                             <canvas id="durationChart"></canvas>
                         </div>
@@ -1403,8 +1408,11 @@
                 </div>
 
                 <div class="charts-grid">
-                    <div class="chart-card">
-                        <div class="chart-title">Query Reformulation</div>
+                    <div class="chart-card clickable">
+                        <div class="chart-title">
+                            Query Reformulation
+                            <span class="chart-subtitle">Click to filter</span>
+                        </div>
                         <div class="chart-container short">
                             <canvas id="reformulationChart"></canvas>
                         </div>
@@ -1412,8 +1420,11 @@
                             Users who changed their search query within a session
                         </div>
                     </div>
-                    <div class="chart-card">
-                        <div class="chart-title">Null Result Recovery</div>
+                    <div class="chart-card clickable">
+                        <div class="chart-title">
+                            Null Result Recovery
+                            <span class="chart-subtitle">Click to filter</span>
+                        </div>
                         <div class="chart-container short">
                             <canvas id="recoveryChart"></canvas>
                         </div>
@@ -1424,8 +1435,11 @@
                 </div>
 
                 <div class="charts-grid">
-                    <div class="chart-card full-width">
-                        <div class="chart-title">Journey Outcome by Complexity</div>
+                    <div class="chart-card full-width clickable">
+                        <div class="chart-title">
+                            Journey Outcome by Complexity
+                            <span class="chart-subtitle">Click to filter</span>
+                        </div>
                         <div class="chart-container tall">
                             <canvas id="outcomeByComplexityChart"></canvas>
                         </div>
@@ -1845,6 +1859,7 @@
         // Global state
         let db = null;
         let conn = null;
+        let dataRefreshDate = null;
         let dateFilter = { from: null, to: null };
         let activeFilters = {};
         let allTermsData = [];
@@ -1920,6 +1935,15 @@
                 updateStatus('loading', 'Loading parquet files...');
                 await loadParquetFiles();
 
+                // Determine data freshness from the latest date in the daily table
+                try {
+                    const refreshResult = await conn.query(`SELECT MAX(date) as last_date FROM daily`);
+                    const row = refreshResult.toArray()[0];
+                    if (row && row.last_date != null) {
+                        dataRefreshDate = new Date(row.last_date);
+                    }
+                } catch (e) { /* ignore */ }
+
                 await setInitialDateRange();
 
                 document.getElementById('loadingState').style.display = 'none';
@@ -1927,7 +1951,7 @@
 
                 await renderDashboard();
 
-                updateStatus('success', `Last updated: ${new Date().toLocaleTimeString()}`);
+                updateStatus('success', getRefreshLabel());
             } catch (error) {
                 console.error('Initialization error:', error);
                 showError(`Failed to initialize: ${error.message}`);
@@ -1995,6 +2019,46 @@
         function getDateWhereClause(dateColumn = 'session_date') {
             if (!dateFilter.from || !dateFilter.to) return '1=1';
             return `${dateColumn} >= '${formatDateForInput(dateFilter.from)}' AND ${dateColumn} <= '${formatDateForInput(dateFilter.to)}'`;
+        }
+
+        function getFilterWhereClause(table) {
+            const clauses = [];
+            for (const filter of Object.values(activeFilters)) {
+                if (filter.table === table) {
+                    if (filter.value === 'true' || filter.value === 'false') {
+                        clauses.push(`${filter.column} = ${filter.value}`);
+                    } else {
+                        clauses.push(`${filter.column} = '${String(filter.value).replace(/'/g, "''")}'`);
+                    }
+                }
+            }
+            return clauses.length > 0 ? ' AND ' + clauses.join(' AND ') : '';
+        }
+
+        const FILTER_DISPLAY = {
+            'Reformulation': { 'true': 'Refined Query', 'false': 'Single Query' },
+            'Recovery': { 'true': 'Recovered', 'false': 'Gave Up' }
+        };
+
+        function toggleChartFilter(label, value, column, table) {
+            if (activeFilters[label] && activeFilters[label].value === value) {
+                delete activeFilters[label];
+            } else {
+                activeFilters[label] = { value, column, table };
+            }
+            updateFiltersDisplay();
+            renderDashboard();
+        }
+
+        function getFilteredColors(colors, labels, filterLabel, valueMapper) {
+            const filter = activeFilters[filterLabel];
+            if (!filter) return colors;
+            return colors.map((color, i) => {
+                const val = valueMapper ? valueMapper(labels[i], i) : labels[i];
+                if (val === filter.value) return color;
+                if (color.startsWith('#') && color.length === 7) return color + '40';
+                return color;
+            });
         }
 
         async function applyDateFilter() {
@@ -2122,7 +2186,7 @@
                     console.error('Render failures:', failures);
                     updateStatus('error', `${failures.length} section(s) failed to render`);
                 } else {
-                    updateStatus('success', `Last updated: ${new Date().toLocaleTimeString()}`);
+                    updateStatus('success', getRefreshLabel());
                 }
             } catch (error) {
                 console.error('Render error:', error);
@@ -2147,7 +2211,7 @@
                     SUM(CAST(result_events AS DOUBLE)) as result_events,
                     SUM(CAST(sessions_with_clicks AS DOUBLE)) as clicked,
                     SUM(CAST(sessions_with_results AS DOUBLE)) as with_results
-                FROM daily WHERE ${getDateWhereClause('date')}
+                FROM daily WHERE ${getDateWhereClause('date')}${getFilterWhereClause('daily')}
             `);
             const metrics = result.toArray()[0];
 
@@ -2157,7 +2221,7 @@
             // Get top problem term
             const problemResult = await conn.query(`
                 SELECT search_term, SUM(CAST(null_result_count AS DOUBLE)) as nulls
-                FROM terms WHERE ${getDateWhereClause('session_date')}
+                FROM terms WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('terms')}
                 GROUP BY search_term
                 HAVING SUM(CAST(null_result_count AS DOUBLE)) > 0
                 ORDER BY nulls DESC LIMIT 1
@@ -2232,7 +2296,7 @@
                     SUM(CAST(sessions_with_clicks AS DOUBLE)) as sessions_with_clicks,
                     SUM(CAST(sessions_with_results AS DOUBLE)) as sessions_with_results,
                     SUM(CAST(sessions_abandoned AS DOUBLE)) as sessions_abandoned
-                FROM daily WHERE ${getDateWhereClause('date')}
+                FROM daily WHERE ${getDateWhereClause('date')}${getFilterWhereClause('daily')}
             `);
 
             const row = result.toArray()[0];
@@ -2288,7 +2352,7 @@
                         THEN ROUND(100.0 * sessions_with_clicks / sessions_with_results, 1)
                         ELSE 0 END as success_rate
                 FROM daily
-                WHERE ${getDateWhereClause('date')}
+                WHERE ${getDateWhereClause('date')}${getFilterWhereClause('daily')}
                 ORDER BY date
             `);
 
@@ -2364,7 +2428,7 @@
             const result = await conn.query(`
                 SELECT journey_outcome, COUNT(*) as sessions,
                     ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER(), 1) as pct
-                FROM journeys WHERE ${getDateWhereClause('session_date')}
+                FROM journeys WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('journeys')}
                 GROUP BY journey_outcome
                 ORDER BY CASE journey_outcome
                     WHEN 'Success' THEN 1 WHEN 'Engaged' THEN 2
@@ -2377,9 +2441,9 @@
             document.getElementById('journeyFunnel').innerHTML = data.map(d => {
                 const width = Math.max(15, (Number(d.sessions) / maxSessions) * 100);
                 const outcomeClass = d.journey_outcome.toLowerCase().replace(' ', '-');
-                const selected = activeFilters.outcome === d.journey_outcome ? 'selected' : '';
+                const selected = activeFilters['Outcome']?.value === d.journey_outcome ? 'selected' : '';
                 return `
-                    <div class="funnel-step ${selected}" onclick="filterByOutcome('${d.journey_outcome}')">
+                    <div class="funnel-step ${selected}" onclick="toggleChartFilter('Outcome', '${d.journey_outcome}', 'journey_outcome', 'journeys')">
                         <div class="funnel-label">${d.journey_outcome}</div>
                         <div class="funnel-bar ${outcomeClass}" style="width: ${width}%">${d.pct}%</div>
                         <div class="funnel-value">${formatNumber(d.sessions)} sessions</div>
@@ -2390,19 +2454,32 @@
             // Pie chart
             if (charts.outcome) charts.outcome.destroy();
             const ctx = document.getElementById('outcomeChart').getContext('2d');
+            const outcomeLabels = data.map(d => d.journey_outcome);
+            const outcomeColors = getFilteredColors(
+                data.map(d => OUTCOME_COLORS[d.journey_outcome] || COLORS.gray),
+                outcomeLabels, 'Outcome'
+            );
             charts.outcome = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
-                    labels: data.map(d => d.journey_outcome),
+                    labels: outcomeLabels,
                     datasets: [{
                         data: data.map(d => Number(d.sessions)),
-                        backgroundColor: data.map(d => OUTCOME_COLORS[d.journey_outcome] || COLORS.gray)
+                        backgroundColor: outcomeColors
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'right' } }
+                    plugins: { legend: { position: 'right' } },
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            toggleChartFilter('Outcome', outcomeLabels[elements[0].index], 'journey_outcome', 'journeys');
+                        }
+                    },
+                    onHover: (event, elements) => {
+                        event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+                    }
                 }
             });
         }
@@ -2415,7 +2492,7 @@
                     SUM(CAST(searches_morning AS DOUBLE)) as morning,
                     SUM(CAST(searches_afternoon AS DOUBLE)) as afternoon,
                     SUM(CAST(searches_evening AS DOUBLE)) as evening
-                FROM daily WHERE ${getDateWhereClause('date')}
+                FROM daily WHERE ${getDateWhereClause('date')}${getFilterWhereClause('daily')}
             `);
 
             const data = result.toArray()[0];
@@ -2445,7 +2522,7 @@
         async function renderWeekdayDistribution() {
             const result = await conn.query(`
                 SELECT day_of_week, day_of_week_num, SUM(CAST(search_starts AS DOUBLE)) as searches
-                FROM daily WHERE ${getDateWhereClause('date')}
+                FROM daily WHERE ${getDateWhereClause('date')}${getFilterWhereClause('daily')}
                 GROUP BY day_of_week, day_of_week_num ORDER BY day_of_week_num
             `);
 
@@ -2453,21 +2530,33 @@
 
             if (charts.weekday) charts.weekday.destroy();
             const ctx = document.getElementById('weekdayChart').getContext('2d');
+            const weekLabels = data.map(d => d.day_of_week.trim());
+            const weekColors = getFilteredColors(
+                weekLabels.map(() => '#555555'), weekLabels, 'Day'
+            );
             charts.weekday = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: data.map(d => d.day_of_week.trim()),
+                    labels: weekLabels,
                     datasets: [{
                         label: 'Searches',
                         data: data.map(d => Number(d.searches)),
-                        backgroundColor: '#555555'
+                        backgroundColor: weekColors
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } }
+                    scales: { y: { beginAtZero: true } },
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            toggleChartFilter('Day', weekLabels[elements[0].index], 'day_of_week', 'daily');
+                        }
+                    },
+                    onHover: (event, elements) => {
+                        event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+                    }
                 }
             });
         }
@@ -2476,7 +2565,7 @@
         async function renderUserCohorts() {
             const result = await conn.query(`
                 SELECT date, new_users, returning_users
-                FROM daily WHERE ${getDateWhereClause('date')} ORDER BY date
+                FROM daily WHERE ${getDateWhereClause('date')}${getFilterWhereClause('daily')} ORDER BY date
             `);
 
             const data = result.toArray();
@@ -2521,7 +2610,7 @@
                     SUM(CAST(clicks_tab AS DOUBLE)) as tab_clicks,
                     SUM(CAST(clicks_pagination AS DOUBLE)) as pagination_clicks,
                     SUM(CAST(clicks_filter AS DOUBLE)) as filter_clicks
-                FROM daily WHERE ${getDateWhereClause('date')}
+                FROM daily WHERE ${getDateWhereClause('date')}${getFilterWhereClause('daily')}
             `);
 
             const data = result.toArray()[0];
@@ -2563,7 +2652,7 @@
                     SUM(CAST(null_result_count AS DOUBLE)) as null_results,
                     SUM(CAST(result_events AS DOUBLE)) as result_events,
                     SUM(CAST(sum_result_count AS DOUBLE)) as sum_results
-                FROM terms WHERE ${getDateWhereClause('session_date')}
+                FROM terms WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('terms')}
                 GROUP BY search_term ORDER BY searches DESC LIMIT 50
             `);
 
@@ -2632,7 +2721,7 @@
                     SUM(CAST(search_count AS DOUBLE)) as searches,
                     SUM(CAST(null_result_count AS DOUBLE)) as null_results,
                     SUM(CAST(result_events AS DOUBLE)) as result_events
-                FROM terms WHERE ${getDateWhereClause('session_date')}
+                FROM terms WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('terms')}
                 GROUP BY search_term
                 HAVING SUM(CAST(null_result_count AS DOUBLE)) > 0 AND SUM(CAST(search_count AS DOUBLE)) >= 3
                 ORDER BY null_results DESC LIMIT 20
@@ -2665,7 +2754,7 @@
                     SUM(CAST(search_count AS DOUBLE)) as searches,
                     SUM(CAST(unique_users AS DOUBLE)) as users,
                     CAST(DATE_DIFF('day', first_seen_date, MAX(session_date)) + 1 AS INTEGER) as term_age
-                FROM terms WHERE ${getDateWhereClause('session_date')}
+                FROM terms WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('terms')}
                 GROUP BY search_term, first_seen_date
                 HAVING first_seen_date >= '${formatDateForInput(dateFilter.from)}'
                 ORDER BY searches DESC LIMIT 20
@@ -2709,7 +2798,7 @@
                         SUM(CAST(success_click_count AS DOUBLE)) as clicks,
                         SUM(CAST(null_result_count AS DOUBLE)) as nulls,
                         SUM(CAST(result_events AS DOUBLE)) as results
-                    FROM terms WHERE ${getDateWhereClause('session_date')}
+                    FROM terms WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('terms')}
                     GROUP BY search_term
                 )
                 SELECT
@@ -2751,7 +2840,7 @@
         async function renderQueryLength() {
             const result = await conn.query(`
                 SELECT word_count, SUM(CAST(search_count AS DOUBLE)) as searches
-                FROM terms WHERE ${getDateWhereClause('session_date')} AND word_count IS NOT NULL
+                FROM terms WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('terms')} AND word_count IS NOT NULL
                 GROUP BY word_count ORDER BY word_count
             `);
 
@@ -2790,7 +2879,7 @@
         async function renderSessionComplexity() {
             const result = await conn.query(`
                 SELECT session_complexity, COUNT(*) as sessions
-                FROM journeys WHERE ${getDateWhereClause('session_date')}
+                FROM journeys WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('journeys')}
                 GROUP BY session_complexity
                 ORDER BY CASE session_complexity
                     WHEN 'Single Action' THEN 1 WHEN 'Simple' THEN 2
@@ -2801,19 +2890,32 @@
 
             if (charts.complexity) charts.complexity.destroy();
             const ctx = document.getElementById('complexityChart').getContext('2d');
+            const complexLabels = data.map(d => d.session_complexity);
+            const complexColors = getFilteredColors(
+                ['#CCC', '#999', '#666', '#333'].slice(0, complexLabels.length),
+                complexLabels, 'Complexity'
+            );
             charts.complexity = new Chart(ctx, {
                 type: 'pie',
                 data: {
-                    labels: data.map(d => d.session_complexity),
+                    labels: complexLabels,
                     datasets: [{
                         data: data.map(d => Number(d.sessions)),
-                        backgroundColor: ['#CCC', '#999', '#666', '#333']
+                        backgroundColor: complexColors
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'right' } }
+                    plugins: { legend: { position: 'right' } },
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            toggleChartFilter('Complexity', complexLabels[elements[0].index], 'session_complexity', 'journeys');
+                        }
+                    },
+                    onHover: (event, elements) => {
+                        event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+                    }
                 }
             });
         }
@@ -2822,7 +2924,7 @@
         async function renderSessionDuration() {
             const result = await conn.query(`
                 SELECT session_duration_bucket, session_duration_sort, COUNT(*) as sessions
-                FROM journeys WHERE ${getDateWhereClause('session_date')}
+                FROM journeys WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('journeys')}
                 GROUP BY session_duration_bucket, session_duration_sort
                 ORDER BY session_duration_sort
             `);
@@ -2831,21 +2933,33 @@
 
             if (charts.duration) charts.duration.destroy();
             const ctx = document.getElementById('durationChart').getContext('2d');
+            const durationLabels = data.map(d => d.session_duration_bucket);
+            const durationColors = getFilteredColors(
+                durationLabels.map(() => '#555555'), durationLabels, 'Duration'
+            );
             charts.duration = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: data.map(d => d.session_duration_bucket),
+                    labels: durationLabels,
                     datasets: [{
                         label: 'Sessions',
                         data: data.map(d => Number(d.sessions)),
-                        backgroundColor: '#555555'
+                        backgroundColor: durationColors
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } }
+                    scales: { y: { beginAtZero: true } },
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            toggleChartFilter('Duration', durationLabels[elements[0].index], 'session_duration_bucket', 'journeys');
+                        }
+                    },
+                    onHover: (event, elements) => {
+                        event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+                    }
                 }
             });
         }
@@ -2854,7 +2968,7 @@
         async function renderReformulation() {
             const result = await conn.query(`
                 SELECT had_reformulation, COUNT(*) as sessions
-                FROM journeys WHERE ${getDateWhereClause('session_date')}
+                FROM journeys WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('journeys')}
                 GROUP BY had_reformulation
             `);
 
@@ -2864,19 +2978,33 @@
 
             if (charts.reformulation) charts.reformulation.destroy();
             const ctx = document.getElementById('reformulationChart').getContext('2d');
+            const reformLabels = ['Refined Query', 'Single Query'];
+            const reformValues = ['true', 'false'];
+            const reformColors = getFilteredColors(
+                [COLORS.warning, '#888888'], reformLabels, 'Reformulation',
+                (label, i) => reformValues[i]
+            );
             charts.reformulation = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Refined Query', 'Single Query'],
+                    labels: reformLabels,
                     datasets: [{
                         data: [reformed, notReformed],
-                        backgroundColor: [COLORS.warning, '#888888']
+                        backgroundColor: reformColors
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom' } }
+                    plugins: { legend: { position: 'bottom' } },
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            toggleChartFilter('Reformulation', reformValues[elements[0].index], 'had_reformulation', 'journeys');
+                        }
+                    },
+                    onHover: (event, elements) => {
+                        event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+                    }
                 }
             });
         }
@@ -2887,26 +3015,40 @@
                 SELECT
                     SUM(CASE WHEN had_null_result = true AND recovered_from_null = true THEN 1 ELSE 0 END) as recovered,
                     SUM(CASE WHEN had_null_result = true AND recovered_from_null = false THEN 1 ELSE 0 END) as not_recovered
-                FROM journeys WHERE ${getDateWhereClause('session_date')}
+                FROM journeys WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('journeys')}
             `);
 
             const data = result.toArray()[0];
 
             if (charts.recovery) charts.recovery.destroy();
             const ctx = document.getElementById('recoveryChart').getContext('2d');
+            const recoveryLabels = ['Recovered', 'Gave Up'];
+            const recoveryValues = ['true', 'false'];
+            const recoveryColors = getFilteredColors(
+                [COLORS.success, COLORS.danger], recoveryLabels, 'Recovery',
+                (label, i) => recoveryValues[i]
+            );
             charts.recovery = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Recovered', 'Gave Up'],
+                    labels: recoveryLabels,
                     datasets: [{
                         data: [Number(data.recovered || 0), Number(data.not_recovered || 0)],
-                        backgroundColor: [COLORS.success, COLORS.danger]
+                        backgroundColor: recoveryColors
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom' } }
+                    plugins: { legend: { position: 'bottom' } },
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            toggleChartFilter('Recovery', recoveryValues[elements[0].index], 'recovered_from_null', 'journeys');
+                        }
+                    },
+                    onHover: (event, elements) => {
+                        event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+                    }
                 }
             });
         }
@@ -2915,7 +3057,7 @@
         async function renderOutcomeByComplexity() {
             const result = await conn.query(`
                 SELECT session_complexity, journey_outcome, COUNT(*) as sessions
-                FROM journeys WHERE ${getDateWhereClause('session_date')}
+                FROM journeys WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('journeys')}
                 GROUP BY session_complexity, journey_outcome
             `);
 
@@ -2941,7 +3083,15 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
-                    plugins: { legend: { position: 'top' } }
+                    plugins: { legend: { position: 'top' } },
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            toggleChartFilter('Complexity', complexities[elements[0].index], 'session_complexity', 'journeys');
+                        }
+                    },
+                    onHover: (event, elements) => {
+                        event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+                    }
                 }
             });
         }
@@ -2950,7 +3100,7 @@
         async function renderSearchLatency() {
             const result = await conn.query(`
                 SELECT search_to_result_bucket, search_to_result_sort, COUNT(*) as sessions
-                FROM journeys WHERE ${getDateWhereClause('session_date')}
+                FROM journeys WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('journeys')}
                     AND search_to_result_bucket IS NOT NULL
                 GROUP BY search_to_result_bucket, search_to_result_sort
                 ORDER BY search_to_result_sort
@@ -2983,7 +3133,7 @@
         async function renderTimeToClick() {
             const result = await conn.query(`
                 SELECT result_to_click_bucket, result_to_click_sort, COUNT(*) as sessions
-                FROM journeys WHERE ${getDateWhereClause('session_date')}
+                FROM journeys WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('journeys')}
                     AND result_to_click_bucket IS NOT NULL AND result_to_click_bucket != 'No Click'
                 GROUP BY result_to_click_bucket, result_to_click_sort
                 ORDER BY result_to_click_sort
@@ -3018,7 +3168,7 @@
                 SELECT session_date,
                     AVG(sec_search_to_result) as avg_latency,
                     AVG(sec_result_to_click) as avg_click_time
-                FROM journeys WHERE ${getDateWhereClause('session_date')}
+                FROM journeys WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('journeys')}
                     AND sec_search_to_result IS NOT NULL
                 GROUP BY session_date ORDER BY session_date
             `);
@@ -3070,7 +3220,7 @@
                     PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY sec_search_to_result) as p95_latency,
                     AVG(sec_result_to_click) as avg_click_time,
                     AVG(total_duration_sec) as avg_session_duration
-                FROM journeys WHERE ${getDateWhereClause('session_date')}
+                FROM journeys WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('journeys')}
                     AND sec_search_to_result IS NOT NULL
             `);
 
@@ -3109,7 +3259,7 @@
                     SUM(CAST(searches_morning AS DOUBLE)) as morning,
                     SUM(CAST(searches_afternoon AS DOUBLE)) as afternoon,
                     SUM(CAST(searches_evening AS DOUBLE)) as evening
-                FROM terms WHERE ${getDateWhereClause('session_date')}
+                FROM terms WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('terms')}
             `);
 
             const timeData = timeResult.toArray()[0];
@@ -3200,7 +3350,7 @@
                     SUM(CAST(searches_morning AS DOUBLE)) as morning,
                     SUM(CAST(searches_afternoon AS DOUBLE)) as afternoon,
                     SUM(CAST(searches_evening AS DOUBLE)) as evening
-                FROM terms WHERE ${getDateWhereClause('session_date')}
+                FROM terms WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('terms')}
                 GROUP BY search_term
                 HAVING SUM(CAST(search_count AS DOUBLE)) >= 5
                 ORDER BY SUM(CAST(search_count AS DOUBLE)) DESC
@@ -3250,7 +3400,7 @@
                 SELECT
                     month_num,
                     SUM(CAST(search_count AS DOUBLE)) as searches
-                FROM terms WHERE ${getDateWhereClause('session_date')}
+                FROM terms WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('terms')}
                 GROUP BY month_num
                 ORDER BY month_num
             `);
@@ -3315,7 +3465,7 @@
                         search_term,
                         MIN(first_seen_date) as first_seen,
                         MAX(session_date) as last_seen
-                    FROM terms WHERE ${getDateWhereClause('session_date')}
+                    FROM terms WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('terms')}
                     GROUP BY search_term
                 ),
                 term_monthly AS (
@@ -3323,7 +3473,7 @@
                         search_term,
                         month_num,
                         SUM(CAST(search_count AS DOUBLE)) as monthly_searches
-                    FROM terms WHERE ${getDateWhereClause('session_date')}
+                    FROM terms WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('terms')}
                     GROUP BY search_term, month_num
                 ),
                 term_stats AS (
@@ -3448,7 +3598,7 @@
                     SUM(CAST(null_result_count AS DOUBLE)) as nulls,
                     SUM(CAST(result_events AS DOUBLE)) as results
                 FROM terms WHERE search_term = '${term.replace(/'/g, "''")}'
-                    AND ${getDateWhereClause('session_date')}
+                    AND ${getDateWhereClause('session_date')}${getFilterWhereClause('terms')}
                 GROUP BY session_date ORDER BY session_date
             `);
 
@@ -3542,16 +3692,6 @@
         }
 
         // Filter functions
-        function filterByOutcome(outcome) {
-            if (activeFilters.outcome === outcome) {
-                delete activeFilters.outcome;
-            } else {
-                activeFilters.outcome = outcome;
-            }
-            updateFiltersDisplay();
-            renderJourneyOutcomes();
-        }
-
         function updateFiltersDisplay() {
             const container = document.getElementById('activeFilters');
             const filters = Object.entries(activeFilters);
@@ -3562,12 +3702,13 @@
             }
 
             container.style.display = 'flex';
-            container.innerHTML = filters.map(([key, value]) => `
-                <div class="filter-tag">
-                    ${key}: ${value}
+            container.innerHTML = filters.map(([key, filter]) => {
+                const displayValue = FILTER_DISPLAY[key]?.[filter.value] ?? filter.value;
+                return `<div class="filter-tag">
+                    ${key}: ${displayValue}
                     <button onclick="removeFilter('${key}')">&times;</button>
-                </div>
-            `).join('') + `<span class="clear-filters" onclick="clearAllFilters()">Clear all</span>`;
+                </div>`;
+            }).join('') + `<span class="clear-filters" onclick="clearAllFilters()">Clear all</span>`;
         }
 
         async function removeFilter(key) {
@@ -3606,7 +3747,7 @@
                     SUM(CAST(searches_evening AS DOUBLE)) as evening,
                     MIN(first_seen_date) as first_seen
                 FROM terms
-                WHERE ${getDateWhereClause('session_date')}
+                WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('terms')}
                 GROUP BY search_term, department, location
                 ORDER BY searches DESC
             `);
@@ -3928,7 +4069,7 @@
                     is_users_first_session,
                     user_session_number
                 FROM journeys
-                WHERE ${getDateWhereClause('session_date')}
+                WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('journeys')}
                 ORDER BY session_date DESC, session_start_str DESC
             `);
             sessionsData = result.toArray().map(d => {
@@ -4139,7 +4280,7 @@
                     CASE WHEN result_events > 0 THEN ROUND(100.0 * null_results / result_events, 1) ELSE 0 END as null_rate_pct,
                     CASE WHEN sessions_with_results > 0 THEN ROUND(100.0 * sessions_with_clicks / sessions_with_results, 1) ELSE 0 END as success_rate_pct
                 FROM daily
-                WHERE ${getDateWhereClause('date')}
+                WHERE ${getDateWhereClause('date')}${getFilterWhereClause('daily')}
                 ORDER BY date DESC
             `);
             dailyData = result.toArray().map(d => {
@@ -4270,7 +4411,7 @@
                     MODE(top_department) as top_department,
                     MODE(top_device_type) as top_device_type
                 FROM term_clicks
-                WHERE ${getDateWhereClause('session_date')}
+                WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('term_clicks')}
                 GROUP BY search_term, clicked_result_title, clicked_result_url
                 ORDER BY clicks DESC
             `);
@@ -4622,6 +4763,13 @@
             }
         }
 
+        function getRefreshLabel() {
+            if (dataRefreshDate) {
+                return `Data through: ${dataRefreshDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}`;
+            }
+            return `Updated: ${new Date().toLocaleTimeString()}`;
+        }
+
         function updateStatus(status, text) {
             const statusEl = document.getElementById('dataStatus');
             statusEl.className = 'data-status';
@@ -4676,7 +4824,7 @@
             const safe = val.replace(/'/g, "''");
             const result = await conn.query(`
                 SELECT DISTINCT search_term FROM terms
-                WHERE search_term ILIKE '%${safe}%' AND ${getDateWhereClause('session_date')}
+                WHERE search_term ILIKE '%${safe}%' AND ${getDateWhereClause('session_date')}${getFilterWhereClause('terms')}
                 ORDER BY search_term LIMIT 10
             `);
             return result.toArray().map(r => ({ label: String(r.search_term), value: String(r.search_term) }));
