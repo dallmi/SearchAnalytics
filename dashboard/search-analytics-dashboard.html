@@ -1776,9 +1776,13 @@
                 updateStatus('loading', 'Waiting for DuckDB...');
 
                 if (!window.duckdb) {
-                    await new Promise(resolve => {
-                        window.addEventListener('duckdb-ready', resolve, { once: true });
-                    });
+                    await Promise.race([
+                        new Promise(resolve => {
+                            window.addEventListener('duckdb-ready', resolve, { once: true });
+                        }),
+                        new Promise((_, reject) => setTimeout(() =>
+                            reject(new Error('DuckDB failed to load after 30 seconds. Check your internet connection and reload.')), 30000))
+                    ]);
                 }
 
                 updateStatus('loading', 'Initializing DuckDB...');
@@ -1847,6 +1851,17 @@
             const result = await conn.query(`SELECT MIN(date) as min_date, MAX(date) as max_date FROM daily`);
             const row = result.toArray()[0];
 
+            if (!row || row.min_date == null || row.max_date == null) {
+                const today = new Date();
+                const thirtyDaysAgo = new Date(today);
+                thirtyDaysAgo.setDate(today.getDate() - 30);
+                document.getElementById('dateFrom').value = formatDateForInput(thirtyDaysAgo);
+                document.getElementById('dateTo').value = formatDateForInput(today);
+                dateFilter.from = thirtyDaysAgo;
+                dateFilter.to = today;
+                return;
+            }
+
             const minDate = new Date(row.min_date);
             const maxDate = new Date(row.max_date);
 
@@ -1884,37 +1899,45 @@
             await renderDashboard();
         }
 
+        let renderInProgress = false;
+
         async function renderDashboard() {
+            if (renderInProgress) return;
+            renderInProgress = true;
             updateStatus('loading', 'Refreshing...');
 
             try {
-                // Run all renders in parallel for the active tab
-                await Promise.all([
-                    renderExecutiveSummary(),
-                    renderKPIs(),
-                    renderDailyTrends(),
-                    renderJourneyOutcomes(),
-                    renderHourlyDistribution(),
-                    renderWeekdayDistribution(),
-                    renderUserCohorts(),
-                    renderClickCategories(),
-                    renderTopTerms(),
-                    renderProblemTerms(),
-                    renderNewTerms(),
-                    renderTermPerformance(),
-                    renderQueryLength(),
-                    renderSessionComplexity(),
-                    renderSessionDuration(),
-                    renderReformulation(),
-                    renderRecovery(),
-                    renderOutcomeByComplexity(),
-                    renderSearchLatency(),
-                    renderTimeToClick(),
-                    renderLatencyTrend(),
-                    renderPerformanceMetrics(),
-                    renderTimeOfDay(),
-                    renderSeasonality()
-                ]);
+                // Run all renders in parallel — allSettled so one failure doesn't abort the rest
+                const renderTasks = [
+                    { name: 'ExecutiveSummary', fn: renderExecutiveSummary },
+                    { name: 'KPIs', fn: renderKPIs },
+                    { name: 'DailyTrends', fn: renderDailyTrends },
+                    { name: 'JourneyOutcomes', fn: renderJourneyOutcomes },
+                    { name: 'HourlyDistribution', fn: renderHourlyDistribution },
+                    { name: 'WeekdayDistribution', fn: renderWeekdayDistribution },
+                    { name: 'UserCohorts', fn: renderUserCohorts },
+                    { name: 'ClickCategories', fn: renderClickCategories },
+                    { name: 'TopTerms', fn: renderTopTerms },
+                    { name: 'ProblemTerms', fn: renderProblemTerms },
+                    { name: 'NewTerms', fn: renderNewTerms },
+                    { name: 'TermPerformance', fn: renderTermPerformance },
+                    { name: 'QueryLength', fn: renderQueryLength },
+                    { name: 'SessionComplexity', fn: renderSessionComplexity },
+                    { name: 'SessionDuration', fn: renderSessionDuration },
+                    { name: 'Reformulation', fn: renderReformulation },
+                    { name: 'Recovery', fn: renderRecovery },
+                    { name: 'OutcomeByComplexity', fn: renderOutcomeByComplexity },
+                    { name: 'SearchLatency', fn: renderSearchLatency },
+                    { name: 'TimeToClick', fn: renderTimeToClick },
+                    { name: 'LatencyTrend', fn: renderLatencyTrend },
+                    { name: 'PerformanceMetrics', fn: renderPerformanceMetrics },
+                    { name: 'TimeOfDay', fn: renderTimeOfDay },
+                    { name: 'Seasonality', fn: renderSeasonality }
+                ];
+                const results = await Promise.allSettled(renderTasks.map(t => t.fn()));
+                const failures = results
+                    .map((r, i) => r.status === 'rejected' ? renderTasks[i].name : null)
+                    .filter(Boolean);
 
                 // Lazy-render the active insights sub-tab
                 insightsRendered.terms = false;
@@ -1923,10 +1946,17 @@
                 insightsRendered.content = false;
                 await renderActiveInsightsTab();
 
-                updateStatus('success', `Last updated: ${new Date().toLocaleTimeString()}`);
+                if (failures.length > 0) {
+                    console.error('Render failures:', failures);
+                    updateStatus('error', `${failures.length} section(s) failed to render`);
+                } else {
+                    updateStatus('success', `Last updated: ${new Date().toLocaleTimeString()}`);
+                }
             } catch (error) {
                 console.error('Render error:', error);
                 updateStatus('error', 'Error rendering');
+            } finally {
+                renderInProgress = false;
             }
         }
 
@@ -2002,7 +2032,7 @@
                 insights.push({
                     type: 'action',
                     title: 'Top Content Gap',
-                    text: `"${topProblem.search_term}" has ${formatNumber(topProblem.nulls)} null results - consider adding content`
+                    text: `"${escapeHtml(topProblem.search_term)}" has ${formatNumber(topProblem.nulls)} null results - consider adding content`
                 });
             }
 
@@ -3028,7 +3058,7 @@
 
                 return `
                     <tr>
-                        <td><a href="#" onclick="showTermDetail('${d.search_term.replace(/'/g, "\\'")}'); return false;">${d.search_term}</a></td>
+                        <td><a href="#" onclick="showTermDetail('${escapeHtml(d.search_term)}'); return false;">${escapeHtml(d.search_term)}</a></td>
                         <td class="text-right">${formatNumber(d.searches)}</td>
                         <td class="text-right"><span style="color: ${peakColor}; font-weight: 500;">${peakPeriod}</span></td>
                         <td class="text-right ${concentrationClass}">${concentration.toFixed(0)}%</td>
@@ -3099,9 +3129,6 @@
             // Seasonal terms table
             await renderSeasonalTermsTable();
 
-            // Add filter event listeners
-            document.getElementById('seasonalMonthFilter').addEventListener('change', renderSeasonalTermsTable);
-            document.getElementById('seasonalTypeFilter').addEventListener('change', renderSeasonalTermsTable);
         }
 
         async function renderSeasonalTermsTable() {
@@ -3218,7 +3245,7 @@
 
                 return `
                     <tr>
-                        <td><a href="#" onclick="showTermDetail('${d.search_term.replace(/'/g, "\\'")}'); return false;">${d.search_term}</a></td>
+                        <td><a href="#" onclick="showTermDetail('${escapeHtml(d.search_term)}'); return false;">${escapeHtml(d.search_term)}</a></td>
                         <td class="text-right">${formatNumber(d.total_searches)}</td>
                         <td class="text-right"><strong>${peakMonth}</strong></td>
                         <td class="text-right">${hasInsufficientData ? '<span style="color: var(--medium-gray);">-</span>' : concentration.toFixed(1) + 'x'}</td>
@@ -3312,8 +3339,9 @@
             `;
 
             // Render mini trend chart
+            if (charts.termTrend) charts.termTrend.destroy();
             const miniCtx = document.getElementById('termTrendChart').getContext('2d');
-            new Chart(miniCtx, {
+            charts.termTrend = new Chart(miniCtx, {
                 type: 'line',
                 data: {
                     labels: data.map(d => new Date(d.session_date)),
@@ -3370,16 +3398,16 @@
             `).join('') + `<span class="clear-filters" onclick="clearAllFilters()">Clear all</span>`;
         }
 
-        function removeFilter(key) {
+        async function removeFilter(key) {
             delete activeFilters[key];
             updateFiltersDisplay();
-            renderDashboard();
+            await renderDashboard();
         }
 
-        function clearAllFilters() {
+        async function clearAllFilters() {
             activeFilters = {};
             updateFiltersDisplay();
-            renderDashboard();
+            await renderDashboard();
         }
 
         // ========== Insights & Export ==========
@@ -3463,7 +3491,8 @@
                     words: Number(d.words) || 0,
                     searches, users, null_rate, avg_results, ctr,
                     avg_click_pos, engagement, priority, outcome, lifecycle,
-                    peak_region, first_seen: firstSeen ? formatDateForInput(firstSeen) : '-'
+                    peak_region, first_seen: firstSeen ? formatDateForInput(firstSeen) : '-',
+                    _null_results: null_results, _result_events: result_events, _success_clicks: success_clicks
                 };
             });
 
@@ -3480,9 +3509,9 @@
                 }
                 const t = termMap[d.search_term];
                 t.searches += d.searches;
-                t.success_clicks += d.searches * d.ctr / 100;
-                t.null_results += d.searches * d.null_rate / 100;
-                t.result_events += d.result_events > 0 ? d.searches : 0;
+                t.success_clicks += d._success_clicks;
+                t.null_results += d._null_results;
+                t.result_events += d._result_events;
             });
             const terms = Object.values(termMap);
             const totalTerms = terms.length;
@@ -3656,9 +3685,9 @@
             const wsData = [headers, ...rows];
             const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-            // Auto-column widths
+            // Auto-column widths (cap scan at 100 rows for performance)
             ws['!cols'] = headers.map((h, i) => {
-                const maxLen = Math.max(h.length, ...rows.map(r => String(r[i] || '').length));
+                const maxLen = Math.max(h.length, ...rows.slice(0, 100).map(r => String(r[i] || '').length));
                 return { wch: Math.min(maxLen + 2, 40) };
             });
 
@@ -3848,22 +3877,38 @@
             ];
         }
 
+        function getFilteredSessionsForExport() {
+            const search = (document.getElementById('sessionsSearch').value || '').toLowerCase();
+            const outcomeFilter = document.getElementById('sessionsOutcomeFilter').value;
+            const complexityFilter = document.getElementById('sessionsComplexityFilter').value;
+            return sessionsData.filter(d => {
+                if (search && !String(d.department).toLowerCase().includes(search)
+                    && !String(d.location).toLowerCase().includes(search)
+                    && !String(d.job_title).toLowerCase().includes(search)) return false;
+                if (outcomeFilter && d.journey_outcome !== outcomeFilter) return false;
+                if (complexityFilter && d.session_complexity !== complexityFilter) return false;
+                return true;
+            });
+        }
+
         function exportSessionsCsv() {
-            if (sessionsData.length === 0) return;
+            const data = getFilteredSessionsForExport();
+            if (data.length === 0) return;
             const headers = getSessionsExportHeaders();
-            const rows = sessionsData.map(getSessionsExportRow);
+            const rows = data.map(getSessionsExportRow);
             exportCsvGeneric(headers, rows, 'session-export');
         }
 
         function exportSessionsXlsx() {
-            if (sessionsData.length === 0) return;
+            const data = getFilteredSessionsForExport();
+            if (data.length === 0) return;
             if (typeof XLSX === 'undefined') { alert('XLSX library not loaded.'); return; }
 
             const groupRow = ['Time','','','Demographics','','','','','Volume','','','','','',
                 'Click Breakdown','','','','','','Performance','','','',
                 'Classification','','','Behavior','','','',''];
             const headers = getSessionsExportHeaders();
-            const rows = sessionsData.map(getSessionsExportRow);
+            const rows = data.map(getSessionsExportRow);
 
             const wsData = [groupRow, headers, ...rows];
             const ws = XLSX.utils.aoa_to_sheet(wsData);
@@ -4141,10 +4186,22 @@
             filterContent();
         }
 
+        function getFilteredContentForExport() {
+            const search = (document.getElementById('contentSearch').value || '').toLowerCase();
+            const minClicks = parseInt(document.getElementById('contentMinClicks').value) || 1;
+            return contentData.filter(d => {
+                if (d.clicks < minClicks) return false;
+                if (search && !d.search_term.toLowerCase().includes(search)
+                    && !d.clicked_result_title.toLowerCase().includes(search)) return false;
+                return true;
+            });
+        }
+
         function exportContentCsv() {
-            if (contentData.length === 0) return;
+            const data = getFilteredContentForExport();
+            if (data.length === 0) return;
             const headers = ['Search Term','Content Title','Content URL','Clicks','Users','Sessions','Avg Click Position','Top Department','Top Device Type'];
-            const rows = contentData.map(d => [
+            const rows = data.map(d => [
                 d.search_term, d.clicked_result_title, d.clicked_result_url,
                 d.clicks, d.users, d.sessions, d.avg_click_pos, d.top_department, d.top_device_type
             ]);
@@ -4152,10 +4209,11 @@
         }
 
         function exportContentXlsx() {
-            if (contentData.length === 0) return;
+            const data = getFilteredContentForExport();
+            if (data.length === 0) return;
             if (typeof XLSX === 'undefined') { alert('XLSX library not loaded.'); return; }
             const headers = ['Search Term','Content Title','Content URL','Clicks','Users','Sessions','Avg Click Position','Top Department','Top Device Type'];
-            const rows = contentData.map(d => [
+            const rows = data.map(d => [
                 d.search_term, d.clicked_result_title, d.clicked_result_url,
                 d.clicks, d.users, d.sessions, d.avg_click_pos, d.top_department, d.top_device_type
             ]);
@@ -4327,7 +4385,7 @@
 
         // Tab handling
         document.querySelectorAll('.nav-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
+            tab.addEventListener('click', async () => {
                 const target = tab.dataset.nav;
 
                 document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
@@ -4335,6 +4393,10 @@
 
                 tab.classList.add('active');
                 document.getElementById('nav' + target.charAt(0).toUpperCase() + target.slice(1)).classList.add('active');
+
+                if (target === 'insights') {
+                    await renderActiveInsightsTab();
+                }
             });
         });
 
@@ -4354,6 +4416,10 @@
         // Search input handler
         document.getElementById('termSearch').addEventListener('input', renderFilteredTerms);
         document.getElementById('termStatusFilter').addEventListener('change', renderFilteredTerms);
+
+        // Seasonality filter handlers
+        document.getElementById('seasonalMonthFilter').addEventListener('change', renderSeasonalTermsTable);
+        document.getElementById('seasonalTypeFilter').addEventListener('change', renderSeasonalTermsTable);
 
         // Insights & Export tab handlers
         document.querySelectorAll('#insightsTable .sort-header').forEach(th => {
