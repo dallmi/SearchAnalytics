@@ -9,6 +9,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
+    <!-- SheetJS for XLSX export (last MIT-licensed release) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
     <!-- DuckDB WASM - loaded as ES module -->
     <script type="module">
         import * as duckdb from 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.28.0/+esm';
@@ -858,6 +861,142 @@
             text-align: right;
         }
 
+        /* Insights & Export tab */
+        .insights-controls {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            background: var(--lighter-gray);
+            border-radius: 6px;
+        }
+
+        .insights-controls input[type="text"],
+        .insights-controls input[type="number"] {
+            padding: 0.4rem 0.5rem;
+            border: 1px solid var(--light-gray);
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+
+        .insights-controls input[type="text"] {
+            width: 200px;
+        }
+
+        .insights-controls input[type="number"] {
+            width: 70px;
+        }
+
+        .insights-controls select {
+            padding: 0.4rem 0.5rem;
+            border: 1px solid var(--light-gray);
+            border-radius: 4px;
+            font-size: 0.8rem;
+            background: var(--white);
+        }
+
+        .insights-controls label {
+            font-size: 0.75rem;
+            color: var(--medium-gray);
+            margin-right: -0.5rem;
+        }
+
+        .export-btn {
+            padding: 0.4rem 0.75rem;
+            border: 1px solid var(--light-gray);
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            background: var(--white);
+            color: var(--dark-gray);
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .export-btn:hover {
+            background: var(--lighter-gray);
+            border-color: var(--medium-gray);
+        }
+
+        .sort-header {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            padding-right: 1.2rem !important;
+            white-space: nowrap;
+        }
+
+        .sort-header:hover {
+            background: var(--lighter-gray);
+        }
+
+        .sort-header::after {
+            content: '\2195';
+            position: absolute;
+            right: 0.3rem;
+            opacity: 0.3;
+            font-size: 0.7rem;
+        }
+
+        .sort-header.asc::after {
+            content: '\2191';
+            opacity: 0.8;
+        }
+
+        .sort-header.desc::after {
+            content: '\2193';
+            opacity: 0.8;
+        }
+
+        .cell-success { color: var(--success); font-weight: 600; }
+        .cell-warning { color: var(--warning); font-weight: 600; }
+        .cell-danger { color: var(--danger); font-weight: 600; }
+
+        .insights-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .insights-kpi-card {
+            background: var(--white);
+            border: 1px solid var(--light-gray);
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            text-align: center;
+        }
+
+        .insights-kpi-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--dark-gray);
+        }
+
+        .insights-kpi-label {
+            font-size: 0.75rem;
+            color: var(--medium-gray);
+            margin-top: 0.25rem;
+        }
+
+        #insightsTable {
+            font-size: 0.8rem;
+        }
+
+        #insightsTable th {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .insights-count {
+            font-size: 0.8rem;
+            color: var(--medium-gray);
+            margin-bottom: 0.5rem;
+        }
+
         /* Trend sparkline placeholder */
         .trend-mini {
             width: 60px;
@@ -920,6 +1059,7 @@
                 <button class="nav-tab" data-nav="journeys">User Journeys</button>
                 <button class="nav-tab" data-nav="performance">Performance</button>
                 <button class="nav-tab" data-nav="patterns">Patterns</button>
+                <button class="nav-tab" data-nav="insights">Insights &amp; Export</button>
             </div>
 
             <!-- Overview Tab -->
@@ -1326,6 +1466,83 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Insights & Export Tab -->
+            <div class="nav-content" id="navInsights">
+                <!-- KPI Summary -->
+                <div class="insights-kpi-grid" id="insightsKpiGrid">
+                    <div class="insights-kpi-card">
+                        <div class="insights-kpi-value" id="insightsKpiTerms">-</div>
+                        <div class="insights-kpi-label">Total Terms</div>
+                    </div>
+                    <div class="insights-kpi-card">
+                        <div class="insights-kpi-value" id="insightsKpiGaps">-</div>
+                        <div class="insights-kpi-label">Content Gaps (Null Rate &ge;50%)</div>
+                    </div>
+                    <div class="insights-kpi-card">
+                        <div class="insights-kpi-value" id="insightsKpiCtr">-</div>
+                        <div class="insights-kpi-label">Avg Success CTR</div>
+                    </div>
+                    <div class="insights-kpi-card">
+                        <div class="insights-kpi-value" id="insightsKpiPriority">-</div>
+                        <div class="insights-kpi-label">High Priority Terms (Score &ge;10)</div>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="insights-controls">
+                    <label>Search</label>
+                    <input type="text" id="insightsSearch" placeholder="Filter by term...">
+                    <label>Outcome</label>
+                    <select id="insightsOutcomeFilter">
+                        <option value="">All</option>
+                        <option value="Zero Results">Zero Results</option>
+                        <option value="Mostly No Results">Mostly No Results</option>
+                        <option value="No Clicks">No Clicks</option>
+                        <option value="Low CTR">Low CTR</option>
+                        <option value="Success">Success</option>
+                    </select>
+                    <label>Lifecycle</label>
+                    <select id="insightsLifecycleFilter">
+                        <option value="">All</option>
+                        <option value="New">New</option>
+                        <option value="Emerging">Emerging</option>
+                        <option value="Established">Established</option>
+                        <option value="Mature">Mature</option>
+                    </select>
+                    <label>Min Searches</label>
+                    <input type="number" id="insightsMinSearches" value="2" min="1">
+                    <button class="export-btn" onclick="exportInsightsCsv()">Export CSV</button>
+                    <button class="export-btn" onclick="exportInsightsXlsx()">Export XLSX</button>
+                </div>
+
+                <div class="insights-count" id="insightsCount"></div>
+
+                <!-- Insights Table -->
+                <div class="table-container">
+                    <table id="insightsTable">
+                        <thead>
+                            <tr>
+                                <th class="sort-header" data-sort="search_term">Search Term</th>
+                                <th class="sort-header text-right" data-sort="words">Words</th>
+                                <th class="sort-header text-right desc" data-sort="searches">Searches</th>
+                                <th class="sort-header text-right" data-sort="users">Users</th>
+                                <th class="sort-header text-right" data-sort="null_rate">Null Rate %</th>
+                                <th class="sort-header text-right" data-sort="avg_results">Avg Results</th>
+                                <th class="sort-header text-right" data-sort="ctr">CTR %</th>
+                                <th class="sort-header text-right" data-sort="avg_click_pos">Avg Pos</th>
+                                <th class="sort-header text-right" data-sort="engagement">Engage %</th>
+                                <th class="sort-header text-right" data-sort="priority">Priority</th>
+                                <th class="sort-header text-center" data-sort="lifecycle">Lifecycle</th>
+                                <th class="sort-header text-center" data-sort="outcome">Outcome</th>
+                                <th class="sort-header text-center" data-sort="peak_region">Peak Region</th>
+                                <th class="sort-header text-right" data-sort="first_seen">First Seen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="insightsBody"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </main>
 
@@ -1349,6 +1566,8 @@
         let dateFilter = { from: null, to: null };
         let activeFilters = {};
         let allTermsData = [];
+        let insightsData = [];
+        let insightsSort = { col: 'searches', dir: 'desc' };
 
         // Chart instances
         let charts = {};
@@ -1520,7 +1739,8 @@
                     renderLatencyTrend(),
                     renderPerformanceMetrics(),
                     renderTimeOfDay(),
-                    renderSeasonality()
+                    renderSeasonality(),
+                    renderInsightsExport()
                 ]);
 
                 updateStatus('success', `Last updated: ${new Date().toLocaleTimeString()}`);
@@ -2982,6 +3202,269 @@
             renderDashboard();
         }
 
+        // ========== Insights & Export ==========
+
+        async function renderInsightsExport() {
+            const result = await conn.query(`
+                SELECT
+                    search_term,
+                    MIN(word_count) as words,
+                    SUM(CAST(search_count AS DOUBLE)) as searches,
+                    SUM(CAST(unique_users AS DOUBLE)) as users,
+                    SUM(CAST(null_result_count AS DOUBLE)) as null_results,
+                    SUM(CAST(result_events AS DOUBLE)) as result_events,
+                    SUM(CAST(sum_result_count AS DOUBLE)) as sum_results,
+                    SUM(CAST(success_click_count AS DOUBLE)) as success_clicks,
+                    SUM(CAST(click_count AS DOUBLE)) as total_clicks,
+                    SUM(CAST(sum_click_position AS DOUBLE)) as sum_click_pos,
+                    SUM(CAST(click_position_count AS DOUBLE)) as click_pos_count,
+                    SUM(CAST(searches_morning AS DOUBLE)) as morning,
+                    SUM(CAST(searches_afternoon AS DOUBLE)) as afternoon,
+                    SUM(CAST(searches_night AS DOUBLE)) as night,
+                    SUM(CAST(searches_evening AS DOUBLE)) as evening,
+                    MIN(first_seen_date) as first_seen
+                FROM terms
+                WHERE ${getDateWhereClause('session_date')}
+                GROUP BY search_term
+                ORDER BY searches DESC
+            `);
+            const raw = result.toArray();
+
+            const now = new Date(formatDateForInput(dateFilter.to));
+            insightsData = raw.map(d => {
+                const searches = Number(d.searches) || 0;
+                const users = Number(d.users) || 0;
+                const null_results = Number(d.null_results) || 0;
+                const result_events = Number(d.result_events) || 0;
+                const sum_results = Number(d.sum_results) || 0;
+                const success_clicks = Number(d.success_clicks) || 0;
+                const total_clicks = Number(d.total_clicks) || 0;
+                const sum_click_pos = Number(d.sum_click_pos) || 0;
+                const click_pos_count = Number(d.click_pos_count) || 0;
+                const morning = Number(d.morning) || 0;
+                const afternoon = Number(d.afternoon) || 0;
+                const night = Number(d.night) || 0;
+                const evening = Number(d.evening) || 0;
+
+                const null_rate = result_events > 0 ? (null_results / result_events * 100) : 0;
+                const avg_results = result_events > 0 ? (sum_results / result_events) : 0;
+                const ctr = searches > 0 ? (success_clicks / searches * 100) : 0;
+                const avg_click_pos = click_pos_count > 0 ? (sum_click_pos / click_pos_count) : 0;
+                const engagement = searches > 0 ? (total_clicks / searches * 100) : 0;
+                const priority = searches * null_rate / 100;
+
+                // Outcome classification (mirrors Power BI DAX)
+                let outcome;
+                if (null_rate >= 100) outcome = 'Zero Results';
+                else if (null_rate >= 50) outcome = 'Mostly No Results';
+                else if (success_clicks === 0) outcome = 'No Clicks';
+                else if (ctr < 20) outcome = 'Low CTR';
+                else outcome = 'Success';
+
+                // Lifecycle based on first_seen age
+                let lifecycle;
+                const firstSeen = d.first_seen ? new Date(String(d.first_seen)) : null;
+                const ageDays = firstSeen ? Math.floor((now - firstSeen) / (1000 * 60 * 60 * 24)) : 999;
+                if (ageDays <= 3) lifecycle = 'New';
+                else if (ageDays <= 14) lifecycle = 'Emerging';
+                else if (ageDays <= 90) lifecycle = 'Established';
+                else lifecycle = 'Mature';
+
+                // Peak region
+                const regions = { 'CET': morning, 'Americas': afternoon, 'APAC': night, 'Night': evening };
+                const peak_region = Object.entries(regions).sort((a, b) => b[1] - a[1])[0][0];
+
+                return {
+                    search_term: String(d.search_term),
+                    words: Number(d.words) || 0,
+                    searches, users, null_rate, avg_results, ctr,
+                    avg_click_pos, engagement, priority, outcome, lifecycle,
+                    peak_region, first_seen: firstSeen ? formatDateForInput(firstSeen) : '-'
+                };
+            });
+
+            renderInsightsKpis(insightsData);
+            filterInsights();
+        }
+
+        function renderInsightsKpis(data) {
+            const totalTerms = data.length;
+            const contentGaps = data.filter(d => d.null_rate >= 50).length;
+            const totalSearches = data.reduce((s, d) => s + d.searches, 0);
+            const totalClicks = data.reduce((s, d) => s + d.searches * d.ctr / 100, 0);
+            const avgCtr = totalSearches > 0 ? (totalClicks / totalSearches * 100) : 0;
+            const highPriority = data.filter(d => d.priority >= 10).length;
+
+            document.getElementById('insightsKpiTerms').textContent = formatNumber(totalTerms);
+            document.getElementById('insightsKpiGaps').textContent = formatNumber(contentGaps);
+            document.getElementById('insightsKpiCtr').textContent = avgCtr.toFixed(1) + '%';
+            document.getElementById('insightsKpiPriority').textContent = formatNumber(highPriority);
+        }
+
+        function filterInsights() {
+            const search = (document.getElementById('insightsSearch').value || '').toLowerCase();
+            const outcomeFilter = document.getElementById('insightsOutcomeFilter').value;
+            const lifecycleFilter = document.getElementById('insightsLifecycleFilter').value;
+            const minSearches = parseInt(document.getElementById('insightsMinSearches').value) || 1;
+
+            let filtered = insightsData.filter(d => {
+                if (d.searches < minSearches) return false;
+                if (search && !d.search_term.toLowerCase().includes(search)) return false;
+                if (outcomeFilter && d.outcome !== outcomeFilter) return false;
+                if (lifecycleFilter && d.lifecycle !== lifecycleFilter) return false;
+                return true;
+            });
+
+            // Sort
+            filtered.sort((a, b) => {
+                const col = insightsSort.col;
+                let va = a[col], vb = b[col];
+                if (typeof va === 'string') {
+                    va = va.toLowerCase(); vb = vb.toLowerCase();
+                    return insightsSort.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+                }
+                return insightsSort.dir === 'asc' ? va - vb : vb - va;
+            });
+
+            document.getElementById('insightsCount').textContent =
+                `Showing ${filtered.length} of ${insightsData.length} terms`;
+
+            renderInsightsTable(filtered);
+        }
+
+        function renderInsightsTable(data) {
+            const OUTCOME_BADGE = {
+                'Zero Results': 'badge-danger',
+                'Mostly No Results': 'badge-warning',
+                'No Clicks': 'badge-secondary',
+                'Low CTR': 'badge-info',
+                'Success': 'badge-success'
+            };
+            const LIFECYCLE_BADGE = {
+                'New': 'badge-success',
+                'Emerging': 'badge-warning',
+                'Established': 'badge-info',
+                'Mature': 'badge-neutral'
+            };
+
+            document.getElementById('insightsBody').innerHTML = data.map(d => {
+                const nullCls = d.null_rate >= 50 ? 'cell-danger' : d.null_rate >= 20 ? 'cell-warning' : '';
+                const ctrCls = d.ctr >= 40 ? 'cell-success' : d.ctr >= 20 ? '' : d.ctr > 0 ? 'cell-warning' : 'cell-danger';
+                const prioStyle = d.priority >= 10 ? 'font-weight:700' : '';
+
+                return `<tr class="clickable" onclick="showTermDetail('${escapeHtml(d.search_term)}')">
+                    <td>${escapeHtml(d.search_term)}</td>
+                    <td class="text-right">${d.words}</td>
+                    <td class="text-right">${formatNumber(d.searches)}</td>
+                    <td class="text-right">${formatNumber(d.users)}</td>
+                    <td class="text-right ${nullCls}">${d.null_rate.toFixed(1)}%</td>
+                    <td class="text-right">${d.avg_results.toFixed(1)}</td>
+                    <td class="text-right ${ctrCls}">${d.ctr.toFixed(1)}%</td>
+                    <td class="text-right">${d.avg_click_pos > 0 ? d.avg_click_pos.toFixed(1) : '-'}</td>
+                    <td class="text-right">${d.engagement.toFixed(1)}%</td>
+                    <td class="text-right" style="${prioStyle}">${d.priority.toFixed(1)}</td>
+                    <td class="text-center"><span class="badge ${LIFECYCLE_BADGE[d.lifecycle] || ''}">${d.lifecycle}</span></td>
+                    <td class="text-center"><span class="badge ${OUTCOME_BADGE[d.outcome] || ''}">${d.outcome}</span></td>
+                    <td class="text-center">${d.peak_region}</td>
+                    <td class="text-right">${d.first_seen}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function sortInsights(col) {
+            if (insightsSort.col === col) {
+                insightsSort.dir = insightsSort.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                insightsSort.col = col;
+                insightsSort.dir = col === 'search_term' ? 'asc' : 'desc';
+            }
+            // Update header indicators
+            document.querySelectorAll('#insightsTable .sort-header').forEach(th => {
+                th.classList.remove('asc', 'desc');
+                if (th.dataset.sort === col) th.classList.add(insightsSort.dir);
+            });
+            filterInsights();
+        }
+
+        function getFilteredInsightsForExport() {
+            const search = (document.getElementById('insightsSearch').value || '').toLowerCase();
+            const outcomeFilter = document.getElementById('insightsOutcomeFilter').value;
+            const lifecycleFilter = document.getElementById('insightsLifecycleFilter').value;
+            const minSearches = parseInt(document.getElementById('insightsMinSearches').value) || 1;
+
+            return insightsData.filter(d => {
+                if (d.searches < minSearches) return false;
+                if (search && !d.search_term.toLowerCase().includes(search)) return false;
+                if (outcomeFilter && d.outcome !== outcomeFilter) return false;
+                if (lifecycleFilter && d.lifecycle !== lifecycleFilter) return false;
+                return true;
+            });
+        }
+
+        function exportInsightsCsv() {
+            const data = getFilteredInsightsForExport();
+            if (data.length === 0) return;
+
+            const headers = ['Search Term','Words','Searches','Users','Null Rate %','Avg Results',
+                'Success CTR %','Avg Click Pos','Engagement %','Priority Score','Lifecycle','Outcome','Peak Region','First Seen'];
+            const rows = data.map(d => [
+                d.search_term, d.words, d.searches, d.users,
+                d.null_rate.toFixed(1), d.avg_results.toFixed(1),
+                d.ctr.toFixed(1), d.avg_click_pos > 0 ? d.avg_click_pos.toFixed(1) : '',
+                d.engagement.toFixed(1), d.priority.toFixed(1),
+                d.lifecycle, d.outcome, d.peak_region, d.first_seen
+            ]);
+
+            const csvEncode = v => {
+                const s = String(v == null ? '' : v);
+                return s.includes(',') || s.includes('"') || s.includes('\n') || s.includes(';')
+                    ? '"' + s.replace(/"/g, '""') + '"' : s;
+            };
+
+            const csv = '\uFEFF' + [headers.map(csvEncode).join(','),
+                ...rows.map(r => r.map(csvEncode).join(','))].join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `search-insights-${formatDateForInput(dateFilter.from)}-to-${formatDateForInput(dateFilter.to)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function exportInsightsXlsx() {
+            const data = getFilteredInsightsForExport();
+            if (data.length === 0) return;
+            if (typeof XLSX === 'undefined') {
+                alert('XLSX library not loaded. Please check your internet connection.');
+                return;
+            }
+
+            const headers = ['Search Term','Words','Searches','Users','Null Rate %','Avg Results',
+                'Success CTR %','Avg Click Pos','Engagement %','Priority Score','Lifecycle','Outcome','Peak Region','First Seen'];
+            const rows = data.map(d => [
+                d.search_term, d.words, d.searches, d.users,
+                parseFloat(d.null_rate.toFixed(1)), parseFloat(d.avg_results.toFixed(1)),
+                parseFloat(d.ctr.toFixed(1)), d.avg_click_pos > 0 ? parseFloat(d.avg_click_pos.toFixed(1)) : null,
+                parseFloat(d.engagement.toFixed(1)), parseFloat(d.priority.toFixed(1)),
+                d.lifecycle, d.outcome, d.peak_region, d.first_seen
+            ]);
+
+            const wsData = [headers, ...rows];
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+            // Auto-column widths
+            ws['!cols'] = headers.map((h, i) => {
+                const maxLen = Math.max(h.length, ...rows.map(r => String(r[i] || '').length));
+                return { wch: Math.min(maxLen + 2, 40) };
+            });
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Search Insights');
+            XLSX.writeFile(wb, `search-insights-${formatDateForInput(dateFilter.from)}-to-${formatDateForInput(dateFilter.to)}.xlsx`);
+        }
+
         // Utility functions
         function formatNumber(num) {
             if (num === null || num === undefined) return '-';
@@ -3042,6 +3525,15 @@
         // Search input handler
         document.getElementById('termSearch').addEventListener('input', renderFilteredTerms);
         document.getElementById('termStatusFilter').addEventListener('change', renderFilteredTerms);
+
+        // Insights & Export tab handlers
+        document.querySelectorAll('#insightsTable .sort-header').forEach(th => {
+            th.addEventListener('click', () => sortInsights(th.dataset.sort));
+        });
+        document.getElementById('insightsSearch').addEventListener('input', filterInsights);
+        document.getElementById('insightsOutcomeFilter').addEventListener('change', filterInsights);
+        document.getElementById('insightsLifecycleFilter').addEventListener('change', filterInsights);
+        document.getElementById('insightsMinSearches').addEventListener('change', filterInsights);
 
         // Modal close on outside click
         document.getElementById('termModal').addEventListener('click', (e) => {
