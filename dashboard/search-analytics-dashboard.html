@@ -18,23 +18,24 @@
 
     <style>
         :root {
-            --primary: #E60000;
-            --primary-dark: #CC0000;
-            --primary-light: #FF3333;
+            --primary: #BD000C;
+            --primary-dark: #9A000A;
+            --primary-light: #D63340;
             --black: #000000;
             --dark-gray: #333333;
             --medium-gray: #666666;
-            --light-gray: #E5E5E5;
+            --light-gray: #D9D9D9;
             --lighter-gray: #F5F5F5;
+            --row-alt: #FAFAFA;
             --white: #FFFFFF;
-            --success: #00875A;
-            --success-light: #E3FCEF;
-            --warning: #FF8B00;
-            --warning-light: #FFFAE6;
-            --danger: #DE350B;
+            --success: #6F7A1A;
+            --success-light: #F0F2E6;
+            --warning: #E4A911;
+            --warning-light: #FDF6E3;
+            --danger: #BD000C;
             --danger-light: #FFEBE6;
-            --info: #0052CC;
-            --info-light: #DEEBFF;
+            --info: #888888;
+            --info-light: #F5F5F5;
         }
 
         * {
@@ -296,7 +297,7 @@
 
         .kpi-card.selected {
             border-color: var(--primary);
-            box-shadow: 0 0 0 2px rgba(230, 0, 0, 0.1);
+            box-shadow: 0 0 0 2px rgba(189, 0, 12, 0.1);
         }
 
         .kpi-card::before {
@@ -438,6 +439,10 @@
             color: var(--dark-gray);
         }
 
+        tr:nth-child(even) td {
+            background: var(--row-alt);
+        }
+
         tr:hover td {
             background: var(--lighter-gray);
         }
@@ -447,7 +452,7 @@
         }
 
         tr.clickable:hover td {
-            background: var(--info-light);
+            background: var(--lighter-gray);
         }
 
         .text-right { text-align: right; }
@@ -1350,24 +1355,27 @@
 
         // Colors
         const COLORS = {
-            primary: '#E60000',
-            primaryLight: '#FF3333',
-            success: '#00875A',
-            warning: '#FF8B00',
-            danger: '#DE350B',
-            info: '#0052CC',
+            primary: '#BD000C',
+            primaryLight: '#D63340',
+            success: '#6F7A1A',
+            warning: '#E4A911',
+            danger: '#BD000C',
+            info: '#888888',
             gray: '#666666',
-            lightGray: '#E5E5E5',
+            lightGray: '#D9D9D9',
             dark: '#333333',
-            chart: '#4A5568'
+            chart: '#555555',
+            chartLight: '#77777799',
+            // Gray palette for multi-series categorical charts
+            palette: ['#333', '#555', '#777', '#999', '#BBB', '#666', '#888', '#AAA']
         };
 
         const OUTCOME_COLORS = {
             'Success': COLORS.success,
-            'Engaged': COLORS.info,
+            'Engaged': '#888888',
             'Abandoned': COLORS.warning,
             'No Results': COLORS.danger,
-            'Unknown': COLORS.gray
+            'Unknown': '#BBBBBB'
         };
 
         // Initialize
@@ -1696,8 +1704,8 @@
                         {
                             label: 'Searches',
                             data: data.map(d => Number(d.search_starts)),
-                            borderColor: COLORS.primary,
-                            backgroundColor: 'rgba(230, 0, 0, 0.1)',
+                            borderColor: '#444444',
+                            backgroundColor: 'rgba(68, 68, 68, 0.1)',
                             fill: true,
                             tension: 0.3,
                             yAxisID: 'y'
@@ -1705,7 +1713,7 @@
                         {
                             label: 'Sessions',
                             data: data.map(d => Number(d.unique_sessions)),
-                            borderColor: COLORS.info,
+                            borderColor: '#999999',
                             backgroundColor: 'transparent',
                             borderDash: [5, 5],
                             tension: 0.3,
@@ -1819,7 +1827,7 @@
                     datasets: [{
                         label: 'Searches',
                         data: [Number(data.night), Number(data.morning), Number(data.afternoon), Number(data.evening)],
-                        backgroundColor: [COLORS.info, COLORS.primary, COLORS.warning, COLORS.gray]
+                        backgroundColor: ['#333', '#555', '#777', '#999']
                     }]
                 },
                 options: {
@@ -1850,7 +1858,7 @@
                     datasets: [{
                         label: 'Searches',
                         data: data.map(d => Number(d.searches)),
-                        backgroundColor: COLORS.chart
+                        backgroundColor: '#555555'
                     }]
                 },
                 options: {
@@ -1881,12 +1889,12 @@
                         {
                             label: 'New Users',
                             data: data.map(d => Number(d.new_users || 0)),
-                            backgroundColor: COLORS.info
+                            backgroundColor: '#555'
                         },
                         {
                             label: 'Returning Users',
                             data: data.map(d => Number(d.returning_users || 0)),
-                            backgroundColor: COLORS.success
+                            backgroundColor: '#AAA'
                         }
                     ]
                 },
@@ -1931,7 +1939,7 @@
                             Number(data.pagination_clicks),
                             Number(data.filter_clicks)
                         ],
-                        backgroundColor: [COLORS.success, COLORS.info, COLORS.warning, COLORS.primary, COLORS.gray]
+                        backgroundColor: ['#333', '#555', '#777', '#999', '#BBB']
                     }]
                 },
                 options: {
@@ -2126,7 +2134,7 @@
                     labels: data.map(d => d.category),
                     datasets: [{
                         data: data.map(d => Number(d.term_count)),
-                        backgroundColor: [COLORS.success, COLORS.warning, COLORS.gray, COLORS.danger, '#8B0000']
+                        backgroundColor: [COLORS.success, COLORS.warning, '#888888', COLORS.danger, '#660006']
                     }]
                 },
                 options: {
@@ -2164,7 +2172,7 @@
                     datasets: [{
                         label: 'Searches',
                         data: values,
-                        backgroundColor: COLORS.chart
+                        backgroundColor: '#555555'
                     }]
                 },
                 options: {
@@ -2197,7 +2205,7 @@
                     labels: data.map(d => d.session_complexity),
                     datasets: [{
                         data: data.map(d => Number(d.sessions)),
-                        backgroundColor: [COLORS.lightGray, COLORS.info, COLORS.warning, COLORS.primary]
+                        backgroundColor: ['#CCC', '#999', '#666', '#333']
                     }]
                 },
                 options: {
@@ -2228,7 +2236,7 @@
                     datasets: [{
                         label: 'Sessions',
                         data: data.map(d => Number(d.sessions)),
-                        backgroundColor: COLORS.chart
+                        backgroundColor: '#555555'
                     }]
                 },
                 options: {
@@ -2260,7 +2268,7 @@
                     labels: ['Refined Query', 'Single Query'],
                     datasets: [{
                         data: [reformed, notReformed],
-                        backgroundColor: [COLORS.warning, COLORS.success]
+                        backgroundColor: [COLORS.warning, '#888888']
                     }]
                 },
                 options: {
@@ -2390,7 +2398,7 @@
                     datasets: [{
                         label: 'Sessions',
                         data: data.map(d => Number(d.sessions)),
-                        backgroundColor: COLORS.chart
+                        backgroundColor: '#555555'
                     }]
                 },
                 options: {
@@ -2425,14 +2433,14 @@
                         {
                             label: 'Avg Latency (sec)',
                             data: data.map(d => Number(d.avg_latency || 0)),
-                            borderColor: COLORS.primary,
+                            borderColor: '#444444',
                             backgroundColor: 'transparent',
                             tension: 0.3
                         },
                         {
                             label: 'Avg Time to Click (sec)',
                             data: data.map(d => Number(d.avg_click_time || 0)),
-                            borderColor: COLORS.info,
+                            borderColor: '#999999',
                             backgroundColor: 'transparent',
                             borderDash: [5, 5],
                             tension: 0.3
@@ -2522,7 +2530,7 @@
                                 Number(timeData.afternoon || 0),
                                 Number(timeData.evening || 0)
                             ],
-                            backgroundColor: [COLORS.info, COLORS.primary, COLORS.warning, COLORS.gray]
+                            backgroundColor: ['#333', '#555', '#777', '#999']
                         }]
                     },
                     options: {
@@ -2560,7 +2568,7 @@
                         labels: ['APAC (03-09 CET)', 'CET (09-16 CET)', 'Americas (16-22 CET)', 'Dead Time (22-03 CET)'],
                         datasets: [{
                             data: [apac, cet, americas, dead],
-                            backgroundColor: [COLORS.info, COLORS.primary, COLORS.warning, COLORS.gray]
+                            backgroundColor: ['#333', '#555', '#777', '#999']
                         }]
                     },
                     options: {
@@ -2610,10 +2618,10 @@
 
                 const maxPct = Math.max(apacPct, cetPct, americasPct, deadPct);
                 let peakPeriod = 'CET';
-                let peakColor = COLORS.primary;
-                if (apacPct === maxPct) { peakPeriod = 'APAC'; peakColor = COLORS.info; }
-                else if (americasPct === maxPct) { peakPeriod = 'Americas'; peakColor = COLORS.warning; }
-                else if (deadPct === maxPct) { peakPeriod = 'Dead Time'; peakColor = COLORS.gray; }
+                let peakColor = '#333';
+                if (apacPct === maxPct) { peakPeriod = 'APAC'; peakColor = '#555'; }
+                else if (americasPct === maxPct) { peakPeriod = 'Americas'; peakColor = '#777'; }
+                else if (deadPct === maxPct) { peakPeriod = 'Dead Time'; peakColor = '#999'; }
 
                 const concentration = maxPct;
                 const concentrationClass = concentration > 40 ? 'danger' : concentration > 30 ? 'warning' : '';
@@ -2667,8 +2675,8 @@
                             label: 'Searches',
                             data: monthlySearches,
                             backgroundColor: monthlySearches.map((v, i) => {
-                                // Highlight Q4 (Oct-Dec) in different color
-                                return i >= 9 ? COLORS.primary : COLORS.info;
+                                // Highlight Q4 (Oct-Dec) in darker tone
+                                return i >= 9 ? '#333' : '#888';
                             })
                         }]
                     },
@@ -2912,8 +2920,8 @@
                     datasets: [{
                         label: 'Searches',
                         data: data.map(d => Number(d.searches)),
-                        borderColor: COLORS.primary,
-                        backgroundColor: 'rgba(230, 0, 0, 0.1)',
+                        borderColor: '#444444',
+                        backgroundColor: 'rgba(68, 68, 68, 0.1)',
                         fill: true,
                         tension: 0.3
                     }]
