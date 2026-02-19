@@ -1524,6 +1524,8 @@
                         <thead>
                             <tr>
                                 <th class="sort-header" data-sort="search_term">Search Term</th>
+                                <th class="sort-header" data-sort="department">Department</th>
+                                <th class="sort-header" data-sort="location">Location</th>
                                 <th class="sort-header text-right" data-sort="words">Words</th>
                                 <th class="sort-header text-right desc" data-sort="searches">Searches</th>
                                 <th class="sort-header text-right" data-sort="users">Users</th>
@@ -3208,6 +3210,8 @@
             const result = await conn.query(`
                 SELECT
                     search_term,
+                    COALESCE(department, '-') as department,
+                    COALESCE(location, '-') as location,
                     MIN(word_count) as words,
                     SUM(CAST(search_count AS DOUBLE)) as searches,
                     SUM(CAST(unique_users AS DOUBLE)) as users,
@@ -3225,7 +3229,7 @@
                     MIN(first_seen_date) as first_seen
                 FROM terms
                 WHERE ${getDateWhereClause('session_date')}
-                GROUP BY search_term
+                GROUP BY search_term, department, location
                 ORDER BY searches DESC
             `);
             const raw = result.toArray();
@@ -3276,6 +3280,8 @@
 
                 return {
                     search_term: String(d.search_term),
+                    department: String(d.department || '-'),
+                    location: String(d.location || '-'),
                     words: Number(d.words) || 0,
                     searches, users, null_rate, avg_results, ctr,
                     avg_click_pos, engagement, priority, outcome, lifecycle,
@@ -3288,12 +3294,28 @@
         }
 
         function renderInsightsKpis(data) {
-            const totalTerms = data.length;
-            const contentGaps = data.filter(d => d.null_rate >= 50).length;
-            const totalSearches = data.reduce((s, d) => s + d.searches, 0);
-            const totalClicks = data.reduce((s, d) => s + d.searches * d.ctr / 100, 0);
+            // Aggregate by unique search_term for KPIs (since table rows are per term × dept × loc)
+            const termMap = {};
+            data.forEach(d => {
+                if (!termMap[d.search_term]) {
+                    termMap[d.search_term] = { searches: 0, success_clicks: 0, null_results: 0, result_events: 0 };
+                }
+                const t = termMap[d.search_term];
+                t.searches += d.searches;
+                t.success_clicks += d.searches * d.ctr / 100;
+                t.null_results += d.searches * d.null_rate / 100;
+                t.result_events += d.result_events > 0 ? d.searches : 0;
+            });
+            const terms = Object.values(termMap);
+            const totalTerms = terms.length;
+            const contentGaps = terms.filter(t => t.result_events > 0 && (t.null_results / t.result_events * 100) >= 50).length;
+            const totalSearches = terms.reduce((s, t) => s + t.searches, 0);
+            const totalClicks = terms.reduce((s, t) => s + t.success_clicks, 0);
             const avgCtr = totalSearches > 0 ? (totalClicks / totalSearches * 100) : 0;
-            const highPriority = data.filter(d => d.priority >= 10).length;
+            const highPriority = terms.filter(t => {
+                const nr = t.result_events > 0 ? (t.null_results / t.result_events * 100) : 0;
+                return (t.searches * nr / 100) >= 10;
+            }).length;
 
             document.getElementById('insightsKpiTerms').textContent = formatNumber(totalTerms);
             document.getElementById('insightsKpiGaps').textContent = formatNumber(contentGaps);
@@ -3327,7 +3349,7 @@
             });
 
             document.getElementById('insightsCount').textContent =
-                `Showing ${filtered.length} of ${insightsData.length} terms`;
+                `Showing ${filtered.length} of ${insightsData.length} rows`;
 
             renderInsightsTable(filtered);
         }
@@ -3354,6 +3376,8 @@
 
                 return `<tr class="clickable" onclick="showTermDetail('${escapeHtml(d.search_term)}')">
                     <td>${escapeHtml(d.search_term)}</td>
+                    <td>${escapeHtml(d.department)}</td>
+                    <td>${escapeHtml(d.location)}</td>
                     <td class="text-right">${d.words}</td>
                     <td class="text-right">${formatNumber(d.searches)}</td>
                     <td class="text-right">${formatNumber(d.users)}</td>
@@ -3405,10 +3429,10 @@
             const data = getFilteredInsightsForExport();
             if (data.length === 0) return;
 
-            const headers = ['Search Term','Words','Searches','Users','Null Rate %','Avg Results',
+            const headers = ['Search Term','Department','Location','Words','Searches','Users','Null Rate %','Avg Results',
                 'Success CTR %','Avg Click Pos','Engagement %','Priority Score','Lifecycle','Outcome','Peak Region','First Seen'];
             const rows = data.map(d => [
-                d.search_term, d.words, d.searches, d.users,
+                d.search_term, d.department, d.location, d.words, d.searches, d.users,
                 d.null_rate.toFixed(1), d.avg_results.toFixed(1),
                 d.ctr.toFixed(1), d.avg_click_pos > 0 ? d.avg_click_pos.toFixed(1) : '',
                 d.engagement.toFixed(1), d.priority.toFixed(1),
@@ -3441,10 +3465,10 @@
                 return;
             }
 
-            const headers = ['Search Term','Words','Searches','Users','Null Rate %','Avg Results',
+            const headers = ['Search Term','Department','Location','Words','Searches','Users','Null Rate %','Avg Results',
                 'Success CTR %','Avg Click Pos','Engagement %','Priority Score','Lifecycle','Outcome','Peak Region','First Seen'];
             const rows = data.map(d => [
-                d.search_term, d.words, d.searches, d.users,
+                d.search_term, d.department, d.location, d.words, d.searches, d.users,
                 parseFloat(d.null_rate.toFixed(1)), parseFloat(d.avg_results.toFixed(1)),
                 parseFloat(d.ctr.toFixed(1)), d.avg_click_pos > 0 ? parseFloat(d.avg_click_pos.toFixed(1)) : null,
                 parseFloat(d.engagement.toFixed(1)), parseFloat(d.priority.toFixed(1)),
