@@ -1469,80 +1469,244 @@
 
             <!-- Insights & Export Tab -->
             <div class="nav-content" id="navInsights">
-                <!-- KPI Summary -->
-                <div class="insights-kpi-grid" id="insightsKpiGrid">
-                    <div class="insights-kpi-card">
-                        <div class="insights-kpi-value" id="insightsKpiTerms">-</div>
-                        <div class="insights-kpi-label">Total Terms</div>
+                <div class="chart-card full-width">
+                    <div class="tabs">
+                        <button class="tab active" data-tab="insightsTerms">Search Terms</button>
+                        <button class="tab" data-tab="insightsSessions">Sessions</button>
+                        <button class="tab" data-tab="insightsDaily">Daily Trends</button>
+                        <button class="tab" data-tab="insightsContent">Content Discovery</button>
                     </div>
-                    <div class="insights-kpi-card">
-                        <div class="insights-kpi-value" id="insightsKpiGaps">-</div>
-                        <div class="insights-kpi-label">Content Gaps (Null Rate &ge;50%)</div>
-                    </div>
-                    <div class="insights-kpi-card">
-                        <div class="insights-kpi-value" id="insightsKpiCtr">-</div>
-                        <div class="insights-kpi-label">Avg Success CTR</div>
-                    </div>
-                    <div class="insights-kpi-card">
-                        <div class="insights-kpi-value" id="insightsKpiPriority">-</div>
-                        <div class="insights-kpi-label">High Priority Terms (Score &ge;10)</div>
-                    </div>
-                </div>
 
-                <!-- Controls -->
-                <div class="insights-controls">
-                    <label>Search</label>
-                    <input type="text" id="insightsSearch" placeholder="Filter by term...">
-                    <label>Outcome</label>
-                    <select id="insightsOutcomeFilter">
-                        <option value="">All</option>
-                        <option value="Zero Results">Zero Results</option>
-                        <option value="Mostly No Results">Mostly No Results</option>
-                        <option value="No Clicks">No Clicks</option>
-                        <option value="Low CTR">Low CTR</option>
-                        <option value="Success">Success</option>
-                    </select>
-                    <label>Lifecycle</label>
-                    <select id="insightsLifecycleFilter">
-                        <option value="">All</option>
-                        <option value="New">New</option>
-                        <option value="Emerging">Emerging</option>
-                        <option value="Established">Established</option>
-                        <option value="Mature">Mature</option>
-                    </select>
-                    <label>Min Searches</label>
-                    <input type="number" id="insightsMinSearches" value="2" min="1">
-                    <button class="export-btn" onclick="exportInsightsCsv()">Export CSV</button>
-                    <button class="export-btn" onclick="exportInsightsXlsx()">Export XLSX</button>
-                </div>
+                    <!-- Search Terms Sub-tab -->
+                    <div class="tab-content active" id="insightsTermsTab">
+                        <div class="insights-kpi-grid" id="insightsKpiGrid">
+                            <div class="insights-kpi-card">
+                                <div class="insights-kpi-value" id="insightsKpiTerms">-</div>
+                                <div class="insights-kpi-label">Total Terms</div>
+                            </div>
+                            <div class="insights-kpi-card">
+                                <div class="insights-kpi-value" id="insightsKpiGaps">-</div>
+                                <div class="insights-kpi-label">Content Gaps (Null Rate &ge;50%)</div>
+                            </div>
+                            <div class="insights-kpi-card">
+                                <div class="insights-kpi-value" id="insightsKpiCtr">-</div>
+                                <div class="insights-kpi-label">Avg Success CTR</div>
+                            </div>
+                            <div class="insights-kpi-card">
+                                <div class="insights-kpi-value" id="insightsKpiPriority">-</div>
+                                <div class="insights-kpi-label">High Priority Terms (Score &ge;10)</div>
+                            </div>
+                        </div>
+                        <div class="insights-controls">
+                            <label>Search</label>
+                            <input type="text" id="insightsSearch" placeholder="Filter by term...">
+                            <label>Outcome</label>
+                            <select id="insightsOutcomeFilter">
+                                <option value="">All</option>
+                                <option value="Zero Results">Zero Results</option>
+                                <option value="Mostly No Results">Mostly No Results</option>
+                                <option value="No Clicks">No Clicks</option>
+                                <option value="Low CTR">Low CTR</option>
+                                <option value="Success">Success</option>
+                            </select>
+                            <label>Lifecycle</label>
+                            <select id="insightsLifecycleFilter">
+                                <option value="">All</option>
+                                <option value="New">New</option>
+                                <option value="Emerging">Emerging</option>
+                                <option value="Established">Established</option>
+                                <option value="Mature">Mature</option>
+                            </select>
+                            <label>Min Searches</label>
+                            <input type="number" id="insightsMinSearches" value="2" min="1">
+                            <button class="export-btn" onclick="exportInsightsCsv()">Export CSV</button>
+                            <button class="export-btn" onclick="exportInsightsXlsx()">Export XLSX</button>
+                        </div>
+                        <div class="insights-count" id="insightsCount"></div>
+                        <div class="table-container">
+                            <table id="insightsTable">
+                                <thead>
+                                    <tr>
+                                        <th class="sort-header" data-sort="search_term">Search Term</th>
+                                        <th class="sort-header" data-sort="department">Department</th>
+                                        <th class="sort-header" data-sort="location">Location</th>
+                                        <th class="sort-header text-right" data-sort="words">Words</th>
+                                        <th class="sort-header text-right desc" data-sort="searches">Searches</th>
+                                        <th class="sort-header text-right" data-sort="users">Users</th>
+                                        <th class="sort-header text-right" data-sort="null_rate">Null Rate %</th>
+                                        <th class="sort-header text-right" data-sort="avg_results">Avg Results</th>
+                                        <th class="sort-header text-right" data-sort="ctr">CTR %</th>
+                                        <th class="sort-header text-right" data-sort="avg_click_pos">Avg Pos</th>
+                                        <th class="sort-header text-right" data-sort="engagement">Engage %</th>
+                                        <th class="sort-header text-right" data-sort="priority">Priority</th>
+                                        <th class="sort-header text-center" data-sort="lifecycle">Lifecycle</th>
+                                        <th class="sort-header text-center" data-sort="outcome">Outcome</th>
+                                        <th class="sort-header text-center" data-sort="peak_region">Peak Region</th>
+                                        <th class="sort-header text-right" data-sort="first_seen">First Seen</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="insightsBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
 
-                <div class="insights-count" id="insightsCount"></div>
+                    <!-- Sessions Sub-tab -->
+                    <div class="tab-content" id="insightsSessionsTab">
+                        <div class="insights-kpi-grid" id="sessionsKpiGrid">
+                            <div class="insights-kpi-card">
+                                <div class="insights-kpi-value" id="sessionsKpiTotal">-</div>
+                                <div class="insights-kpi-label">Total Sessions</div>
+                            </div>
+                            <div class="insights-kpi-card">
+                                <div class="insights-kpi-value" id="sessionsKpiSuccess">-</div>
+                                <div class="insights-kpi-label">Success Rate</div>
+                            </div>
+                            <div class="insights-kpi-card">
+                                <div class="insights-kpi-value" id="sessionsKpiDuration">-</div>
+                                <div class="insights-kpi-label">Avg Duration (sec)</div>
+                            </div>
+                            <div class="insights-kpi-card">
+                                <div class="insights-kpi-value" id="sessionsKpiReform">-</div>
+                                <div class="insights-kpi-label">Reformulation Rate</div>
+                            </div>
+                        </div>
+                        <div class="insights-controls">
+                            <label>Search</label>
+                            <input type="text" id="sessionsSearch" placeholder="Filter by dept, location, job...">
+                            <label>Outcome</label>
+                            <select id="sessionsOutcomeFilter">
+                                <option value="">All</option>
+                                <option value="Success">Success</option>
+                                <option value="Engaged">Engaged</option>
+                                <option value="Abandoned">Abandoned</option>
+                                <option value="No Results">No Results</option>
+                            </select>
+                            <label>Complexity</label>
+                            <select id="sessionsComplexityFilter">
+                                <option value="">All</option>
+                                <option value="Single Action">Single Action</option>
+                                <option value="Simple">Simple</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Complex">Complex</option>
+                            </select>
+                            <button class="export-btn" onclick="exportSessionsCsv()">Export CSV</button>
+                            <button class="export-btn" onclick="exportSessionsXlsx()">Export XLSX</button>
+                        </div>
+                        <div class="insights-count" id="sessionsCount"></div>
+                        <div class="table-container">
+                            <table id="sessionsTable">
+                                <thead>
+                                    <tr>
+                                        <th class="sort-header desc" data-sort="session_date">Date</th>
+                                        <th class="sort-header" data-sort="department">Department</th>
+                                        <th class="sort-header" data-sort="location">Location</th>
+                                        <th class="sort-header" data-sort="device_type">Device</th>
+                                        <th class="sort-header text-right" data-sort="search_count_in_session">Searches</th>
+                                        <th class="sort-header text-right" data-sort="click_count">Clicks</th>
+                                        <th class="sort-header text-right" data-sort="success_click_count">Success</th>
+                                        <th class="sort-header text-center" data-sort="journey_outcome">Outcome</th>
+                                        <th class="sort-header text-center" data-sort="session_complexity">Complexity</th>
+                                        <th class="sort-header text-right" data-sort="total_duration_sec">Duration (s)</th>
+                                        <th class="sort-header text-center" data-sort="had_reformulation">Reformulated</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sessionsBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
 
-                <!-- Insights Table -->
-                <div class="table-container">
-                    <table id="insightsTable">
-                        <thead>
-                            <tr>
-                                <th class="sort-header" data-sort="search_term">Search Term</th>
-                                <th class="sort-header" data-sort="department">Department</th>
-                                <th class="sort-header" data-sort="location">Location</th>
-                                <th class="sort-header text-right" data-sort="words">Words</th>
-                                <th class="sort-header text-right desc" data-sort="searches">Searches</th>
-                                <th class="sort-header text-right" data-sort="users">Users</th>
-                                <th class="sort-header text-right" data-sort="null_rate">Null Rate %</th>
-                                <th class="sort-header text-right" data-sort="avg_results">Avg Results</th>
-                                <th class="sort-header text-right" data-sort="ctr">CTR %</th>
-                                <th class="sort-header text-right" data-sort="avg_click_pos">Avg Pos</th>
-                                <th class="sort-header text-right" data-sort="engagement">Engage %</th>
-                                <th class="sort-header text-right" data-sort="priority">Priority</th>
-                                <th class="sort-header text-center" data-sort="lifecycle">Lifecycle</th>
-                                <th class="sort-header text-center" data-sort="outcome">Outcome</th>
-                                <th class="sort-header text-center" data-sort="peak_region">Peak Region</th>
-                                <th class="sort-header text-right" data-sort="first_seen">First Seen</th>
-                            </tr>
-                        </thead>
-                        <tbody id="insightsBody"></tbody>
-                    </table>
+                    <!-- Daily Trends Sub-tab -->
+                    <div class="tab-content" id="insightsDailyTab">
+                        <div class="insights-kpi-grid" id="dailyKpiGrid">
+                            <div class="insights-kpi-card">
+                                <div class="insights-kpi-value" id="dailyKpiDays">-</div>
+                                <div class="insights-kpi-label">Total Days</div>
+                            </div>
+                            <div class="insights-kpi-card">
+                                <div class="insights-kpi-value" id="dailyKpiSearches">-</div>
+                                <div class="insights-kpi-label">Avg Daily Searches</div>
+                            </div>
+                            <div class="insights-kpi-card">
+                                <div class="insights-kpi-value" id="dailyKpiUsers">-</div>
+                                <div class="insights-kpi-label">Avg Daily Users</div>
+                            </div>
+                            <div class="insights-kpi-card">
+                                <div class="insights-kpi-value" id="dailyKpiRate">-</div>
+                                <div class="insights-kpi-label">Avg Success Rate</div>
+                            </div>
+                        </div>
+                        <div class="insights-controls">
+                            <button class="export-btn" onclick="exportDailyCsv()">Export CSV</button>
+                            <button class="export-btn" onclick="exportDailyXlsx()">Export XLSX</button>
+                        </div>
+                        <div class="insights-count" id="dailyCount"></div>
+                        <div class="table-container">
+                            <table id="dailyTable">
+                                <thead>
+                                    <tr>
+                                        <th class="sort-header desc" data-sort="date">Date</th>
+                                        <th class="sort-header" data-sort="day_of_week">Day</th>
+                                        <th class="sort-header text-right" data-sort="unique_sessions">Sessions</th>
+                                        <th class="sort-header text-right" data-sort="unique_users">Users</th>
+                                        <th class="sort-header text-right" data-sort="search_starts">Searches</th>
+                                        <th class="sort-header text-right" data-sort="success_rate_pct">Success Rate %</th>
+                                        <th class="sort-header text-right" data-sort="null_rate_pct">Null Rate %</th>
+                                        <th class="sort-header text-right" data-sort="avg_latency_ms">Avg Latency (ms)</th>
+                                        <th class="sort-header text-right" data-sort="new_users">New Users</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dailyBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Content Discovery Sub-tab -->
+                    <div class="tab-content" id="insightsContentTab">
+                        <div class="insights-kpi-grid" id="contentKpiGrid">
+                            <div class="insights-kpi-card">
+                                <div class="insights-kpi-value" id="contentKpiPairs">-</div>
+                                <div class="insights-kpi-label">Term-Content Pairs</div>
+                            </div>
+                            <div class="insights-kpi-card">
+                                <div class="insights-kpi-value" id="contentKpiUrls">-</div>
+                                <div class="insights-kpi-label">Unique Content URLs</div>
+                            </div>
+                            <div class="insights-kpi-card">
+                                <div class="insights-kpi-value" id="contentKpiPos">-</div>
+                                <div class="insights-kpi-label">Avg Click Position</div>
+                            </div>
+                            <div class="insights-kpi-card">
+                                <div class="insights-kpi-value" id="contentKpiDept">-</div>
+                                <div class="insights-kpi-label">Top Department</div>
+                            </div>
+                        </div>
+                        <div class="insights-controls">
+                            <label>Search</label>
+                            <input type="text" id="contentSearch" placeholder="Filter by term or title...">
+                            <label>Min Clicks</label>
+                            <input type="number" id="contentMinClicks" value="2" min="1">
+                            <button class="export-btn" onclick="exportContentCsv()">Export CSV</button>
+                            <button class="export-btn" onclick="exportContentXlsx()">Export XLSX</button>
+                        </div>
+                        <div class="insights-count" id="contentCount"></div>
+                        <div class="table-container">
+                            <table id="contentTable">
+                                <thead>
+                                    <tr>
+                                        <th class="sort-header" data-sort="search_term">Search Term</th>
+                                        <th class="sort-header" data-sort="clicked_result_title">Content Title</th>
+                                        <th class="sort-header text-right desc" data-sort="clicks">Clicks</th>
+                                        <th class="sort-header text-right" data-sort="users">Users</th>
+                                        <th class="sort-header text-right" data-sort="sessions">Sessions</th>
+                                        <th class="sort-header text-right" data-sort="avg_click_pos">Avg Pos</th>
+                                        <th class="sort-header" data-sort="top_department">Department</th>
+                                        <th class="sort-header" data-sort="top_device_type">Device</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="contentBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1570,6 +1734,13 @@
         let allTermsData = [];
         let insightsData = [];
         let insightsSort = { col: 'searches', dir: 'desc' };
+        let sessionsData = [];
+        let sessionsSort = { col: 'session_date', dir: 'desc' };
+        let dailyData = [];
+        let dailySort = { col: 'date', dir: 'desc' };
+        let contentData = [];
+        let contentSort = { col: 'clicks', dir: 'desc' };
+        const insightsRendered = { terms: false, sessions: false, daily: false, content: false };
 
         // Chart instances
         let charts = {};
@@ -1669,6 +1840,7 @@
             await loadWithFallback('daily', 'searches_daily.parquet', 'Loaded daily data...');
             await loadWithFallback('journeys', 'searches_journeys.parquet', 'Loaded journeys data...');
             await loadWithFallback('terms', 'searches_terms.parquet', 'Loaded terms data...');
+            await loadWithFallback('term_clicks', 'searches_term_clicks.parquet', 'Loaded term clicks...');
         }
 
         async function setInitialDateRange() {
@@ -1741,9 +1913,15 @@
                     renderLatencyTrend(),
                     renderPerformanceMetrics(),
                     renderTimeOfDay(),
-                    renderSeasonality(),
-                    renderInsightsExport()
+                    renderSeasonality()
                 ]);
+
+                // Lazy-render the active insights sub-tab
+                insightsRendered.terms = false;
+                insightsRendered.sessions = false;
+                insightsRendered.daily = false;
+                insightsRendered.content = false;
+                await renderActiveInsightsTab();
 
                 updateStatus('success', `Last updated: ${new Date().toLocaleTimeString()}`);
             } catch (error) {
@@ -3486,7 +3664,634 @@
 
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Search Insights');
+            addGlossarySheet(wb, 'terms');
             XLSX.writeFile(wb, `search-insights-${formatDateForInput(dateFilter.from)}-to-${formatDateForInput(dateFilter.to)}.xlsx`);
+        }
+
+        // ========== Lazy Rendering for Insights Sub-tabs ==========
+
+        async function renderActiveInsightsTab() {
+            const activeTab = document.querySelector('#navInsights .tab.active');
+            if (!activeTab) return;
+            const target = activeTab.dataset.tab;
+            if (target === 'insightsTerms' && !insightsRendered.terms) {
+                await renderInsightsExport();
+                insightsRendered.terms = true;
+            } else if (target === 'insightsSessions' && !insightsRendered.sessions) {
+                await renderInsightsSessions();
+                insightsRendered.sessions = true;
+            } else if (target === 'insightsDaily' && !insightsRendered.daily) {
+                await renderInsightsDaily();
+                insightsRendered.daily = true;
+            } else if (target === 'insightsContent' && !insightsRendered.content) {
+                await renderInsightsContent();
+                insightsRendered.content = true;
+            }
+        }
+
+        // ========== Sessions Section ==========
+
+        async function renderInsightsSessions() {
+            const result = await conn.query(`
+                SELECT
+                    session_date,
+                    session_start_str,
+                    first_event_hour,
+                    COALESCE(department, '-') as department,
+                    COALESCE(location, '-') as location,
+                    COALESCE(device_type, '-') as device_type,
+                    COALESCE(job_title, '-') as job_title,
+                    COALESCE(query_language, '-') as query_language,
+                    search_count_in_session,
+                    unique_search_terms,
+                    click_count,
+                    success_click_count,
+                    null_result_count,
+                    max_total_results,
+                    result_clicks,
+                    trending_clicks,
+                    tab_clicks,
+                    pagination_clicks,
+                    filter_clicks,
+                    viewmore_clicks,
+                    ROUND(sec_search_to_result, 2) as sec_search_to_result,
+                    ROUND(sec_result_to_click, 2) as sec_result_to_click,
+                    ROUND(total_duration_sec, 1) as total_duration_sec,
+                    ROUND(avg_click_position, 1) as avg_click_position,
+                    journey_outcome,
+                    session_complexity,
+                    session_duration_bucket,
+                    had_reformulation,
+                    recovered_from_null,
+                    had_tab_switch,
+                    is_users_first_session,
+                    user_session_number
+                FROM journeys
+                WHERE ${getDateWhereClause('session_date')}
+                ORDER BY session_date DESC, session_start_str DESC
+            `);
+            sessionsData = result.toArray().map(d => {
+                const obj = {};
+                for (const key of Object.keys(d)) {
+                    const v = d[key];
+                    obj[key] = (typeof v === 'bigint') ? Number(v) : v;
+                }
+                obj.session_date = String(d.session_date);
+                obj.had_reformulation = !!d.had_reformulation;
+                obj.recovered_from_null = !!d.recovered_from_null;
+                obj.had_tab_switch = !!d.had_tab_switch;
+                obj.is_users_first_session = !!d.is_users_first_session;
+                return obj;
+            });
+
+            // KPIs
+            const total = sessionsData.length;
+            const successCount = sessionsData.filter(d => d.journey_outcome === 'Success').length;
+            const successRate = total > 0 ? (successCount / total * 100) : 0;
+            const avgDuration = total > 0 ? (sessionsData.reduce((s, d) => s + (Number(d.total_duration_sec) || 0), 0) / total) : 0;
+            const reformCount = sessionsData.filter(d => d.had_reformulation).length;
+            const reformRate = total > 0 ? (reformCount / total * 100) : 0;
+
+            document.getElementById('sessionsKpiTotal').textContent = formatNumber(total);
+            document.getElementById('sessionsKpiSuccess').textContent = successRate.toFixed(1) + '%';
+            document.getElementById('sessionsKpiDuration').textContent = avgDuration.toFixed(1);
+            document.getElementById('sessionsKpiReform').textContent = reformRate.toFixed(1) + '%';
+
+            filterSessions();
+        }
+
+        function filterSessions() {
+            const search = (document.getElementById('sessionsSearch').value || '').toLowerCase();
+            const outcomeFilter = document.getElementById('sessionsOutcomeFilter').value;
+            const complexityFilter = document.getElementById('sessionsComplexityFilter').value;
+
+            let filtered = sessionsData.filter(d => {
+                if (search && !String(d.department).toLowerCase().includes(search)
+                    && !String(d.location).toLowerCase().includes(search)
+                    && !String(d.job_title).toLowerCase().includes(search)) return false;
+                if (outcomeFilter && d.journey_outcome !== outcomeFilter) return false;
+                if (complexityFilter && d.session_complexity !== complexityFilter) return false;
+                return true;
+            });
+
+            filtered.sort((a, b) => {
+                const col = sessionsSort.col;
+                let va = a[col], vb = b[col];
+                if (typeof va === 'boolean') { va = va ? 1 : 0; vb = vb ? 1 : 0; }
+                if (typeof va === 'string') {
+                    va = va.toLowerCase(); vb = vb.toLowerCase();
+                    return sessionsSort.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+                }
+                return sessionsSort.dir === 'asc' ? (va||0) - (vb||0) : (vb||0) - (va||0);
+            });
+
+            document.getElementById('sessionsCount').textContent =
+                `Showing ${filtered.length} of ${sessionsData.length} sessions`;
+            renderSessionsTable(filtered);
+        }
+
+        function renderSessionsTable(data) {
+            const OUTCOME_BADGE = {
+                'Success': 'badge-success', 'Engaged': 'badge-info',
+                'Abandoned': 'badge-warning', 'No Results': 'badge-danger', 'Unknown': 'badge-neutral'
+            };
+            document.getElementById('sessionsBody').innerHTML = data.map(d => `
+                <tr>
+                    <td>${String(d.session_date).substring(0, 10)}</td>
+                    <td>${escapeHtml(String(d.department))}</td>
+                    <td>${escapeHtml(String(d.location))}</td>
+                    <td>${escapeHtml(String(d.device_type))}</td>
+                    <td class="text-right">${d.search_count_in_session}</td>
+                    <td class="text-right">${d.click_count}</td>
+                    <td class="text-right">${d.success_click_count}</td>
+                    <td class="text-center"><span class="badge ${OUTCOME_BADGE[d.journey_outcome] || ''}">${d.journey_outcome}</span></td>
+                    <td class="text-center">${d.session_complexity}</td>
+                    <td class="text-right">${d.total_duration_sec != null ? Number(d.total_duration_sec).toFixed(1) : '-'}</td>
+                    <td class="text-center">${d.had_reformulation ? 'Yes' : 'No'}</td>
+                </tr>
+            `).join('');
+        }
+
+        function sortSessions(col) {
+            if (sessionsSort.col === col) {
+                sessionsSort.dir = sessionsSort.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                sessionsSort.col = col;
+                sessionsSort.dir = col === 'department' || col === 'location' || col === 'device_type' ? 'asc' : 'desc';
+            }
+            document.querySelectorAll('#sessionsTable .sort-header').forEach(th => {
+                th.classList.remove('asc', 'desc');
+                if (th.dataset.sort === col) th.classList.add(sessionsSort.dir);
+            });
+            filterSessions();
+        }
+
+        function getSessionsExportHeaders() {
+            return ['Date','Session Start','Hour','Department','Location','Device Type','Job Title','Language',
+                'Searches','Unique Terms','Clicks','Success Clicks','Null Results','Max Results',
+                'Result Clicks','Trending Clicks','Tab Clicks','Pagination Clicks','Filter Clicks','ViewMore Clicks',
+                'Search to Result (s)','Result to Click (s)','Duration (s)','Avg Click Position',
+                'Outcome','Complexity','Duration Bucket',
+                'Reformulated','Recovered from Null','Tab Switch','First Session','Session Number'];
+        }
+
+        function getSessionsExportRow(d) {
+            return [
+                String(d.session_date).substring(0, 10), d.session_start_str, d.first_event_hour,
+                d.department, d.location, d.device_type, d.job_title, d.query_language,
+                d.search_count_in_session, d.unique_search_terms, d.click_count, d.success_click_count,
+                d.null_result_count, d.max_total_results,
+                d.result_clicks, d.trending_clicks, d.tab_clicks, d.pagination_clicks, d.filter_clicks, d.viewmore_clicks,
+                d.sec_search_to_result, d.sec_result_to_click, d.total_duration_sec, d.avg_click_position,
+                d.journey_outcome, d.session_complexity, d.session_duration_bucket,
+                d.had_reformulation, d.recovered_from_null, d.had_tab_switch, d.is_users_first_session, d.user_session_number
+            ];
+        }
+
+        function exportSessionsCsv() {
+            if (sessionsData.length === 0) return;
+            const headers = getSessionsExportHeaders();
+            const rows = sessionsData.map(getSessionsExportRow);
+            exportCsvGeneric(headers, rows, 'session-export');
+        }
+
+        function exportSessionsXlsx() {
+            if (sessionsData.length === 0) return;
+            if (typeof XLSX === 'undefined') { alert('XLSX library not loaded.'); return; }
+
+            const groupRow = ['Time','','','Demographics','','','','','Volume','','','','','',
+                'Click Breakdown','','','','','','Performance','','','',
+                'Classification','','','Behavior','','','',''];
+            const headers = getSessionsExportHeaders();
+            const rows = sessionsData.map(getSessionsExportRow);
+
+            const wsData = [groupRow, headers, ...rows];
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+            // Merge group header cells
+            ws['!merges'] = [
+                { s: {r:0,c:0}, e: {r:0,c:2} },   // Time (3 cols)
+                { s: {r:0,c:3}, e: {r:0,c:7} },   // Demographics (5 cols)
+                { s: {r:0,c:8}, e: {r:0,c:13} },  // Volume (6 cols)
+                { s: {r:0,c:14}, e: {r:0,c:19} }, // Click Breakdown (6 cols)
+                { s: {r:0,c:20}, e: {r:0,c:23} }, // Performance (4 cols)
+                { s: {r:0,c:24}, e: {r:0,c:26} }, // Classification (3 cols)
+                { s: {r:0,c:27}, e: {r:0,c:31} }  // Behavior (5 cols)
+            ];
+
+            ws['!cols'] = headers.map((h, i) => {
+                const maxLen = Math.max(h.length, ...rows.slice(0, 100).map(r => String(r[i] || '').length));
+                return { wch: Math.min(maxLen + 2, 40) };
+            });
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Sessions');
+            addGlossarySheet(wb, 'sessions');
+            XLSX.writeFile(wb, `session-export-${formatDateForInput(dateFilter.from)}-to-${formatDateForInput(dateFilter.to)}.xlsx`);
+        }
+
+        // ========== Daily Trends Section ==========
+
+        async function renderInsightsDaily() {
+            const result = await conn.query(`
+                SELECT
+                    date,
+                    day_of_week,
+                    unique_sessions,
+                    unique_users,
+                    search_starts,
+                    success_clicks,
+                    null_results,
+                    result_events,
+                    sessions_with_clicks,
+                    sessions_with_results,
+                    sessions_abandoned,
+                    clicks_result,
+                    clicks_trending,
+                    clicks_tab,
+                    clicks_pagination,
+                    clicks_filter,
+                    clicks_viewmore,
+                    searches_morning,
+                    searches_afternoon,
+                    searches_night,
+                    searches_evening,
+                    new_users,
+                    returning_users,
+                    ROUND(CAST(sum_search_latency_ms AS DOUBLE) / NULLIF(latency_event_count, 0), 0) as avg_latency_ms,
+                    CASE WHEN result_events > 0 THEN ROUND(100.0 * null_results / result_events, 1) ELSE 0 END as null_rate_pct,
+                    CASE WHEN sessions_with_results > 0 THEN ROUND(100.0 * sessions_with_clicks / sessions_with_results, 1) ELSE 0 END as success_rate_pct
+                FROM daily
+                WHERE ${getDateWhereClause('date')}
+                ORDER BY date DESC
+            `);
+            dailyData = result.toArray().map(d => {
+                const obj = {};
+                for (const key of Object.keys(d)) {
+                    const v = d[key];
+                    obj[key] = (typeof v === 'bigint') ? Number(v) : v;
+                }
+                obj.date = String(d.date);
+                return obj;
+            });
+
+            // KPIs
+            const totalDays = dailyData.length;
+            const avgSearches = totalDays > 0 ? (dailyData.reduce((s, d) => s + (Number(d.search_starts) || 0), 0) / totalDays) : 0;
+            const avgUsers = totalDays > 0 ? (dailyData.reduce((s, d) => s + (Number(d.unique_users) || 0), 0) / totalDays) : 0;
+            const avgSuccessRate = totalDays > 0 ? (dailyData.reduce((s, d) => s + (Number(d.success_rate_pct) || 0), 0) / totalDays) : 0;
+
+            document.getElementById('dailyKpiDays').textContent = formatNumber(totalDays);
+            document.getElementById('dailyKpiSearches').textContent = Math.round(avgSearches).toLocaleString();
+            document.getElementById('dailyKpiUsers').textContent = Math.round(avgUsers).toLocaleString();
+            document.getElementById('dailyKpiRate').textContent = avgSuccessRate.toFixed(1) + '%';
+
+            filterDaily();
+        }
+
+        function filterDaily() {
+            let filtered = [...dailyData];
+            filtered.sort((a, b) => {
+                const col = dailySort.col;
+                let va = a[col], vb = b[col];
+                if (typeof va === 'string') {
+                    va = va.toLowerCase(); vb = vb.toLowerCase();
+                    return dailySort.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+                }
+                return dailySort.dir === 'asc' ? (va||0) - (vb||0) : (vb||0) - (va||0);
+            });
+            document.getElementById('dailyCount').textContent = `${filtered.length} days`;
+            renderDailyTable(filtered);
+        }
+
+        function renderDailyTable(data) {
+            document.getElementById('dailyBody').innerHTML = data.map(d => {
+                const srCls = (Number(d.success_rate_pct)||0) >= 40 ? 'cell-success' : (Number(d.success_rate_pct)||0) >= 20 ? '' : 'cell-warning';
+                const nrCls = (Number(d.null_rate_pct)||0) >= 50 ? 'cell-danger' : (Number(d.null_rate_pct)||0) >= 20 ? 'cell-warning' : '';
+                return `<tr>
+                    <td>${String(d.date).substring(0, 10)}</td>
+                    <td>${d.day_of_week}</td>
+                    <td class="text-right">${formatNumber(d.unique_sessions)}</td>
+                    <td class="text-right">${formatNumber(d.unique_users)}</td>
+                    <td class="text-right">${formatNumber(d.search_starts)}</td>
+                    <td class="text-right ${srCls}">${Number(d.success_rate_pct||0).toFixed(1)}%</td>
+                    <td class="text-right ${nrCls}">${Number(d.null_rate_pct||0).toFixed(1)}%</td>
+                    <td class="text-right">${d.avg_latency_ms != null ? formatNumber(Math.round(Number(d.avg_latency_ms))) : '-'}</td>
+                    <td class="text-right">${formatNumber(d.new_users)}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function sortDaily(col) {
+            if (dailySort.col === col) {
+                dailySort.dir = dailySort.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                dailySort.col = col;
+                dailySort.dir = col === 'day_of_week' ? 'asc' : 'desc';
+            }
+            document.querySelectorAll('#dailyTable .sort-header').forEach(th => {
+                th.classList.remove('asc', 'desc');
+                if (th.dataset.sort === col) th.classList.add(dailySort.dir);
+            });
+            filterDaily();
+        }
+
+        function getDailyExportHeaders() {
+            return ['Date','Day of Week','Sessions','Users','Searches','Success Clicks','Null Results','Result Events',
+                'Sessions with Clicks','Sessions with Results','Sessions Abandoned',
+                'Result Clicks','Trending Clicks','Tab Clicks','Pagination Clicks','Filter Clicks','ViewMore Clicks',
+                'Searches Morning (CET)','Searches Afternoon (Americas)','Searches Night (APAC)','Searches Evening',
+                'New Users','Returning Users','Avg Latency (ms)','Null Rate %','Success Rate %'];
+        }
+
+        function getDailyExportRow(d) {
+            return [
+                String(d.date).substring(0, 10), d.day_of_week, d.unique_sessions, d.unique_users, d.search_starts,
+                d.success_clicks, d.null_results, d.result_events,
+                d.sessions_with_clicks, d.sessions_with_results, d.sessions_abandoned,
+                d.clicks_result, d.clicks_trending, d.clicks_tab, d.clicks_pagination, d.clicks_filter, d.clicks_viewmore,
+                d.searches_morning, d.searches_afternoon, d.searches_night, d.searches_evening,
+                d.new_users, d.returning_users, d.avg_latency_ms, d.null_rate_pct, d.success_rate_pct
+            ];
+        }
+
+        function exportDailyCsv() {
+            if (dailyData.length === 0) return;
+            exportCsvGeneric(getDailyExportHeaders(), dailyData.map(getDailyExportRow), 'daily-trends');
+        }
+
+        function exportDailyXlsx() {
+            if (dailyData.length === 0) return;
+            if (typeof XLSX === 'undefined') { alert('XLSX library not loaded.'); return; }
+            const headers = getDailyExportHeaders();
+            const rows = dailyData.map(getDailyExportRow);
+            const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+            ws['!cols'] = headers.map((h, i) => {
+                const maxLen = Math.max(h.length, ...rows.slice(0, 100).map(r => String(r[i] || '').length));
+                return { wch: Math.min(maxLen + 2, 40) };
+            });
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Daily Trends');
+            addGlossarySheet(wb, 'daily');
+            XLSX.writeFile(wb, `daily-trends-${formatDateForInput(dateFilter.from)}-to-${formatDateForInput(dateFilter.to)}.xlsx`);
+        }
+
+        // ========== Content Discovery Section ==========
+
+        async function renderInsightsContent() {
+            const result = await conn.query(`
+                SELECT
+                    search_term,
+                    clicked_result_title,
+                    clicked_result_url,
+                    SUM(CAST(click_count AS DOUBLE)) as clicks,
+                    SUM(CAST(unique_users AS DOUBLE)) as users,
+                    SUM(CAST(unique_sessions AS DOUBLE)) as sessions,
+                    CASE WHEN SUM(CAST(click_position_count AS DOUBLE)) > 0
+                        THEN ROUND(SUM(CAST(sum_click_position AS DOUBLE)) / SUM(CAST(click_position_count AS DOUBLE)), 1)
+                        ELSE NULL END as avg_click_pos,
+                    MODE(top_department) as top_department,
+                    MODE(top_device_type) as top_device_type
+                FROM term_clicks
+                WHERE ${getDateWhereClause('session_date')}
+                GROUP BY search_term, clicked_result_title, clicked_result_url
+                ORDER BY clicks DESC
+            `);
+            contentData = result.toArray().map(d => ({
+                search_term: String(d.search_term || ''),
+                clicked_result_title: String(d.clicked_result_title || ''),
+                clicked_result_url: String(d.clicked_result_url || ''),
+                clicks: Number(d.clicks) || 0,
+                users: Number(d.users) || 0,
+                sessions: Number(d.sessions) || 0,
+                avg_click_pos: d.avg_click_pos != null ? Number(d.avg_click_pos) : null,
+                top_department: String(d.top_department || '-'),
+                top_device_type: String(d.top_device_type || '-')
+            }));
+
+            // KPIs
+            const totalPairs = contentData.length;
+            const uniqueUrls = new Set(contentData.map(d => d.clicked_result_url)).size;
+            const withPos = contentData.filter(d => d.avg_click_pos != null);
+            const avgPos = withPos.length > 0 ? (withPos.reduce((s, d) => s + d.avg_click_pos, 0) / withPos.length) : 0;
+            const deptCounts = {};
+            contentData.forEach(d => { deptCounts[d.top_department] = (deptCounts[d.top_department] || 0) + d.clicks; });
+            const topDept = Object.entries(deptCounts).sort((a, b) => b[1] - a[1])[0];
+
+            document.getElementById('contentKpiPairs').textContent = formatNumber(totalPairs);
+            document.getElementById('contentKpiUrls').textContent = formatNumber(uniqueUrls);
+            document.getElementById('contentKpiPos').textContent = avgPos > 0 ? avgPos.toFixed(1) : '-';
+            document.getElementById('contentKpiDept').textContent = topDept ? topDept[0] : '-';
+
+            filterContent();
+        }
+
+        function filterContent() {
+            const search = (document.getElementById('contentSearch').value || '').toLowerCase();
+            const minClicks = parseInt(document.getElementById('contentMinClicks').value) || 1;
+
+            let filtered = contentData.filter(d => {
+                if (d.clicks < minClicks) return false;
+                if (search && !d.search_term.toLowerCase().includes(search)
+                    && !d.clicked_result_title.toLowerCase().includes(search)) return false;
+                return true;
+            });
+
+            filtered.sort((a, b) => {
+                const col = contentSort.col;
+                let va = a[col], vb = b[col];
+                if (typeof va === 'string') {
+                    va = va.toLowerCase(); vb = vb.toLowerCase();
+                    return contentSort.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+                }
+                return contentSort.dir === 'asc' ? (va||0) - (vb||0) : (vb||0) - (va||0);
+            });
+
+            document.getElementById('contentCount').textContent =
+                `Showing ${filtered.length} of ${contentData.length} pairs`;
+            renderContentTable(filtered);
+        }
+
+        function renderContentTable(data) {
+            document.getElementById('contentBody').innerHTML = data.map(d => `
+                <tr>
+                    <td>${escapeHtml(d.search_term)}</td>
+                    <td title="${escapeHtml(d.clicked_result_url)}">${escapeHtml(d.clicked_result_title.length > 60 ? d.clicked_result_title.substring(0, 57) + '...' : d.clicked_result_title)}</td>
+                    <td class="text-right">${formatNumber(d.clicks)}</td>
+                    <td class="text-right">${formatNumber(d.users)}</td>
+                    <td class="text-right">${formatNumber(d.sessions)}</td>
+                    <td class="text-right">${d.avg_click_pos != null ? d.avg_click_pos.toFixed(1) : '-'}</td>
+                    <td>${escapeHtml(d.top_department)}</td>
+                    <td>${escapeHtml(d.top_device_type)}</td>
+                </tr>
+            `).join('');
+        }
+
+        function sortContent(col) {
+            if (contentSort.col === col) {
+                contentSort.dir = contentSort.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                contentSort.col = col;
+                contentSort.dir = col === 'search_term' || col === 'clicked_result_title' || col === 'top_department' || col === 'top_device_type' ? 'asc' : 'desc';
+            }
+            document.querySelectorAll('#contentTable .sort-header').forEach(th => {
+                th.classList.remove('asc', 'desc');
+                if (th.dataset.sort === col) th.classList.add(contentSort.dir);
+            });
+            filterContent();
+        }
+
+        function exportContentCsv() {
+            if (contentData.length === 0) return;
+            const headers = ['Search Term','Content Title','Content URL','Clicks','Users','Sessions','Avg Click Position','Top Department','Top Device Type'];
+            const rows = contentData.map(d => [
+                d.search_term, d.clicked_result_title, d.clicked_result_url,
+                d.clicks, d.users, d.sessions, d.avg_click_pos, d.top_department, d.top_device_type
+            ]);
+            exportCsvGeneric(headers, rows, 'content-discovery');
+        }
+
+        function exportContentXlsx() {
+            if (contentData.length === 0) return;
+            if (typeof XLSX === 'undefined') { alert('XLSX library not loaded.'); return; }
+            const headers = ['Search Term','Content Title','Content URL','Clicks','Users','Sessions','Avg Click Position','Top Department','Top Device Type'];
+            const rows = contentData.map(d => [
+                d.search_term, d.clicked_result_title, d.clicked_result_url,
+                d.clicks, d.users, d.sessions, d.avg_click_pos, d.top_department, d.top_device_type
+            ]);
+            const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+            ws['!cols'] = headers.map((h, i) => {
+                const maxLen = Math.max(h.length, ...rows.slice(0, 100).map(r => String(r[i] || '').length));
+                return { wch: Math.min(maxLen + 2, 50) };
+            });
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Content Discovery');
+            addGlossarySheet(wb, 'content');
+            XLSX.writeFile(wb, `content-discovery-${formatDateForInput(dateFilter.from)}-to-${formatDateForInput(dateFilter.to)}.xlsx`);
+        }
+
+        // ========== Shared Export Helpers ==========
+
+        function exportCsvGeneric(headers, rows, filePrefix) {
+            const csvEncode = v => {
+                const s = String(v == null ? '' : v);
+                return s.includes(',') || s.includes('"') || s.includes('\n') || s.includes(';')
+                    ? '"' + s.replace(/"/g, '""') + '"' : s;
+            };
+            const csv = '\uFEFF' + [headers.map(csvEncode).join(','),
+                ...rows.map(r => r.map(csvEncode).join(','))].join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${filePrefix}-${formatDateForInput(dateFilter.from)}-to-${formatDateForInput(dateFilter.to)}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function addGlossarySheet(wb, type) {
+            const glossary = getGlossary(type);
+            const wsData = [['Column', 'Group', 'Description'], ...glossary.map(g => [g.column, g.group, g.description])];
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            ws['!cols'] = [{ wch: 25 }, { wch: 18 }, { wch: 80 }];
+            XLSX.utils.book_append_sheet(wb, ws, 'Glossary');
+        }
+
+        function getGlossary(type) {
+            const glossaries = {
+                terms: [
+                    { column: 'Search Term', group: 'Term', description: 'The normalized search query entered by users' },
+                    { column: 'Department', group: 'Demographics', description: 'User department who performed the search' },
+                    { column: 'Location', group: 'Demographics', description: 'User location (office/site)' },
+                    { column: 'Words', group: 'Term', description: 'Word count of the search term' },
+                    { column: 'Searches', group: 'Volume', description: 'Total number of SEARCH_TRIGGERED events (SUM across dates)' },
+                    { column: 'Users', group: 'Volume', description: 'Approximate unique users (SUM of daily unique counts, may overcount across days)' },
+                    { column: 'Null Rate %', group: 'Quality', description: 'Percentage of result events returning zero results. Formula: null_results / result_events * 100' },
+                    { column: 'Avg Results', group: 'Quality', description: 'Average result count per search event. Formula: sum_results / result_events' },
+                    { column: 'Success CTR %', group: 'Quality', description: 'Percentage of searches leading to a result click (clickable search results only). Formula: success_clicks / searches * 100' },
+                    { column: 'Avg Click Pos', group: 'Quality', description: 'Average position of clicked results (lower = better relevance). Formula: sum_click_position / click_position_count' },
+                    { column: 'Engagement %', group: 'Quality', description: 'Percentage of searches with any click (all click types). Formula: total_clicks / searches * 100' },
+                    { column: 'Priority Score', group: 'Derived', description: 'Volume-weighted content gap score. Formula: searches * null_rate / 100. Higher score = more urgent content gap to fix' },
+                    { column: 'Lifecycle', group: 'Derived', description: 'Term maturity based on first_seen age: New (<=3 days), Emerging (<=14 days), Established (<=90 days), Mature (>90 days)' },
+                    { column: 'Outcome', group: 'Derived', description: 'Performance classification: Zero Results (100% null), Mostly No Results (>=50% null), No Clicks (0 success clicks), Low CTR (<20%), Success (>=20% CTR)' },
+                    { column: 'Peak Region', group: 'Derived', description: 'Time zone with most searches. CET=09-16h, Americas=16-22h, APAC=03-09h, Night=22-03h (all CET-based)' },
+                    { column: 'First Seen', group: 'Term', description: 'Earliest date this term appeared in search data' }
+                ],
+                sessions: [
+                    { column: 'Date', group: 'Time', description: 'CET-based date of the search session' },
+                    { column: 'Session Start', group: 'Time', description: 'Timestamp of the first event in the session (CET, format: YYYY-MM-DD HH:MM:SS.mmm)' },
+                    { column: 'Hour', group: 'Time', description: 'CET hour of the first event (0-23)' },
+                    { column: 'Department', group: 'Demographics', description: 'User department (first non-null value in session)' },
+                    { column: 'Location', group: 'Demographics', description: 'User location / office site (first non-null value in session)' },
+                    { column: 'Device Type', group: 'Demographics', description: 'Device type: Desktop, Mobile, Tablet, etc.' },
+                    { column: 'Job Title', group: 'Demographics', description: 'User job title (first non-null value in session)' },
+                    { column: 'Language', group: 'Demographics', description: 'Detected query language (UPPER case, e.g., EN, DE)' },
+                    { column: 'Searches', group: 'Volume', description: 'Count of SEARCH_TRIGGERED events in this session' },
+                    { column: 'Unique Terms', group: 'Volume', description: 'Distinct normalized search terms used in the session' },
+                    { column: 'Clicks', group: 'Volume', description: 'Total click events (all click categories)' },
+                    { column: 'Success Clicks', group: 'Volume', description: 'Clicks on actual search results (SEARCH_RESULT_CLICK(ED) on clickable results)' },
+                    { column: 'Null Results', group: 'Volume', description: 'Count of zero-result search events in the session' },
+                    { column: 'Max Results', group: 'Volume', description: 'Highest total result count seen in any single search event' },
+                    { column: 'Result Clicks', group: 'Click Breakdown', description: 'Clicks on search result items' },
+                    { column: 'Trending Clicks', group: 'Click Breakdown', description: 'Clicks on trending/suggested items' },
+                    { column: 'Tab Clicks', group: 'Click Breakdown', description: 'Clicks on content type tabs (e.g., News, People)' },
+                    { column: 'Pagination Clicks', group: 'Click Breakdown', description: 'Clicks on pagination controls (All, News, GoTo combined)' },
+                    { column: 'Filter Clicks', group: 'Click Breakdown', description: 'Clicks on filter/refinement controls' },
+                    { column: 'ViewMore Clicks', group: 'Click Breakdown', description: 'Clicks on "View More" or "Show All" links' },
+                    { column: 'Search to Result (s)', group: 'Performance', description: 'Seconds from SEARCH_TRIGGERED to SEARCH_RESULT_COUNT (perceived search latency)' },
+                    { column: 'Result to Click (s)', group: 'Performance', description: 'Seconds from SEARCH_RESULT_COUNT to first result click (decision time)' },
+                    { column: 'Duration (s)', group: 'Performance', description: 'Total session duration from first to last event (seconds)' },
+                    { column: 'Avg Click Position', group: 'Performance', description: 'Average position of clicked results in this session (result clicks only, lower = better)' },
+                    { column: 'Outcome', group: 'Classification', description: 'Journey outcome: Success (clicked result), Engaged (clicked but not result), Abandoned (had results, no clicks), No Results (all searches returned zero), Unknown' },
+                    { column: 'Complexity', group: 'Classification', description: 'Session complexity: Single Action (1 event), Simple (2-3), Medium (4-6), Complex (7+)' },
+                    { column: 'Duration Bucket', group: 'Classification', description: 'Session duration category: < 5s (quick), 5-30s, 30-60s, 1-3 min, 3-5 min, > 5 min (extended)' },
+                    { column: 'Reformulated', group: 'Behavior', description: 'TRUE if session had more than 1 unique search term (user refined their search)' },
+                    { column: 'Recovered from Null', group: 'Behavior', description: 'TRUE if session had a null result but user eventually made a success click' },
+                    { column: 'Tab Switch', group: 'Behavior', description: 'TRUE if user clicked on more than one distinct click category type' },
+                    { column: 'First Session', group: 'Behavior', description: 'TRUE if this was the user\'s first-ever search session' },
+                    { column: 'Session Number', group: 'Behavior', description: 'This user\'s Nth search session (lifetime rank by time)' }
+                ],
+                daily: [
+                    { column: 'Date', group: 'Time', description: 'CET-based calendar day' },
+                    { column: 'Day of Week', group: 'Time', description: 'Day name: Monday through Sunday' },
+                    { column: 'Sessions', group: 'Volume', description: 'Distinct search sessions on this day' },
+                    { column: 'Users', group: 'Volume', description: 'Distinct users who searched on this day' },
+                    { column: 'Searches', group: 'Volume', description: 'Total SEARCH_TRIGGERED events' },
+                    { column: 'Success Clicks', group: 'Clicks', description: 'Clicks on actual search results (is_success_click = true)' },
+                    { column: 'Null Results', group: 'Quality', description: 'Search events returning zero results' },
+                    { column: 'Result Events', group: 'Quality', description: 'SEARCH_RESULT_COUNT events (denominator for null rate)' },
+                    { column: 'Sessions with Clicks', group: 'Quality', description: 'Sessions that had results AND at least one success click' },
+                    { column: 'Sessions with Results', group: 'Quality', description: 'Sessions that had at least one clickable result' },
+                    { column: 'Sessions Abandoned', group: 'Quality', description: 'Sessions with results but zero success clicks' },
+                    { column: 'Result Clicks', group: 'Clicks', description: 'Clicks on search result items' },
+                    { column: 'Trending Clicks', group: 'Clicks', description: 'Clicks on trending/suggested items' },
+                    { column: 'Tab Clicks', group: 'Clicks', description: 'Clicks on content type tabs' },
+                    { column: 'Pagination Clicks', group: 'Clicks', description: 'All pagination click types combined' },
+                    { column: 'Filter Clicks', group: 'Clicks', description: 'Clicks on filter/refinement controls' },
+                    { column: 'ViewMore Clicks', group: 'Clicks', description: 'Clicks on "View More" links' },
+                    { column: 'Searches Morning (CET)', group: 'Regional', description: 'Searches during 09-16 CET (European business hours)' },
+                    { column: 'Searches Afternoon (Americas)', group: 'Regional', description: 'Searches during 16-22 CET (Americas business hours)' },
+                    { column: 'Searches Night (APAC)', group: 'Regional', description: 'Searches during 03-09 CET (APAC business hours)' },
+                    { column: 'Searches Evening', group: 'Regional', description: 'Searches during 22-03 CET (low activity period)' },
+                    { column: 'New Users', group: 'Users', description: 'Users whose first-ever search was on this day' },
+                    { column: 'Returning Users', group: 'Users', description: 'Users who had searched on a previous day' },
+                    { column: 'Avg Latency (ms)', group: 'Performance', description: 'Average App Insights search latency in milliseconds. Formula: sum_search_latency_ms / latency_event_count' },
+                    { column: 'Null Rate %', group: 'Performance', description: 'Percentage of result events with zero results. Formula: null_results / result_events * 100' },
+                    { column: 'Success Rate %', group: 'Performance', description: 'Percentage of sessions with results that led to a click. Formula: sessions_with_clicks / sessions_with_results * 100' }
+                ],
+                content: [
+                    { column: 'Search Term', group: 'Term', description: 'The normalized search query that led to the click' },
+                    { column: 'Content Title', group: 'Content', description: 'Title of the clicked result page/document' },
+                    { column: 'Content URL', group: 'Content', description: 'URL of the clicked result' },
+                    { column: 'Clicks', group: 'Volume', description: 'Total clicks on this term-content pair (SUM across dates)' },
+                    { column: 'Users', group: 'Volume', description: 'Approximate unique users who clicked this pair' },
+                    { column: 'Sessions', group: 'Volume', description: 'Approximate unique sessions with this click pair' },
+                    { column: 'Avg Click Position', group: 'Quality', description: 'Average result position when this content was clicked (lower = higher ranking)' },
+                    { column: 'Top Department', group: 'Demographics', description: 'Most common department among users who clicked this pair (MODE)' },
+                    { column: 'Top Device Type', group: 'Demographics', description: 'Most common device type among users who clicked this pair (MODE)' }
+                ]
+            };
+            return glossaries[type] || [];
         }
 
         // Utility functions
@@ -3558,6 +4363,31 @@
         document.getElementById('insightsOutcomeFilter').addEventListener('change', filterInsights);
         document.getElementById('insightsLifecycleFilter').addEventListener('change', filterInsights);
         document.getElementById('insightsMinSearches').addEventListener('change', filterInsights);
+
+        // Sessions tab handlers
+        document.querySelectorAll('#sessionsTable .sort-header').forEach(th => {
+            th.addEventListener('click', () => sortSessions(th.dataset.sort));
+        });
+        document.getElementById('sessionsSearch').addEventListener('input', filterSessions);
+        document.getElementById('sessionsOutcomeFilter').addEventListener('change', filterSessions);
+        document.getElementById('sessionsComplexityFilter').addEventListener('change', filterSessions);
+
+        // Daily tab handlers
+        document.querySelectorAll('#dailyTable .sort-header').forEach(th => {
+            th.addEventListener('click', () => sortDaily(th.dataset.sort));
+        });
+
+        // Content tab handlers
+        document.querySelectorAll('#contentTable .sort-header').forEach(th => {
+            th.addEventListener('click', () => sortContent(th.dataset.sort));
+        });
+        document.getElementById('contentSearch').addEventListener('input', filterContent);
+        document.getElementById('contentMinClicks').addEventListener('change', filterContent);
+
+        // Insights sub-tab lazy rendering
+        document.querySelectorAll('#navInsights .tab').forEach(tab => {
+            tab.addEventListener('click', () => renderActiveInsightsTab());
+        });
 
         // Modal close on outside click
         document.getElementById('termModal').addEventListener('click', (e) => {
