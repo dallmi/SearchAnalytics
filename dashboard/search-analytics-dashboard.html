@@ -88,6 +88,11 @@
             flex-wrap: wrap;
         }
 
+        .date-filter.loading {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
         .date-presets {
             display: flex;
             gap: 0;
@@ -1105,7 +1110,7 @@
     <header class="header">
         <h1>Search Analytics Dashboard</h1>
         <div class="header-controls">
-            <div class="date-filter">
+            <div class="date-filter loading" id="dateFilterControls">
                 <div class="date-presets">
                     <button class="date-preset" data-preset="7d" onclick="applyDatePreset('7d')">Last 7 days</button>
                     <button class="date-preset" data-preset="30d" onclick="applyDatePreset('30d')">Last 30 days</button>
@@ -1951,6 +1956,7 @@
 
                 document.getElementById('loadingState').style.display = 'none';
                 document.getElementById('dashboardContent').style.display = 'block';
+                document.getElementById('dateFilterControls').classList.remove('loading');
 
                 await renderDashboard();
 
