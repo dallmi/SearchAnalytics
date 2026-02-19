@@ -493,8 +493,8 @@
         }
 
         .search-input {
-            flex: 1;
-            max-width: 300px;
+            width: 100%;
+            box-sizing: border-box;
             padding: 0.4rem 0.75rem;
             border: 1px solid var(--light-gray);
             border-radius: 4px;
@@ -503,7 +503,7 @@
 
         .search-input:focus {
             outline: none;
-            border-color: var(--info);
+            border-color: var(--primary);
         }
 
         .filter-select {
@@ -882,11 +882,75 @@
         }
 
         .insights-controls input[type="text"] {
-            width: 200px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .insights-controls input[type="text"]:focus,
+        .insights-controls input[type="number"]:focus {
+            outline: none;
+            border-color: var(--primary);
         }
 
         .insights-controls input[type="number"] {
             width: 70px;
+        }
+
+        /* Autocomplete dropdown */
+        .autocomplete-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        .table-controls .autocomplete-wrapper {
+            flex: 1;
+            max-width: 300px;
+        }
+
+        .insights-controls .autocomplete-wrapper {
+            width: 200px;
+        }
+
+        .autocomplete-list {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--white);
+            border: 1px solid var(--light-gray);
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 100;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+        }
+
+        .autocomplete-list.open { display: block; }
+
+        .autocomplete-item {
+            padding: 0.45rem 0.6rem;
+            font-size: 0.8rem;
+            cursor: pointer;
+            color: var(--dark-gray);
+            border-bottom: 1px solid var(--lighter-gray);
+        }
+
+        .autocomplete-item:last-child { border-bottom: none; }
+        .autocomplete-item:hover,
+        .autocomplete-item.active { background: var(--lighter-gray); }
+
+        .autocomplete-item .ac-hint {
+            font-size: 0.7rem;
+            color: var(--medium-gray);
+            margin-left: 0.4rem;
+        }
+
+        .autocomplete-item mark {
+            background: transparent;
+            color: var(--primary);
+            font-weight: 600;
         }
 
         .insights-controls select {
@@ -1187,7 +1251,10 @@
                         <!-- Top Terms Tab -->
                         <div class="tab-content active" id="topTermsTab">
                             <div class="table-controls">
-                                <input type="text" class="search-input" id="termSearch" placeholder="Search terms...">
+                                <div class="autocomplete-wrapper">
+                                    <input type="text" class="search-input" id="termSearch" placeholder="Search terms..." autocomplete="off">
+                                    <div class="autocomplete-list" id="termSearchAc"></div>
+                                </div>
                                 <select class="filter-select" id="termStatusFilter">
                                     <option value="">All statuses</option>
                                     <option value="good">High CTR (&gt;30%)</option>
@@ -1499,7 +1566,10 @@
                         </div>
                         <div class="insights-controls">
                             <label>Search</label>
-                            <input type="text" id="insightsSearch" placeholder="Filter by term...">
+                            <div class="autocomplete-wrapper">
+                                <input type="text" id="insightsSearch" placeholder="Filter by term..." autocomplete="off">
+                                <div class="autocomplete-list" id="insightsSearchAc"></div>
+                            </div>
                             <label>Outcome</label>
                             <select id="insightsOutcomeFilter">
                                 <option value="">All</option>
@@ -1572,7 +1642,10 @@
                         </div>
                         <div class="insights-controls">
                             <label>Search</label>
-                            <input type="text" id="sessionsSearch" placeholder="Filter by dept, location, job...">
+                            <div class="autocomplete-wrapper">
+                                <input type="text" id="sessionsSearch" placeholder="Filter by dept, location, job..." autocomplete="off">
+                                <div class="autocomplete-list" id="sessionsSearchAc"></div>
+                            </div>
                             <label>Outcome</label>
                             <select id="sessionsOutcomeFilter">
                                 <option value="">All</option>
@@ -1682,7 +1755,10 @@
                         </div>
                         <div class="insights-controls">
                             <label>Search</label>
-                            <input type="text" id="contentSearch" placeholder="Filter by term or title...">
+                            <div class="autocomplete-wrapper">
+                                <input type="text" id="contentSearch" placeholder="Filter by term or title..." autocomplete="off">
+                                <div class="autocomplete-list" id="contentSearchAc"></div>
+                            </div>
                             <label>Min Clicks</label>
                             <input type="number" id="contentMinClicks" value="2" min="1">
                             <button class="export-btn" onclick="exportContentCsv()">Export CSV</button>
@@ -4364,6 +4440,92 @@
             return div.innerHTML;
         }
 
+        // ========== Autocomplete Engine ==========
+
+        function initAutocomplete(inputId, listId, getSuggestions, onFilter) {
+            const input = document.getElementById(inputId);
+            const list = document.getElementById(listId);
+            let acIndex = -1;
+            let acItems = [];
+            let acTimer = null;
+
+            input.addEventListener('input', () => {
+                clearTimeout(acTimer);
+                onFilter();
+                const val = input.value.trim();
+                if (val.length < 2) { closeAc(); return; }
+                acTimer = setTimeout(async () => {
+                    try {
+                        const items = await getSuggestions(val);
+                        showAc(items, val);
+                    } catch (e) { closeAc(); }
+                }, 150);
+            });
+
+            input.addEventListener('keydown', (e) => {
+                if (!list.classList.contains('open') || acItems.length === 0) {
+                    if (e.key === 'Enter') { e.preventDefault(); onFilter(); }
+                    return;
+                }
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    acIndex = Math.min(acIndex + 1, acItems.length - 1);
+                    highlightAc();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    acIndex = Math.max(acIndex - 1, 0);
+                    highlightAc();
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (acIndex >= 0 && acItems[acIndex]) {
+                        input.value = acItems[acIndex].value;
+                        closeAc();
+                        onFilter();
+                    }
+                } else if (e.key === 'Escape') {
+                    closeAc();
+                }
+            });
+
+            list.addEventListener('mousedown', (e) => {
+                const item = e.target.closest('.autocomplete-item');
+                if (item) {
+                    const idx = parseInt(item.dataset.index);
+                    input.value = acItems[idx].value;
+                    closeAc();
+                    onFilter();
+                }
+            });
+
+            input.addEventListener('blur', () => setTimeout(closeAc, 150));
+
+            function showAc(items, term) {
+                if (!items || items.length === 0) { closeAc(); return; }
+                acItems = items;
+                const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                list.innerHTML = items.map((item, i) => {
+                    const highlighted = escapeHtml(item.label).replace(regex, '<mark>$1</mark>');
+                    const hint = item.hint ? `<span class="ac-hint">${escapeHtml(item.hint)}</span>` : '';
+                    return `<div class="autocomplete-item" data-index="${i}">${highlighted}${hint}</div>`;
+                }).join('');
+                acIndex = -1;
+                list.classList.add('open');
+            }
+
+            function closeAc() {
+                list.classList.remove('open');
+                acIndex = -1;
+                acItems = [];
+            }
+
+            function highlightAc() {
+                list.querySelectorAll('.autocomplete-item').forEach((it, i) => {
+                    it.classList.toggle('active', i === acIndex);
+                    if (i === acIndex) it.scrollIntoView({ block: 'nearest' });
+                });
+            }
+        }
+
         function updateStatus(status, text) {
             const statusEl = document.getElementById('dataStatus');
             statusEl.className = 'data-status';
@@ -4413,8 +4575,16 @@
             });
         });
 
-        // Search input handler
-        document.getElementById('termSearch').addEventListener('input', renderFilteredTerms);
+        // Search input with autocomplete
+        initAutocomplete('termSearch', 'termSearchAc', async (val) => {
+            const safe = val.replace(/'/g, "''");
+            const result = await conn.query(`
+                SELECT DISTINCT search_term FROM terms
+                WHERE search_term ILIKE '%${safe}%' AND ${getDateWhereClause('session_date')}
+                ORDER BY search_term LIMIT 10
+            `);
+            return result.toArray().map(r => ({ label: String(r.search_term), value: String(r.search_term) }));
+        }, renderFilteredTerms);
         document.getElementById('termStatusFilter').addEventListener('change', renderFilteredTerms);
 
         // Seasonality filter handlers
@@ -4425,7 +4595,15 @@
         document.querySelectorAll('#insightsTable .sort-header').forEach(th => {
             th.addEventListener('click', () => sortInsights(th.dataset.sort));
         });
-        document.getElementById('insightsSearch').addEventListener('input', filterInsights);
+        initAutocomplete('insightsSearch', 'insightsSearchAc', async (val) => {
+            if (insightsData.length === 0) return [];
+            const lower = val.toLowerCase();
+            const seen = new Set();
+            return insightsData
+                .filter(d => d.search_term.toLowerCase().includes(lower) && !seen.has(d.search_term) && seen.add(d.search_term))
+                .slice(0, 10)
+                .map(d => ({ label: d.search_term, value: d.search_term, hint: d.outcome }));
+        }, filterInsights);
         document.getElementById('insightsOutcomeFilter').addEventListener('change', filterInsights);
         document.getElementById('insightsLifecycleFilter').addEventListener('change', filterInsights);
         document.getElementById('insightsMinSearches').addEventListener('change', filterInsights);
@@ -4434,7 +4612,24 @@
         document.querySelectorAll('#sessionsTable .sort-header').forEach(th => {
             th.addEventListener('click', () => sortSessions(th.dataset.sort));
         });
-        document.getElementById('sessionsSearch').addEventListener('input', filterSessions);
+        initAutocomplete('sessionsSearch', 'sessionsSearchAc', async (val) => {
+            if (sessionsData.length === 0) return [];
+            const lower = val.toLowerCase();
+            const seen = new Set();
+            const items = [];
+            for (const d of sessionsData) {
+                if (items.length >= 10) break;
+                for (const [field, hint] of [['department','Dept'],['location','Loc'],['job_title','Job']]) {
+                    const v = String(d[field]);
+                    if (v !== '-' && v.toLowerCase().includes(lower) && !seen.has(v + hint)) {
+                        seen.add(v + hint);
+                        items.push({ label: v, value: v, hint });
+                        if (items.length >= 10) break;
+                    }
+                }
+            }
+            return items;
+        }, filterSessions);
         document.getElementById('sessionsOutcomeFilter').addEventListener('change', filterSessions);
         document.getElementById('sessionsComplexityFilter').addEventListener('change', filterSessions);
 
@@ -4447,7 +4642,25 @@
         document.querySelectorAll('#contentTable .sort-header').forEach(th => {
             th.addEventListener('click', () => sortContent(th.dataset.sort));
         });
-        document.getElementById('contentSearch').addEventListener('input', filterContent);
+        initAutocomplete('contentSearch', 'contentSearchAc', async (val) => {
+            if (contentData.length === 0) return [];
+            const lower = val.toLowerCase();
+            const seen = new Set();
+            const items = [];
+            for (const d of contentData) {
+                if (items.length >= 10) break;
+                if (d.search_term.toLowerCase().includes(lower) && !seen.has('t:' + d.search_term)) {
+                    seen.add('t:' + d.search_term);
+                    items.push({ label: d.search_term, value: d.search_term, hint: 'Term' });
+                }
+                if (items.length >= 10) break;
+                if (d.clicked_result_title.toLowerCase().includes(lower) && !seen.has('c:' + d.clicked_result_title)) {
+                    seen.add('c:' + d.clicked_result_title);
+                    items.push({ label: d.clicked_result_title, value: d.clicked_result_title, hint: 'Content' });
+                }
+            }
+            return items;
+        }, filterContent);
         document.getElementById('contentMinClicks').addEventListener('change', filterContent);
 
         // Insights sub-tab lazy rendering
