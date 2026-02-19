@@ -85,7 +85,33 @@
             display: flex;
             gap: 0.5rem;
             align-items: center;
+            flex-wrap: wrap;
         }
+
+        .date-presets {
+            display: flex;
+            gap: 0;
+            border: 1px solid var(--light-gray);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-right: 0.5rem;
+        }
+
+        .date-preset {
+            padding: 0.35rem 0.6rem;
+            background: var(--white);
+            border: none;
+            border-right: 1px solid var(--light-gray);
+            cursor: pointer;
+            font-size: 0.75rem;
+            color: var(--medium-gray);
+            white-space: nowrap;
+            transition: all 0.15s;
+        }
+
+        .date-preset:last-child { border-right: none; }
+        .date-preset:hover { background: var(--lighter-gray); color: var(--dark-gray); }
+        .date-preset.active { background: var(--primary); color: var(--white); }
 
         .date-filter label {
             font-size: 0.8rem;
@@ -97,6 +123,11 @@
             border: 1px solid var(--light-gray);
             border-radius: 4px;
             font-size: 0.8rem;
+        }
+
+        .date-filter input:focus {
+            outline: none;
+            border-color: var(--primary);
         }
 
         .btn {
@@ -1075,6 +1106,15 @@
         <h1>Search Analytics Dashboard</h1>
         <div class="header-controls">
             <div class="date-filter">
+                <div class="date-presets">
+                    <button class="date-preset" data-preset="7d" onclick="applyDatePreset('7d')">Last 7 days</button>
+                    <button class="date-preset" data-preset="30d" onclick="applyDatePreset('30d')">Last 30 days</button>
+                    <button class="date-preset" data-preset="this-month" onclick="applyDatePreset('this-month')">This month</button>
+                    <button class="date-preset" data-preset="last-month" onclick="applyDatePreset('last-month')">Last month</button>
+                    <button class="date-preset" data-preset="ytd" onclick="applyDatePreset('ytd')">This year</button>
+                    <button class="date-preset" data-preset="last-year" onclick="applyDatePreset('last-year')">Last year</button>
+                    <button class="date-preset active" data-preset="all" onclick="applyDatePreset('all')">All time</button>
+                </div>
                 <label>From:</label>
                 <input type="date" id="dateFrom">
                 <label>To:</label>
@@ -1588,7 +1628,7 @@
                                 <option value="Mature">Mature</option>
                             </select>
                             <label>Min Searches</label>
-                            <input type="number" id="insightsMinSearches" value="2" min="1">
+                            <input type="number" id="insightsMinSearches" value="1" min="1">
                             <button class="export-btn" onclick="exportInsightsCsv()">Export CSV</button>
                             <button class="export-btn" onclick="exportInsightsXlsx()">Export XLSX</button>
                         </div>
@@ -1760,7 +1800,7 @@
                                 <div class="autocomplete-list" id="contentSearchAc"></div>
                             </div>
                             <label>Min Clicks</label>
-                            <input type="number" id="contentMinClicks" value="2" min="1">
+                            <input type="number" id="contentMinClicks" value="1" min="1">
                             <button class="export-btn" onclick="exportContentCsv()">Export CSV</button>
                             <button class="export-btn" onclick="exportContentXlsx()">Export XLSX</button>
                         </div>
@@ -1964,6 +2004,7 @@
             if (fromInput && toInput) {
                 dateFilter.from = new Date(fromInput);
                 dateFilter.to = new Date(toInput);
+                clearPresetActive();
                 await renderDashboard();
             }
         }
@@ -1972,7 +2013,62 @@
             activeFilters = {};
             updateFiltersDisplay();
             await setInitialDateRange();
+            clearPresetActive();
+            document.querySelector('.date-preset[data-preset="all"]').classList.add('active');
             await renderDashboard();
+        }
+
+        async function applyDatePreset(preset) {
+            const today = new Date();
+            let from, to;
+
+            switch (preset) {
+                case '7d':
+                    to = today;
+                    from = new Date(today);
+                    from.setDate(from.getDate() - 6);
+                    break;
+                case '30d':
+                    to = today;
+                    from = new Date(today);
+                    from.setDate(from.getDate() - 29);
+                    break;
+                case 'this-month':
+                    from = new Date(today.getFullYear(), today.getMonth(), 1);
+                    to = today;
+                    break;
+                case 'last-month':
+                    from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                    to = new Date(today.getFullYear(), today.getMonth(), 0);
+                    break;
+                case 'ytd':
+                    from = new Date(today.getFullYear(), 0, 1);
+                    to = today;
+                    break;
+                case 'last-year':
+                    from = new Date(today.getFullYear() - 1, 0, 1);
+                    to = new Date(today.getFullYear() - 1, 11, 31);
+                    break;
+                case 'all':
+                    await setInitialDateRange();
+                    clearPresetActive();
+                    document.querySelector('.date-preset[data-preset="all"]').classList.add('active');
+                    await renderDashboard();
+                    return;
+            }
+
+            document.getElementById('dateFrom').value = formatDateForInput(from);
+            document.getElementById('dateTo').value = formatDateForInput(to);
+            dateFilter.from = from;
+            dateFilter.to = to;
+
+            clearPresetActive();
+            document.querySelector(`.date-preset[data-preset="${preset}"]`).classList.add('active');
+            await renderDashboard();
+        }
+
+        function clearPresetActive() {
+            document.querySelectorAll('.date-preset').forEach(b => b.classList.remove('active'));
         }
 
         let renderInProgress = false;
