@@ -469,4 +469,4 @@ All processing happens client-side; no data is sent to external servers.
 | Version | Date | Changes |
 |---------|------|---------|
 | 2.0 | 2026-02-24 | Added executive questions, metric calculations, tab walkthrough |
-| 1.0 | 2025-01-27 | Initial documentation |
+| 1.0 | 2026-01-27 | Initial documentation |
