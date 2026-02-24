@@ -150,6 +150,7 @@ Region mapping is **not time-aware** — countries don't change regions, so the 
 | **Are new topics emerging?** | Search Terms → New/Trending sub-tab | Term age, lifecycle stage, search volume |
 | **How do users behave in search sessions?** | Journeys tab → Complexity, Duration, Reformulation | Session complexity, reformulation rate, recovery rate |
 | **Which content gets clicked from search?** | Insights & Export → Content Discovery | Click counts, avg click position, top departments |
+| **Which divisions and regions use search?** | Overview → Business Division bar; Region doughnut | Session count, % distribution per division/region |
 | **How is search trending over time?** | Overview → Daily Trends chart; Insights & Export → Daily Trends | Searches/day, success rate trend, user cohorts |
 
 ---
@@ -296,6 +297,17 @@ The landing page provides a high-level picture of search health.
 
 **Weekday Distribution** (bar chart):
 - 7 bars (Mon–Sun). Click a bar to filter all data by that weekday.
+
+**Sessions by Business Division** (horizontal bar, clickable):
+- Top 8 divisions by session count
+- Each bar shows session count and percentage as a data label
+- Click a bar to filter all journey-based charts by that division
+
+**Sessions by Region** (doughnut, clickable):
+- Geographic region distribution (SWITZERLAND, EMEA, AMERICAS, APAC)
+- Legend shows region name with percentage
+- Tooltip shows full count and percentage
+- Click a slice to filter all journey-based charts by that region
 
 **User Cohorts** (stacked bar, time series):
 - New Users (dark) vs Returning Users (light) over time
@@ -446,6 +458,8 @@ Many charts support click-to-filter. Clicking a chart element filters all dashbo
 | Journey Outcomes Funnel | Journey outcome |
 | Outcome Doughnut | Journey outcome |
 | Weekday Distribution | Day of week |
+| Sessions by Business Division | Business division (department) |
+| Sessions by Region | Geographic region |
 | Session Complexity Pie | Complexity level |
 | Session Duration Bar | Duration bucket |
 | Reformulation Doughnut | Had reformulation (yes/no) |
@@ -527,6 +541,7 @@ All processing happens client-side; no data is sent to external servers.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.1 | 2026-02-24 | Added Sessions by Business Division and Sessions by Region charts to Overview tab with click-to-filter |
 | 3.0 | 2026-02-24 | Added department mapping (GEDULD temporal lookup), region mapping (GEDULD + hardcoded fallback), Location→Region in dashboard display |
 | 2.0 | 2026-02-24 | Added executive questions, metric calculations, tab walkthrough |
 | 1.0 | 2026-01-27 | Initial documentation |

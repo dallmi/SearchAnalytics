@@ -1268,7 +1268,29 @@
                     </div>
                 </div>
 
-                <!-- Charts Row 4: User Cohorts -->
+                <!-- Charts Row 4: Demographics -->
+                <div class="charts-grid">
+                    <div class="chart-card clickable">
+                        <div class="chart-title">
+                            Sessions by Business Division
+                            <span class="chart-subtitle">Click to filter</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="departmentChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card clickable">
+                        <div class="chart-title">
+                            Sessions by Region
+                            <span class="chart-subtitle">Click to filter</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="regionChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Row 5: User Cohorts -->
                 <div class="charts-grid">
                     <div class="chart-card">
                         <div class="chart-title">New vs Returning Users</div>
@@ -2162,6 +2184,8 @@
                     { name: 'WeekdayDistribution', fn: renderWeekdayDistribution },
                     { name: 'UserCohorts', fn: renderUserCohorts },
                     { name: 'ClickCategories', fn: renderClickCategories },
+                    { name: 'DepartmentDistribution', fn: renderDepartmentDistribution },
+                    { name: 'RegionDistribution', fn: renderRegionDistribution },
                     { name: 'TopTerms', fn: renderTopTerms },
                     { name: 'ProblemTerms', fn: renderProblemTerms },
                     { name: 'NewTerms', fn: renderNewTerms },
@@ -2647,6 +2671,135 @@
                     maintainAspectRatio: false,
                     indexAxis: 'y',
                     plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        // Department distribution (horizontal bar with data labels)
+        async function renderDepartmentDistribution() {
+            const result = await conn.query(`
+                SELECT COALESCE(department, '-') as dept, COUNT(*) as sessions,
+                    ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER(), 1) as pct
+                FROM journeys
+                WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('journeys')}
+                GROUP BY dept
+                ORDER BY sessions DESC
+                LIMIT 8
+            `);
+            const data = result.toArray();
+            const labels = data.map(d => d.dept);
+            const values = data.map(d => Number(d.sessions));
+            const pcts = data.map(d => Number(d.pct));
+            const colors = getFilteredColors(
+                COLORS.palette.slice(0, labels.length),
+                labels, 'Division'
+            );
+
+            if (charts.department) charts.department.destroy();
+            const ctx = document.getElementById('departmentChart').getContext('2d');
+            charts.department = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{ label: 'Sessions', data: values, backgroundColor: colors }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: { x: { display: false } },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (c) => `${formatNumber(c.raw)} sessions (${pcts[c.dataIndex]}%)`
+                            }
+                        }
+                    },
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            toggleChartFilter('Division', labels[elements[0].index], 'department', 'journeys');
+                        }
+                    },
+                    onHover: (event, elements) => {
+                        event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+                    }
+                },
+                plugins: [{
+                    afterDatasetsDraw(chart) {
+                        const { ctx: c } = chart;
+                        c.save();
+                        c.font = '11px -apple-system, sans-serif';
+                        c.fillStyle = '#555';
+                        c.textBaseline = 'middle';
+                        chart.getDatasetMeta(0).data.forEach((bar, i) => {
+                            const label = `${formatNumber(values[i])} (${pcts[i]}%)`;
+                            c.fillText(label, bar.x + 6, bar.y);
+                        });
+                        c.restore();
+                    }
+                }]
+            });
+        }
+
+        // Region distribution (doughnut with custom legend)
+        async function renderRegionDistribution() {
+            const result = await conn.query(`
+                SELECT COALESCE(region, '-') as region, COUNT(*) as sessions,
+                    ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER(), 1) as pct
+                FROM journeys
+                WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('journeys')}
+                GROUP BY region
+                ORDER BY sessions DESC
+            `);
+            const data = result.toArray();
+            const labels = data.map(d => d.region);
+            const values = data.map(d => Number(d.sessions));
+            const pcts = data.map(d => Number(d.pct));
+            const colors = getFilteredColors(
+                COLORS.palette.slice(0, labels.length),
+                labels, 'Region'
+            );
+
+            if (charts.region) charts.region.destroy();
+            const ctx = document.getElementById('regionChart').getContext('2d');
+            charts.region = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{ data: values, backgroundColor: colors }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                generateLabels: (chart) => {
+                                    const ds = chart.data.datasets[0];
+                                    return chart.data.labels.map((label, i) => ({
+                                        text: `${label}  ${pcts[i]}%`,
+                                        fillStyle: ds.backgroundColor[i],
+                                        strokeStyle: ds.backgroundColor[i],
+                                        hidden: false,
+                                        index: i
+                                    }));
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (c) => `${c.label}: ${formatNumber(c.raw)} sessions (${pcts[c.dataIndex]}%)`
+                            }
+                        }
+                    },
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            toggleChartFilter('Region', labels[elements[0].index], 'region', 'journeys');
+                        }
+                    },
+                    onHover: (event, elements) => {
+                        event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+                    }
                 }
             });
         }
