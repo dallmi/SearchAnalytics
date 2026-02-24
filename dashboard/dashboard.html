@@ -2690,8 +2690,9 @@
             const labels = data.map(d => d.dept);
             const values = data.map(d => Number(d.sessions));
             const pcts = data.map(d => Number(d.pct));
+            const DIVISION_PALETTE = ['#4A6FA5', '#5B8C85', '#D4874E', '#8B6E9B', '#7A8B5C', '#C4725D', '#6B8FAD', '#A8896C'];
             const colors = getFilteredColors(
-                COLORS.palette.slice(0, labels.length),
+                DIVISION_PALETTE.slice(0, labels.length),
                 labels, 'Division'
             );
 
@@ -2755,8 +2756,12 @@
             const labels = data.map(d => d.region);
             const values = data.map(d => Number(d.sessions));
             const pcts = data.map(d => Number(d.pct));
+            const REGION_COLORS = {
+                'SWITZERLAND': '#BD000C', 'EMEA': '#333333',
+                'AMERICAS': '#E4A911', 'APAC': '#888888', '-': '#BBBBBB'
+            };
             const colors = getFilteredColors(
-                COLORS.palette.slice(0, labels.length),
+                labels.map(l => REGION_COLORS[l] || '#BBBBBB'),
                 labels, 'Region'
             );
 
