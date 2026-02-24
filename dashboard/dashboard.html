@@ -2678,7 +2678,7 @@
         // Department distribution (horizontal bar with data labels)
         async function renderDepartmentDistribution() {
             const result = await conn.query(`
-                SELECT COALESCE(department, '-') as dept, COUNT(*) as sessions,
+                SELECT COALESCE(department, 'Unknown') as dept, COUNT(*) as sessions,
                     ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER(), 1) as pct
                 FROM journeys
                 WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('journeys')}
@@ -2745,7 +2745,7 @@
         // Region distribution (doughnut with custom legend)
         async function renderRegionDistribution() {
             const result = await conn.query(`
-                SELECT COALESCE(region, '-') as region, COUNT(*) as sessions,
+                SELECT COALESCE(region, 'Unknown') as region, COUNT(*) as sessions,
                     ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER(), 1) as pct
                 FROM journeys
                 WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('journeys')}
@@ -2758,7 +2758,7 @@
             const pcts = data.map(d => Number(d.pct));
             const REGION_COLORS = {
                 'SWITZERLAND': '#BD000C', 'EMEA': '#333333',
-                'AMERICAS': '#E4A911', 'APAC': '#888888', '-': '#BBBBBB'
+                'AMERICAS': '#E4A911', 'APAC': '#888888', 'Unknown': '#BBBBBB'
             };
             const colors = getFilteredColors(
                 labels.map(l => REGION_COLORS[l] || '#BBBBBB'),
