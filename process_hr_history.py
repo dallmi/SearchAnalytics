@@ -1,0 +1,246 @@
+#!/usr/bin/env python3
+"""
+HR History Processing Script
+
+Reads all GEDULD Excel files from mappings/ and consolidates them into a single
+Parquet file for historical headcount analysis.
+
+Usage:
+    python process_hr_history.py              # Process all GEDULD files in mappings/
+    python process_hr_history.py --force      # Overwrite existing parquet output
+
+Input folder: mappings/
+    Place your monthly GEDULD files here with date suffix _YYYY_MM_DD, e.g.:
+    - GEDULD_2024_01_15.xlsx
+    - GEDULD_2024_02_15.xlsx
+
+Output:
+    - output/hr_history.parquet   (all monthly snapshots consolidated)
+"""
+
+import sys
+import os
+import re
+import duckdb
+import pandas as pd
+from pathlib import Path
+from datetime import datetime
+
+
+def log(message):
+    """Print timestamped log message"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{timestamp}] {message}")
+
+
+def extract_date_from_filename(filepath):
+    """
+    Extract date from filename with format _YYYY_MM_DD.
+    Returns a date object or None if not found.
+    """
+    match = re.search(r'_(\d{4})_(\d{2})_(\d{2})', str(filepath))
+    if match:
+        try:
+            return datetime(int(match.group(1)), int(match.group(2)), int(match.group(3))).date()
+        except ValueError:
+            return None
+    return None
+
+
+def find_geduld_files(mappings_dir):
+    """
+    Find all GEDULD files in the mappings directory.
+    Returns list of (filepath, date) tuples sorted by date (oldest first).
+    """
+    if not mappings_dir.exists():
+        return []
+
+    all_files = list(mappings_dir.glob('GEDULD*.xlsx')) + list(mappings_dir.glob('GEDULD*.xls'))
+
+    if not all_files:
+        return []
+
+    files_with_dates = []
+    for f in all_files:
+        file_date = extract_date_from_filename(f)
+        if file_date:
+            files_with_dates.append((f, file_date))
+        else:
+            log(f"  WARNING: Could not extract date from {f.name} - skipping")
+
+    files_with_dates.sort(key=lambda x: x[1])
+    return files_with_dates
+
+
+def normalize_columns(df):
+    """Normalize column names to snake_case for clean SQL."""
+    df.columns = [
+        col.strip().lower().replace(' ', '_').replace('-', '_').replace('(', '').replace(')', '')
+        for col in df.columns
+    ]
+    return df
+
+
+def read_geduld_file(filepath, file_date):
+    """
+    Read a single GEDULD Excel file and add snapshot columns.
+    Forces GPN to string to preserve leading zeros.
+    """
+    # Try to read GPN as string
+    try:
+        df = pd.read_excel(filepath, dtype={'GPN': str})
+    except Exception:
+        # If GPN column doesn't exist or other issue, read without dtype constraint
+        df = pd.read_excel(filepath)
+
+    row_count = len(df)
+
+    # Normalize column names
+    df = normalize_columns(df)
+
+    # Ensure gpn is string (in case it was read as numeric)
+    if 'gpn' in df.columns:
+        df['gpn'] = df['gpn'].astype(str).str.strip()
+
+    # Extract snapshot date from headcount_date column if available
+    snapshot_year = None
+    snapshot_month = None
+
+    if 'headcount_date' in df.columns:
+        # Try to parse the first non-null headcount date
+        valid_dates = df['headcount_date'].dropna()
+        if len(valid_dates) > 0:
+            first_date = valid_dates.iloc[0]
+            try:
+                if isinstance(first_date, (datetime, pd.Timestamp)):
+                    snapshot_year = first_date.year
+                    snapshot_month = first_date.month
+                elif isinstance(first_date, str):
+                    parsed = pd.to_datetime(first_date)
+                    snapshot_year = parsed.year
+                    snapshot_month = parsed.month
+            except Exception:
+                pass
+
+    # Fallback to filename date
+    if snapshot_year is None:
+        snapshot_year = file_date.year
+        snapshot_month = file_date.month
+        log(f"    Using filename date as snapshot: {snapshot_year}-{snapshot_month:02d}")
+
+    # Add snapshot columns
+    df['snapshot_year'] = snapshot_year
+    df['snapshot_month'] = snapshot_month
+
+    return df, row_count, snapshot_year, snapshot_month
+
+
+def process_hr_history(force=False):
+    """Main processing function."""
+    script_dir = Path(os.path.dirname(os.path.abspath(__file__)))
+    mappings_dir = script_dir / 'mappings'
+    output_dir = script_dir / 'output'
+    output_file = output_dir / 'hr_history.parquet'
+
+    log("=" * 60)
+    log("HR HISTORY PROCESSING")
+    log("=" * 60)
+
+    # Check for existing output
+    if output_file.exists() and not force:
+        size_mb = output_file.stat().st_size / (1024 * 1024)
+        log(f"  Output file already exists: {output_file} ({size_mb:.1f} MB)")
+        log("  Use --force to overwrite")
+        return
+
+    # Find GEDULD files
+    geduld_files = find_geduld_files(mappings_dir)
+
+    if not geduld_files:
+        log("  No GEDULD files found in mappings/")
+        log("  Place files like GEDULD_2024_01_15.xlsx in the mappings/ folder")
+        return
+
+    log(f"  Found {len(geduld_files)} GEDULD file(s)")
+    log(f"  Date range: {geduld_files[0][1]} → {geduld_files[-1][1]}")
+    log("")
+
+    # Read all files
+    all_dfs = []
+    total_rows = 0
+
+    for filepath, file_date in geduld_files:
+        log(f"  Reading {filepath.name}...")
+        df, row_count, snap_year, snap_month = read_geduld_file(filepath, file_date)
+        all_dfs.append(df)
+        total_rows += row_count
+        log(f"    {row_count:,} rows → snapshot {snap_year}-{snap_month:02d}")
+
+    log("")
+    log(f"  Concatenating {len(all_dfs)} file(s)...")
+
+    # Concatenate all DataFrames
+    combined = pd.concat(all_dfs, ignore_index=True)
+    log(f"  Combined: {len(combined):,} rows × {len(combined.columns)} columns")
+
+    # Deduplicate: same GPN in same snapshot month → keep last (latest file wins)
+    if 'gpn' in combined.columns:
+        before = len(combined)
+        combined = combined.drop_duplicates(
+            subset=['gpn', 'snapshot_year', 'snapshot_month'],
+            keep='last'
+        )
+        dupes = before - len(combined)
+        if dupes > 0:
+            log(f"  Removed {dupes:,} duplicate rows (same GPN in same snapshot)")
+
+    # Export to parquet via DuckDB
+    log("")
+    log("  Exporting to parquet...")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    con = duckdb.connect(':memory:')
+    con.register('_hr_df', combined)
+    con.execute("CREATE TABLE hr_history AS SELECT * FROM _hr_df")
+    con.unregister('_hr_df')
+
+    # Verify GPN is stored as string
+    if 'gpn' in combined.columns:
+        gpn_type = con.execute("SELECT typeof(gpn) FROM hr_history LIMIT 1").fetchone()[0]
+        log(f"  GPN column type: {gpn_type}")
+
+    con.execute(f"COPY hr_history TO '{output_file}' (FORMAT PARQUET, COMPRESSION SNAPPY)")
+    con.close()
+
+    # Summary
+    file_size = output_file.stat().st_size / (1024 * 1024)
+    unique_gpns = combined['gpn'].nunique() if 'gpn' in combined.columns else 'N/A'
+    snapshots = combined.groupby(['snapshot_year', 'snapshot_month']).ngroups
+
+    log("")
+    log("=" * 60)
+    log("SUMMARY")
+    log("=" * 60)
+    log(f"  Files processed:  {len(geduld_files)}")
+    log(f"  Snapshots:        {snapshots}")
+    log(f"  Total rows:       {len(combined):,}")
+    log(f"  Unique GPNs:      {unique_gpns:,}" if isinstance(unique_gpns, int) else f"  Unique GPNs:      {unique_gpns}")
+    log(f"  Columns:          {len(combined.columns)}")
+    log(f"  Output file:      {output_file}")
+    log(f"  File size:        {file_size:.1f} MB")
+    log("")
+
+    # Column inventory
+    log("  Columns:")
+    for col in sorted(combined.columns):
+        non_null = combined[col].notna().sum()
+        pct = 100 * non_null / len(combined) if len(combined) > 0 else 0
+        log(f"    {col:<40} {pct:5.1f}% populated")
+
+    log("")
+    log("Done!")
+
+
+if __name__ == '__main__':
+    force = '--force' in sys.argv
+    process_hr_history(force=force)
