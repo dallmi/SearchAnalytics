@@ -1430,6 +1430,107 @@ def print_summary(con, output_dir=None):
         bar = "#" * int(pct / 5) if pct > 0 else ""
         log(f"    {field:<25s} {val:>8,} / {total:,}  ({pct:5.1f}%)  {bar}")
 
+    # --- Mapping coverage (only if GEDULD mapping tables exist) ---
+    has_dept_mapping = False
+    has_region_mapping = False
+    try:
+        con.execute("SELECT 1 FROM department_mapping LIMIT 1")
+        has_dept_mapping = True
+    except Exception:
+        pass
+    try:
+        con.execute("SELECT 1 FROM region_mapping LIMIT 1")
+        has_region_mapping = True
+    except Exception:
+        pass
+
+    if has_dept_mapping or has_region_mapping:
+        log("\n  MAPPING COVERAGE")
+        log("  " + "-" * 60)
+
+        if has_dept_mapping:
+            dept_stats = con.execute("""
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN department != department_raw AND department_raw IS NOT NULL THEN 1 ELSE 0 END) as mapped,
+                    SUM(CASE WHEN department = department_raw AND department_ou_code IS NOT NULL THEN 1 ELSE 0 END) as unmapped
+                FROM searches
+                WHERE department_raw IS NOT NULL
+            """).fetchone()
+            dept_total = int(dept_stats[0])
+            dept_mapped = int(dept_stats[1])
+            dept_unmapped = int(dept_stats[2])
+
+            log("  Department mapping:")
+            if dept_total > 0:
+                mapped_pct = 100.0 * dept_mapped / dept_total
+                unmapped_pct = 100.0 * dept_unmapped / dept_total
+                log(f"    Mapped to Business Division: {dept_mapped:>8,} / {dept_total:,}  ({mapped_pct:5.1f}%)")
+                log(f"    Unmapped (raw value used):   {dept_unmapped:>8,} / {dept_total:,}  ({unmapped_pct:5.1f}%)")
+            else:
+                log("    No department data available")
+
+            if dept_unmapped > 0:
+                unmapped_ous = con.execute("""
+                    SELECT department_ou_code as ou_code, department_raw as raw_value, COUNT(*) as cnt
+                    FROM searches
+                    WHERE department = department_raw
+                      AND department_ou_code IS NOT NULL
+                      AND department_raw IS NOT NULL
+                    GROUP BY department_ou_code, department_raw
+                    ORDER BY cnt DESC
+                    LIMIT 15
+                """).df()
+                log("    Unmapped OU codes:")
+                for _, row in unmapped_ous.iterrows():
+                    raw_display = str(row['raw_value'])[:40]
+                    log(f"      {row['ou_code']:<6s} \"{raw_display}\"  {int(row['cnt']):>8,} rows")
+            elif dept_total > 0:
+                log("    All OU codes mapped successfully")
+
+        if has_region_mapping:
+            region_stats = con.execute("""
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN s.location IS NOT NULL AND EXISTS (
+                        SELECT 1 FROM region_mapping rm WHERE rm.country = s.location
+                    ) THEN 1 ELSE 0 END) as geduld_mapped,
+                    SUM(CASE WHEN s.location IS NOT NULL AND NOT EXISTS (
+                        SELECT 1 FROM region_mapping rm WHERE rm.country = s.location
+                    ) THEN 1 ELSE 0 END) as hardcoded_fallback,
+                    SUM(CASE WHEN s.location IS NULL THEN 1 ELSE 0 END) as no_location
+                FROM searches s
+            """).fetchone()
+            reg_total = int(region_stats[0])
+            reg_geduld = int(region_stats[1])
+            reg_hardcoded = int(region_stats[2])
+            reg_no_loc = int(region_stats[3])
+
+            log("  Region mapping:")
+            if reg_total > 0:
+                log(f"    GEDULD-mapped:              {reg_geduld:>8,} / {reg_total:,}  ({100.0 * reg_geduld / reg_total:5.1f}%)")
+                log(f"    Hardcoded fallback:          {reg_hardcoded:>8,} / {reg_total:,}  ({100.0 * reg_hardcoded / reg_total:5.1f}%)")
+                log(f"    No location data:            {reg_no_loc:>8,} / {reg_total:,}  ({100.0 * reg_no_loc / reg_total:5.1f}%)")
+            else:
+                log("    No data available")
+
+            if reg_hardcoded > 0:
+                fallback_countries = con.execute("""
+                    SELECT s.location as country, s.region, COUNT(*) as cnt
+                    FROM searches s
+                    WHERE s.location IS NOT NULL
+                      AND NOT EXISTS (SELECT 1 FROM region_mapping rm WHERE rm.country = s.location)
+                    GROUP BY s.location, s.region
+                    ORDER BY cnt DESC
+                    LIMIT 15
+                """).df()
+                log("    Countries using hardcoded fallback:")
+                for _, row in fallback_countries.iterrows():
+                    region_val = str(row['region']) if row['region'] else '?'
+                    log(f"      {str(row['country']):<30s} → {region_val:<15s} {int(row['cnt']):>8,} rows")
+            elif reg_total > 0 and reg_no_loc < reg_total:
+                log("    All countries found in GEDULD")
+
     # --- Event type breakdown ---
     events = con.execute("""
         SELECT name, COUNT(*) as cnt,
