@@ -119,8 +119,10 @@ def find_mapping_files(mappings_dir):
 
 def load_department_mapping(con, mappings_dir):
     """
-    Load all GEDULD department mapping files into a DuckDB table.
-    Each file represents a monthly snapshot. Matching is month-level (day ignored).
+    Load all GEDULD department mapping files into DuckDB tables.
+    Creates two tables:
+      - department_mapping: OU Code → Division (monthly snapshots)
+      - region_mapping: Work Location Country → Work Location Region (deduplicated)
     Returns True if mappings were loaded, False otherwise.
     """
     mapping_files = find_mapping_files(mappings_dir)
@@ -129,36 +131,51 @@ def load_department_mapping(con, mappings_dir):
         log("  No GEDULD mapping files found in mappings/ - using raw department values")
         return False
 
-    log(f"  Loading department mappings from {len(mapping_files)} GEDULD file(s)...")
+    log(f"  Loading mappings from {len(mapping_files)} GEDULD file(s)...")
 
-    all_mappings = []
+    all_dept_mappings = []
+    all_region_mappings = []
     for filepath, file_date in mapping_files:
         df = pd.read_excel(filepath)
 
-        required_cols = ['OU Code', 'GCRS Division Desc']
-        missing = [c for c in required_cols if c not in df.columns]
-        if missing:
-            log(f"  WARNING: {filepath.name} missing columns {missing} - skipping")
-            continue
+        # Department mapping (OU Code → Division)
+        dept_cols = ['OU Code', 'GCRS Division Desc']
+        missing_dept = [c for c in dept_cols if c not in df.columns]
+        if missing_dept:
+            log(f"  WARNING: {filepath.name} missing columns {missing_dept} - skipping department mapping")
+        else:
+            df_dept = df[dept_cols].dropna(subset=dept_cols).copy()
+            df_dept['OU Code'] = df_dept['OU Code'].astype(str).str.strip()
+            df_dept['GCRS Division Desc'] = df_dept['GCRS Division Desc'].astype(str).str.strip()
+            df_dept['valid_year'] = file_date.year
+            df_dept['valid_month'] = file_date.month
+            all_dept_mappings.append(df_dept)
 
-        df_mapping = df[required_cols].dropna(subset=required_cols).copy()
-        df_mapping['OU Code'] = df_mapping['OU Code'].astype(str).str.strip()
-        df_mapping['GCRS Division Desc'] = df_mapping['GCRS Division Desc'].astype(str).str.strip()
-        df_mapping['valid_year'] = file_date.year
-        df_mapping['valid_month'] = file_date.month
+        # Region mapping (Country → Region)
+        region_cols = ['Work Location Country', 'Work Location Region']
+        missing_region = [c for c in region_cols if c not in df.columns]
+        if missing_region:
+            log(f"  WARNING: {filepath.name} missing columns {missing_region} - skipping region mapping")
+        else:
+            df_region = df[region_cols].dropna(subset=region_cols).copy()
+            df_region['Work Location Country'] = df_region['Work Location Country'].astype(str).str.strip()
+            df_region['Work Location Region'] = df_region['Work Location Region'].astype(str).str.strip()
+            all_region_mappings.append(df_region)
 
-        all_mappings.append(df_mapping)
-        log(f"    {filepath.name}: {len(df_mapping)} mappings (→ {file_date.year}-{file_date.month:02d})")
+        dept_count = len(df_dept) if not missing_dept else 0
+        region_count = len(df_region) if not missing_region else 0
+        log(f"    {filepath.name}: {dept_count} dept + {region_count} region mappings (→ {file_date.year}-{file_date.month:02d})")
 
-    if not all_mappings:
-        log("  WARNING: No valid mapping data found - using raw department values")
+    if not all_dept_mappings:
+        log("  WARNING: No valid department mapping data found - using raw department values")
         return False
 
-    combined = pd.concat(all_mappings, ignore_index=True)
-    combined = combined.drop_duplicates(subset=['OU Code', 'valid_year', 'valid_month'], keep='last')
+    # Department mapping table
+    combined_dept = pd.concat(all_dept_mappings, ignore_index=True)
+    combined_dept = combined_dept.drop_duplicates(subset=['OU Code', 'valid_year', 'valid_month'], keep='last')
 
     con.execute("DROP TABLE IF EXISTS department_mapping")
-    con.register('_mapping_df', combined)
+    con.register('_dept_df', combined_dept)
     con.execute("""
         CREATE TABLE department_mapping AS
         SELECT
@@ -166,13 +183,34 @@ def load_department_mapping(con, mappings_dir):
             "GCRS Division Desc" as division_name,
             CAST(valid_year AS INTEGER) as valid_year,
             CAST(valid_month AS INTEGER) as valid_month
-        FROM _mapping_df
+        FROM _dept_df
     """)
-    con.unregister('_mapping_df')
+    con.unregister('_dept_df')
 
-    total = con.execute("SELECT COUNT(*) FROM department_mapping").fetchone()[0]
+    total_dept = con.execute("SELECT COUNT(*) FROM department_mapping").fetchone()[0]
     months = con.execute("SELECT COUNT(DISTINCT valid_year * 100 + valid_month) FROM department_mapping").fetchone()[0]
-    log(f"  Loaded {total} department mappings across {months} month(s)")
+    log(f"  Loaded {total_dept} department mappings across {months} month(s)")
+
+    # Region mapping table (deduplicated across all files, latest wins)
+    con.execute("DROP TABLE IF EXISTS region_mapping")
+    if all_region_mappings:
+        combined_region = pd.concat(all_region_mappings, ignore_index=True)
+        combined_region = combined_region.drop_duplicates(subset=['Work Location Country'], keep='last')
+
+        con.register('_region_df', combined_region)
+        con.execute("""
+            CREATE TABLE region_mapping AS
+            SELECT
+                "Work Location Country" as country,
+                "Work Location Region" as region
+            FROM _region_df
+        """)
+        con.unregister('_region_df')
+
+        total_region = con.execute("SELECT COUNT(*) FROM region_mapping").fetchone()[0]
+        log(f"  Loaded {total_region} country→region mappings")
+    else:
+        log("  No region mapping data found - using hardcoded country→region fallback")
 
     return True
 
@@ -524,8 +562,8 @@ def add_calculated_columns(con, has_department_mapping=False):
     location_candidates = [c for c in ['CP_userDetails_location'] if c in col_names]
     location_expr = f"COALESCE({', '.join(location_candidates)})" if location_candidates else 'NULL'
 
-    # Region mapping (country name → region)
-    region_expr = f"""CASE
+    # Region mapping: GEDULD-based lookup first, hardcoded fallback second
+    hardcoded_region = f"""CASE
                 WHEN {location_expr} = 'Switzerland' THEN 'SWITZERLAND'
                 WHEN {location_expr} IN ('United States', 'Canada', 'Mexico', 'Brazil', 'Argentina', 'Chile',
                     'Colombia', 'Peru', 'Venezuela', 'Ecuador', 'Uruguay', 'Paraguay', 'Bolivia',
@@ -540,6 +578,22 @@ def add_calculated_columns(con, has_department_mapping=False):
                 WHEN {location_expr} IS NOT NULL THEN 'EMEA'
                 ELSE NULL
             END""" if location_candidates else 'NULL'
+
+    # Check if region_mapping table exists (loaded from GEDULD files)
+    has_region_mapping = False
+    if has_department_mapping:
+        try:
+            con.execute("SELECT 1 FROM region_mapping LIMIT 1")
+            has_region_mapping = True
+        except Exception:
+            pass
+
+    if has_region_mapping and location_candidates:
+        region_expr = f"""COALESCE(
+              (SELECT rm.region FROM region_mapping rm WHERE rm.country = {location_expr} LIMIT 1),
+              {hardcoded_region})"""
+    else:
+        region_expr = hardcoded_region
 
     # Job title
     job_title_candidates = [c for c in ['CP_userDetails_jobTitle'] if c in col_names]
