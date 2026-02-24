@@ -2745,11 +2745,11 @@
         // Region distribution (doughnut with custom legend)
         async function renderRegionDistribution() {
             const result = await conn.query(`
-                SELECT COALESCE(region, 'Unknown') as region, COUNT(*) as sessions,
+                SELECT COALESCE(UPPER(region), 'Unknown') as region, COUNT(*) as sessions,
                     ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER(), 1) as pct
                 FROM journeys
                 WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('journeys')}
-                GROUP BY region
+                GROUP BY COALESCE(UPPER(region), 'Unknown')
                 ORDER BY sessions DESC
             `);
             const data = result.toArray();
@@ -2799,7 +2799,7 @@
                     },
                     onClick: (event, elements) => {
                         if (elements.length > 0) {
-                            toggleChartFilter('Region', labels[elements[0].index], 'region', 'journeys');
+                            toggleChartFilter('Region', labels[elements[0].index], 'UPPER(region)', 'journeys');
                         }
                     },
                     onHover: (event, elements) => {
