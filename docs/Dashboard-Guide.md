@@ -20,6 +20,9 @@ The dashboard expects these parquet files in the `output/` folder (sibling to th
 SearchAnalytics/
 ├── dashboard/
 │   └── dashboard.html
+├── mappings/                        ← Optional department mapping files
+│   ├── GEDULD_2025_12_15.xlsx
+│   └── GEDULD_2026_01_14.xlsx
 └── output/
     ├── searches_daily.parquet
     ├── searches_journeys.parquet
@@ -35,6 +38,42 @@ SearchAnalytics/
 | `searches_term_clicks.parquet` | Term-to-content click pairs |
 
 The dashboard automatically resolves the parquet file path relative to the HTML file location (`../output/`), with fallback paths.
+
+## Department Mapping (Optional)
+
+The processing script can map raw department OU codes to Business Division names using monthly GEDULD Excel files.
+
+### Setup
+
+Place GEDULD files in the `mappings/` folder with the naming convention `GEDULD_YYYY_MM_DD.xlsx`. Each file represents a monthly HR snapshot. The day in the filename is ignored — only the year and month matter.
+
+### How It Works
+
+1. Raw department values from App Insights follow the pattern `"AAAA - Department Name"`, where `AAAA` is the OU Code (characters before ` - `)
+2. The script extracts the OU Code and looks up the corresponding "GCRS Division Desc" (Business Division) from the GEDULD file
+3. The mapped Business Division replaces the raw department value in all outputs
+
+### Required Columns in GEDULD Files
+
+| Column | Description |
+|--------|-------------|
+| `OU Code` | Organizational unit code (matches prefix in department field) |
+| `GCRS Division Desc` | Business Division name to use as the mapped department |
+
+### Temporal Matching
+
+People can change divisions over time. The script uses a **best-available** fallback strategy:
+
+1. **Exact month match** — event in Feb 2026 → uses GEDULD Feb 2026
+2. **Most recent prior file** — event in Jan 2026 but no Jan file → uses GEDULD Dec 2025
+3. **Earliest future file** — event in Jan 2026 but no prior files → uses GEDULD Feb 2026
+4. **Raw department value** — only if no GEDULD file contains that OU Code at all
+
+### Traceability
+
+The processing script adds two extra columns to the enriched data for debugging:
+- `department_raw` — the original department value from App Insights
+- `department_ou_code` — the extracted OU Code
 
 ## Starting the Dashboard
 

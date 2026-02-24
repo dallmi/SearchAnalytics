@@ -94,6 +94,89 @@ def find_latest_input_file(input_dir):
     return files_with_dates[0][0]
 
 
+def find_mapping_files(mappings_dir):
+    """
+    Find all GEDULD mapping files in the mappings directory.
+    Returns list of (filepath, date) tuples sorted by date, or empty list.
+    """
+    if not mappings_dir.exists():
+        return []
+
+    all_files = list(mappings_dir.glob('GEDULD*.xlsx')) + list(mappings_dir.glob('GEDULD*.xls'))
+
+    if not all_files:
+        return []
+
+    files_with_dates = []
+    for f in all_files:
+        file_date = extract_date_from_filename(f)
+        if file_date:
+            files_with_dates.append((f, file_date))
+
+    files_with_dates.sort(key=lambda x: x[1])
+    return files_with_dates
+
+
+def load_department_mapping(con, mappings_dir):
+    """
+    Load all GEDULD department mapping files into a DuckDB table.
+    Each file represents a monthly snapshot. Matching is month-level (day ignored).
+    Returns True if mappings were loaded, False otherwise.
+    """
+    mapping_files = find_mapping_files(mappings_dir)
+
+    if not mapping_files:
+        log("  No GEDULD mapping files found in mappings/ - using raw department values")
+        return False
+
+    log(f"  Loading department mappings from {len(mapping_files)} GEDULD file(s)...")
+
+    all_mappings = []
+    for filepath, file_date in mapping_files:
+        df = pd.read_excel(filepath)
+
+        required_cols = ['OU Code', 'GCRS Division Desc']
+        missing = [c for c in required_cols if c not in df.columns]
+        if missing:
+            log(f"  WARNING: {filepath.name} missing columns {missing} - skipping")
+            continue
+
+        df_mapping = df[required_cols].dropna(subset=required_cols).copy()
+        df_mapping['OU Code'] = df_mapping['OU Code'].astype(str).str.strip()
+        df_mapping['GCRS Division Desc'] = df_mapping['GCRS Division Desc'].astype(str).str.strip()
+        df_mapping['valid_year'] = file_date.year
+        df_mapping['valid_month'] = file_date.month
+
+        all_mappings.append(df_mapping)
+        log(f"    {filepath.name}: {len(df_mapping)} mappings (→ {file_date.year}-{file_date.month:02d})")
+
+    if not all_mappings:
+        log("  WARNING: No valid mapping data found - using raw department values")
+        return False
+
+    combined = pd.concat(all_mappings, ignore_index=True)
+    combined = combined.drop_duplicates(subset=['OU Code', 'valid_year', 'valid_month'], keep='last')
+
+    con.execute("DROP TABLE IF EXISTS department_mapping")
+    con.register('_mapping_df', combined)
+    con.execute("""
+        CREATE TABLE department_mapping AS
+        SELECT
+            "OU Code" as ou_code,
+            "GCRS Division Desc" as division_name,
+            CAST(valid_year AS INTEGER) as valid_year,
+            CAST(valid_month AS INTEGER) as valid_month
+        FROM _mapping_df
+    """)
+    con.unregister('_mapping_df')
+
+    total = con.execute("SELECT COUNT(*) FROM department_mapping").fetchone()[0]
+    months = con.execute("SELECT COUNT(DISTINCT valid_year * 100 + valid_month) FROM department_mapping").fetchone()[0]
+    log(f"  Loaded {total} department mappings across {months} month(s)")
+
+    return True
+
+
 def get_all_input_files(input_dir):
     """Get all input files sorted by date in filename (oldest first for processing order)."""
     patterns = ['*.xlsx', '*.xls', '*.csv']
@@ -354,7 +437,7 @@ def upsert_data(con, temp_table='temp_import'):
     con.execute(f"DROP TABLE IF EXISTS {temp_table}")
 
 
-def add_calculated_columns(con):
+def add_calculated_columns(con, has_department_mapping=False):
     """Add all calculated columns to searches_raw and create final searches table."""
     log("Adding calculated columns...")
 
@@ -420,7 +503,22 @@ def add_calculated_columns(con):
 
     # Department
     department_candidates = [c for c in ['CP_userDetails_department'] if c in col_names]
-    department_expr = f"COALESCE({', '.join(department_candidates)})" if department_candidates else 'NULL'
+    raw_department_expr = f"COALESCE({', '.join(department_candidates)})" if department_candidates else 'NULL'
+    ou_code_expr = f"TRIM(SPLIT_PART({raw_department_expr}, ' - ', 1))" if department_candidates else 'NULL'
+
+    if has_department_mapping and department_candidates:
+        department_mapped_expr = f"""COALESCE(
+              (SELECT dm.division_name FROM department_mapping dm
+               WHERE dm.ou_code = {ou_code_expr}
+                 AND (dm.valid_year * 100 + dm.valid_month) <= (YEAR(r.timestamp) * 100 + MONTH(r.timestamp))
+               ORDER BY dm.valid_year DESC, dm.valid_month DESC LIMIT 1),
+              (SELECT dm.division_name FROM department_mapping dm
+               WHERE dm.ou_code = {ou_code_expr}
+                 AND (dm.valid_year * 100 + dm.valid_month) > (YEAR(r.timestamp) * 100 + MONTH(r.timestamp))
+               ORDER BY dm.valid_year ASC, dm.valid_month ASC LIMIT 1),
+              {raw_department_expr})"""
+    else:
+        department_mapped_expr = raw_department_expr
 
     # Location
     location_candidates = [c for c in ['CP_userDetails_location'] if c in col_names]
@@ -529,7 +627,9 @@ def add_calculated_columns(con):
                 ELSE NULL
             END as query_language,
             {device_type_expr} as device_type,
-            {department_expr} as department,
+            {raw_department_expr} as department_raw,
+            {ou_code_expr} as department_ou_code,
+            {department_mapped_expr} as department,
             {location_expr} as location,
             {job_title_expr} as job_title,
             {latency_expr} as search_latency
@@ -1283,6 +1383,7 @@ def process_search_analytics(input_file=None, full_refresh=False):
     input_dir = script_dir / 'input'
     data_dir = script_dir / 'data'
     output_dir = script_dir / 'output'
+    mappings_dir = script_dir / 'mappings'
     db_path = data_dir / 'searchanalytics.db'
 
     # Create directories
@@ -1342,8 +1443,11 @@ def process_search_analytics(input_file=None, full_refresh=False):
         # Upsert into main table
         upsert_data(con)
 
+    # Load department mapping (optional - from GEDULD files in mappings/)
+    has_department_mapping = load_department_mapping(con, mappings_dir)
+
     # Add calculated columns
-    add_calculated_columns(con)
+    add_calculated_columns(con, has_department_mapping=has_department_mapping)
 
     # Export Parquet files
     export_parquet_files(con, output_dir)
