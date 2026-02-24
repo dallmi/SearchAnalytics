@@ -14,46 +14,54 @@ Before running the dashboard, ensure you have:
 
 ## Required Data Files
 
-The dashboard expects these parquet files in the same directory as the HTML file:
+The dashboard expects these parquet files in the `output/` folder (sibling to the `dashboard/` folder):
+
+```
+SearchAnalytics/
+├── dashboard/
+│   └── search-analytics-dashboard.html
+└── output/
+    ├── searches_daily.parquet
+    ├── searches_journeys.parquet
+    ├── searches_terms.parquet
+    └── searches_term_clicks.parquet
+```
 
 | File | Description |
 |------|-------------|
 | `searches_daily.parquet` | Daily aggregated metrics |
 | `searches_journeys.parquet` | Session-level journey data |
 | `searches_terms.parquet` | Search term analysis data |
+| `searches_term_clicks.parquet` | Term-to-content click pairs |
+
+The dashboard automatically resolves the parquet file path relative to the HTML file location (`../output/`), with fallback paths.
 
 ## Starting the Dashboard
 
 ### Option 1: Python HTTP Server (Recommended)
 
-1. Open a terminal and navigate to the dashboard directory:
+1. Open a terminal and navigate to the project root:
    ```bash
-   cd /path/to/SearchAnalytics/dashboard
+   cd /path/to/SearchAnalytics
    ```
 
-2. Copy the required parquet files to this directory:
-   ```bash
-   cp ../output/searches_daily.parquet .
-   cp ../output/searches_journeys.parquet .
-   cp ../output/searches_terms.parquet .
-   ```
-
-3. Start a local web server:
+2. Start a local web server:
    ```bash
    python -m http.server 8080
    ```
 
-4. Open your browser and navigate to:
+3. Open your browser and navigate to:
    ```
-   http://localhost:8080/search-analytics-dashboard.html
+   http://localhost:8080/dashboard/search-analytics-dashboard.html
    ```
 
 ### Option 2: VS Code Live Server
 
 1. Install the "Live Server" extension in VS Code
-2. Copy parquet files to the dashboard directory
-3. Right-click on `search-analytics-dashboard.html`
-4. Select "Open with Live Server"
+2. Ensure parquet files exist in the `output/` folder
+3. Open the project root folder in VS Code
+4. Right-click on `dashboard/search-analytics-dashboard.html`
+5. Select "Open with Live Server"
 
 ### Option 3: Node.js HTTP Server
 
@@ -62,13 +70,13 @@ The dashboard expects these parquet files in the same directory as the HTML file
    npm install -g http-server
    ```
 
-2. Navigate to the dashboard directory and start the server:
+2. Navigate to the project root and start the server:
    ```bash
-   cd /path/to/SearchAnalytics/dashboard
+   cd /path/to/SearchAnalytics
    http-server -p 8080
    ```
 
-3. Open `http://localhost:8080/search-analytics-dashboard.html`
+3. Open `http://localhost:8080/dashboard/search-analytics-dashboard.html`
 
 ## Executive Questions This Dashboard Answers
 
