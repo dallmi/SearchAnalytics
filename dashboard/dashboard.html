@@ -2112,12 +2112,15 @@
                                 c.textAlign = 'right';
                                 c.fillText(`${pcts[i]}%`, bar.x - 6, bar.y);
                             }
-                            // Count to the right of bar
+                            // Count (and % if bar was too narrow) to the right of bar
                             c.font = '11px -apple-system, sans-serif';
                             c.fillStyle = '#555';
                             c.textBaseline = 'middle';
                             c.textAlign = 'left';
-                            c.fillText(formatNumber(values[i]), bar.x + 6, bar.y);
+                            const outsideLabel = barWidth > 50
+                                ? formatNumber(values[i])
+                                : `${formatNumber(values[i])} (${pcts[i]}%)`;
+                            c.fillText(outsideLabel, bar.x + 6, bar.y);
                         } else {
                             const barTop = bar.y;
                             const barBottom = chart.scales.y.getPixelForValue(0);
@@ -2126,7 +2129,10 @@
                             c.fillStyle = '#555';
                             c.textAlign = 'center';
                             c.textBaseline = 'bottom';
-                            c.fillText(formatNumber(values[i]), bar.x, barTop - 4);
+                            const topLabel = barHeight > minBarSize
+                                ? formatNumber(values[i])
+                                : `${formatNumber(values[i])} (${pcts[i]}%)`;
+                            c.fillText(topLabel, bar.x, barTop - 4);
                             if (barHeight > minBarSize) {
                                 c.fillStyle = '#fff';
                                 c.textBaseline = 'top';
