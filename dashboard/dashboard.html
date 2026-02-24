@@ -2092,6 +2092,58 @@
             });
         }
 
+        // Reusable Chart.js plugin for bar data labels (count + %)
+        function barLabelPlugin(values, pcts, options = {}) {
+            const { horizontal = false, minBarSize = 25 } = options;
+            return {
+                afterDatasetsDraw(chart) {
+                    const c = chart.ctx;
+                    c.save();
+                    const meta = chart.getDatasetMeta(0);
+                    meta.data.forEach((bar, i) => {
+                        if (horizontal) {
+                            c.font = '11px -apple-system, sans-serif';
+                            c.fillStyle = '#555';
+                            c.textBaseline = 'middle';
+                            c.textAlign = 'left';
+                            c.fillText(`${formatNumber(values[i])} (${pcts[i]}%)`, bar.x + 6, bar.y);
+                        } else {
+                            const barTop = bar.y;
+                            const barBottom = chart.scales.y.getPixelForValue(0);
+                            const barHeight = barBottom - barTop;
+                            c.font = '10px -apple-system, sans-serif';
+                            c.fillStyle = '#555';
+                            c.textAlign = 'center';
+                            c.textBaseline = 'bottom';
+                            c.fillText(formatNumber(values[i]), bar.x, barTop - 4);
+                            if (barHeight > minBarSize) {
+                                c.fillStyle = '#fff';
+                                c.textBaseline = 'top';
+                                c.fillText(`${pcts[i]}%`, bar.x, barTop + 4);
+                            }
+                        }
+                    });
+                    c.restore();
+                }
+            };
+        }
+
+        // Reusable custom legend labels for doughnut/pie charts
+        function doughnutLegendLabels(values, pcts) {
+            return {
+                generateLabels: (chart) => {
+                    const ds = chart.data.datasets[0];
+                    return chart.data.labels.map((label, i) => ({
+                        text: `${label}  ${formatNumber(values[i])} (${pcts[i]}%)`,
+                        fillStyle: ds.backgroundColor[i],
+                        strokeStyle: ds.backgroundColor[i],
+                        hidden: false,
+                        index: i
+                    }));
+                }
+            };
+        }
+
         async function applyDateFilter() {
             const fromInput = document.getElementById('dateFrom').value;
             const toInput = document.getElementById('dateTo').value;
@@ -2488,6 +2540,8 @@
             if (charts.outcome) charts.outcome.destroy();
             const ctx = document.getElementById('outcomeChart').getContext('2d');
             const outcomeLabels = data.map(d => d.journey_outcome);
+            const outcomeValues = data.map(d => Number(d.sessions));
+            const outcomePcts = data.map(d => Number(d.pct));
             const outcomeColors = getFilteredColors(
                 data.map(d => OUTCOME_COLORS[d.journey_outcome] || COLORS.gray),
                 outcomeLabels, 'Outcome'
@@ -2497,14 +2551,14 @@
                 data: {
                     labels: outcomeLabels,
                     datasets: [{
-                        data: data.map(d => Number(d.sessions)),
+                        data: outcomeValues,
                         backgroundColor: outcomeColors
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'right' } },
+                    plugins: { legend: { position: 'right', labels: doughnutLegendLabels(outcomeValues, outcomePcts) } },
                     onClick: (event, elements) => {
                         if (elements.length > 0) {
                             toggleChartFilter('Outcome', outcomeLabels[elements[0].index], 'journey_outcome', 'journeys');
@@ -2529,6 +2583,9 @@
             `);
 
             const data = result.toArray()[0];
+            const hourlyValues = [Number(data.night), Number(data.morning), Number(data.afternoon), Number(data.evening)];
+            const hourlyTotal = hourlyValues.reduce((a, b) => a + b, 0);
+            const hourlyPcts = hourlyValues.map(v => hourlyTotal > 0 ? (v / hourlyTotal * 100).toFixed(1) : '0.0');
 
             if (charts.hourly) charts.hourly.destroy();
             const ctx = document.getElementById('hourlyChart').getContext('2d');
@@ -2538,7 +2595,7 @@
                     labels: ['APAC (03-09 CET)', 'CET (09-16 CET)', 'Americas (16-22 CET)', 'Dead Time (22-03 CET)'],
                     datasets: [{
                         label: 'Searches',
-                        data: [Number(data.night), Number(data.morning), Number(data.afternoon), Number(data.evening)],
+                        data: hourlyValues,
                         backgroundColor: ['#333', '#555', '#777', '#999']
                     }]
                 },
@@ -2546,8 +2603,9 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } }
-                }
+                    scales: { y: { beginAtZero: true, grace: '15%' } }
+                },
+                plugins: [barLabelPlugin(hourlyValues, hourlyPcts)]
             });
         }
 
@@ -2560,6 +2618,9 @@
             `);
 
             const data = result.toArray();
+            const weekValues = data.map(d => Number(d.searches));
+            const weekTotal = weekValues.reduce((a, b) => a + b, 0);
+            const weekPcts = weekValues.map(v => weekTotal > 0 ? (v / weekTotal * 100).toFixed(1) : '0.0');
 
             if (charts.weekday) charts.weekday.destroy();
             const ctx = document.getElementById('weekdayChart').getContext('2d');
@@ -2573,7 +2634,7 @@
                     labels: weekLabels,
                     datasets: [{
                         label: 'Searches',
-                        data: data.map(d => Number(d.searches)),
+                        data: weekValues,
                         backgroundColor: weekColors
                     }]
                 },
@@ -2581,7 +2642,7 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } },
+                    scales: { y: { beginAtZero: true, grace: '15%' } },
                     onClick: (event, elements) => {
                         if (elements.length > 0) {
                             toggleChartFilter('Day', weekLabels[elements[0].index], 'day_of_week', 'daily');
@@ -2590,7 +2651,8 @@
                     onHover: (event, elements) => {
                         event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
                     }
-                }
+                },
+                plugins: [barLabelPlugin(weekValues, weekPcts)]
             });
         }
 
@@ -2647,6 +2709,12 @@
             `);
 
             const data = result.toArray()[0];
+            const clickValues = [
+                Number(data.result_clicks), Number(data.trending_clicks),
+                Number(data.tab_clicks), Number(data.pagination_clicks), Number(data.filter_clicks)
+            ];
+            const clickTotal = clickValues.reduce((a, b) => a + b, 0);
+            const clickPcts = clickValues.map(v => clickTotal > 0 ? (v / clickTotal * 100).toFixed(1) : '0.0');
 
             if (charts.clickCategories) charts.clickCategories.destroy();
             const ctx = document.getElementById('clickCategoriesChart').getContext('2d');
@@ -2656,13 +2724,7 @@
                     labels: ['Result (Success)', 'Trending', 'Tab', 'Pagination', 'Filter'],
                     datasets: [{
                         label: 'Clicks',
-                        data: [
-                            Number(data.result_clicks),
-                            Number(data.trending_clicks),
-                            Number(data.tab_clicks),
-                            Number(data.pagination_clicks),
-                            Number(data.filter_clicks)
-                        ],
+                        data: clickValues,
                         backgroundColor: ['#333', '#555', '#777', '#999', '#BBB']
                     }]
                 },
@@ -2670,8 +2732,10 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     indexAxis: 'y',
+                    scales: { x: { display: false } },
                     plugins: { legend: { display: false } }
-                }
+                },
+                plugins: [barLabelPlugin(clickValues, clickPcts, { horizontal: true })]
             });
         }
 
@@ -2725,20 +2789,7 @@
                         event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
                     }
                 },
-                plugins: [{
-                    afterDatasetsDraw(chart) {
-                        const { ctx: c } = chart;
-                        c.save();
-                        c.font = '11px -apple-system, sans-serif';
-                        c.fillStyle = '#555';
-                        c.textBaseline = 'middle';
-                        chart.getDatasetMeta(0).data.forEach((bar, i) => {
-                            const label = `${formatNumber(values[i])} (${pcts[i]}%)`;
-                            c.fillText(label, bar.x + 6, bar.y);
-                        });
-                        c.restore();
-                    }
-                }]
+                plugins: [barLabelPlugin(values, pcts, { horizontal: true })]
             });
         }
 
@@ -2778,18 +2829,7 @@
                     plugins: {
                         legend: {
                             position: 'right',
-                            labels: {
-                                generateLabels: (chart) => {
-                                    const ds = chart.data.datasets[0];
-                                    return chart.data.labels.map((label, i) => ({
-                                        text: `${label}  ${pcts[i]}%`,
-                                        fillStyle: ds.backgroundColor[i],
-                                        strokeStyle: ds.backgroundColor[i],
-                                        hidden: false,
-                                        index: i
-                                    }));
-                                }
-                            }
+                            labels: doughnutLegendLabels(values, pcts)
                         },
                         tooltip: {
                             callbacks: {
@@ -2983,6 +3023,9 @@
             const data = result.toArray();
             const order = ['Success', 'Low CTR', 'No Clicks', 'Mostly No Results', 'Zero Results'];
             data.sort((a, b) => order.indexOf(a.category) - order.indexOf(b.category));
+            const tpValues = data.map(d => Number(d.term_count));
+            const tpTotal = tpValues.reduce((a, b) => a + b, 0);
+            const tpPcts = tpValues.map(v => tpTotal > 0 ? (v / tpTotal * 100).toFixed(1) : '0.0');
 
             if (charts.termPerformance) charts.termPerformance.destroy();
             const ctx = document.getElementById('termPerformanceChart').getContext('2d');
@@ -2991,14 +3034,14 @@
                 data: {
                     labels: data.map(d => d.category),
                     datasets: [{
-                        data: data.map(d => Number(d.term_count)),
+                        data: tpValues,
                         backgroundColor: [COLORS.success, COLORS.warning, '#888888', COLORS.danger, '#9A000A']
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'right' } }
+                    plugins: { legend: { position: 'right', labels: doughnutLegendLabels(tpValues, tpPcts) } }
                 }
             });
         }
@@ -3020,6 +3063,8 @@
 
             const labels = ['1', '2', '3', '4', '5+'];
             const values = labels.map(l => buckets[l] || 0);
+            const qlTotal = values.reduce((a, b) => a + b, 0);
+            const qlPcts = values.map(v => qlTotal > 0 ? (v / qlTotal * 100).toFixed(1) : '0.0');
 
             if (charts.queryLength) charts.queryLength.destroy();
             const ctx = document.getElementById('queryLengthChart').getContext('2d');
@@ -3037,8 +3082,9 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } }
-                }
+                    scales: { y: { beginAtZero: true, grace: '15%' } }
+                },
+                plugins: [barLabelPlugin(values, qlPcts)]
             });
         }
 
@@ -3054,6 +3100,9 @@
             `);
 
             const data = result.toArray();
+            const cxValues = data.map(d => Number(d.sessions));
+            const cxTotal = cxValues.reduce((a, b) => a + b, 0);
+            const cxPcts = cxValues.map(v => cxTotal > 0 ? (v / cxTotal * 100).toFixed(1) : '0.0');
 
             if (charts.complexity) charts.complexity.destroy();
             const ctx = document.getElementById('complexityChart').getContext('2d');
@@ -3067,14 +3116,14 @@
                 data: {
                     labels: complexLabels,
                     datasets: [{
-                        data: data.map(d => Number(d.sessions)),
+                        data: cxValues,
                         backgroundColor: complexColors
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'right' } },
+                    plugins: { legend: { position: 'right', labels: doughnutLegendLabels(cxValues, cxPcts) } },
                     onClick: (event, elements) => {
                         if (elements.length > 0) {
                             toggleChartFilter('Complexity', complexLabels[elements[0].index], 'session_complexity', 'journeys');
@@ -3097,6 +3146,9 @@
             `);
 
             const data = result.toArray();
+            const durValues = data.map(d => Number(d.sessions));
+            const durTotal = durValues.reduce((a, b) => a + b, 0);
+            const durPcts = durValues.map(v => durTotal > 0 ? (v / durTotal * 100).toFixed(1) : '0.0');
 
             if (charts.duration) charts.duration.destroy();
             const ctx = document.getElementById('durationChart').getContext('2d');
@@ -3110,7 +3162,7 @@
                     labels: durationLabels,
                     datasets: [{
                         label: 'Sessions',
-                        data: data.map(d => Number(d.sessions)),
+                        data: durValues,
                         backgroundColor: durationColors
                     }]
                 },
@@ -3118,7 +3170,7 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } },
+                    scales: { y: { beginAtZero: true, grace: '15%' } },
                     onClick: (event, elements) => {
                         if (elements.length > 0) {
                             toggleChartFilter('Duration', durationLabels[elements[0].index], 'session_duration_bucket', 'journeys');
@@ -3127,7 +3179,8 @@
                     onHover: (event, elements) => {
                         event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
                     }
-                }
+                },
+                plugins: [barLabelPlugin(durValues, durPcts)]
             });
         }
 
@@ -3142,6 +3195,9 @@
             const data = result.toArray();
             const reformed = Number(data.find(d => d.had_reformulation === true)?.sessions || 0);
             const notReformed = Number(data.find(d => d.had_reformulation === false)?.sessions || 0);
+            const rfData = [reformed, notReformed];
+            const rfTotal = rfData.reduce((a, b) => a + b, 0);
+            const rfPcts = rfData.map(v => rfTotal > 0 ? (v / rfTotal * 100).toFixed(1) : '0.0');
 
             if (charts.reformulation) charts.reformulation.destroy();
             const ctx = document.getElementById('reformulationChart').getContext('2d');
@@ -3156,14 +3212,14 @@
                 data: {
                     labels: reformLabels,
                     datasets: [{
-                        data: [reformed, notReformed],
+                        data: rfData,
                         backgroundColor: reformColors
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom' } },
+                    plugins: { legend: { position: 'bottom', labels: doughnutLegendLabels(rfData, rfPcts) } },
                     onClick: (event, elements) => {
                         if (elements.length > 0) {
                             toggleChartFilter('Reformulation', reformValues[elements[0].index], 'had_reformulation', 'journeys');
@@ -3186,6 +3242,9 @@
             `);
 
             const data = result.toArray()[0];
+            const recData = [Number(data.recovered || 0), Number(data.not_recovered || 0)];
+            const recTotal = recData.reduce((a, b) => a + b, 0);
+            const recPcts = recData.map(v => recTotal > 0 ? (v / recTotal * 100).toFixed(1) : '0.0');
 
             if (charts.recovery) charts.recovery.destroy();
             const ctx = document.getElementById('recoveryChart').getContext('2d');
@@ -3200,14 +3259,14 @@
                 data: {
                     labels: recoveryLabels,
                     datasets: [{
-                        data: [Number(data.recovered || 0), Number(data.not_recovered || 0)],
+                        data: recData,
                         backgroundColor: recoveryColors
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom' } },
+                    plugins: { legend: { position: 'bottom', labels: doughnutLegendLabels(recData, recPcts) } },
                     onClick: (event, elements) => {
                         if (elements.length > 0) {
                             toggleChartFilter('Recovery', recoveryValues[elements[0].index], 'recovered_from_null', 'journeys');
@@ -3274,6 +3333,9 @@
             `);
 
             const data = result.toArray();
+            const latValues = data.map(d => Number(d.sessions));
+            const latTotal = latValues.reduce((a, b) => a + b, 0);
+            const latPcts = latValues.map(v => latTotal > 0 ? (v / latTotal * 100).toFixed(1) : '0.0');
 
             if (charts.searchLatency) charts.searchLatency.destroy();
             const ctx = document.getElementById('searchLatencyChart').getContext('2d');
@@ -3283,7 +3345,7 @@
                     labels: data.map(d => d.search_to_result_bucket),
                     datasets: [{
                         label: 'Sessions',
-                        data: data.map(d => Number(d.sessions)),
+                        data: latValues,
                         backgroundColor: data.map((d, i) => i <= 2 ? COLORS.success : (i <= 3 ? COLORS.warning : COLORS.danger))
                     }]
                 },
@@ -3291,8 +3353,9 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } }
-                }
+                    scales: { y: { beginAtZero: true, grace: '15%' } }
+                },
+                plugins: [barLabelPlugin(latValues, latPcts)]
             });
         }
 
@@ -3307,6 +3370,9 @@
             `);
 
             const data = result.toArray();
+            const ttcValues = data.map(d => Number(d.sessions));
+            const ttcTotal = ttcValues.reduce((a, b) => a + b, 0);
+            const ttcPcts = ttcValues.map(v => ttcTotal > 0 ? (v / ttcTotal * 100).toFixed(1) : '0.0');
 
             if (charts.timeToClick) charts.timeToClick.destroy();
             const ctx = document.getElementById('timeToClickChart').getContext('2d');
@@ -3316,7 +3382,7 @@
                     labels: data.map(d => d.result_to_click_bucket),
                     datasets: [{
                         label: 'Sessions',
-                        data: data.map(d => Number(d.sessions)),
+                        data: ttcValues,
                         backgroundColor: '#555555'
                     }]
                 },
@@ -3324,8 +3390,9 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
-                    scales: { y: { beginAtZero: true } }
-                }
+                    scales: { y: { beginAtZero: true, grace: '15%' } }
+                },
+                plugins: [barLabelPlugin(ttcValues, ttcPcts)]
             });
         }
 
@@ -3430,8 +3497,10 @@
             `);
 
             const timeData = timeResult.toArray()[0];
-            const total = Number(timeData.night || 0) + Number(timeData.morning || 0) +
-                         Number(timeData.afternoon || 0) + Number(timeData.evening || 0);
+            const todValues = [Number(timeData.night || 0), Number(timeData.morning || 0),
+                              Number(timeData.afternoon || 0), Number(timeData.evening || 0)];
+            const total = todValues.reduce((a, b) => a + b, 0);
+            const todPcts = todValues.map(v => total > 0 ? (v / total * 100).toFixed(1) : '0.0');
 
             // Time of Day bar chart
             if (charts.timeOfDay) charts.timeOfDay.destroy();
@@ -3443,12 +3512,7 @@
                         labels: ['APAC (03-09 CET)', 'CET (09-16 CET)', 'Americas (16-22 CET)', 'Dead Time (22-03 CET)'],
                         datasets: [{
                             label: 'Searches',
-                            data: [
-                                Number(timeData.night || 0),
-                                Number(timeData.morning || 0),
-                                Number(timeData.afternoon || 0),
-                                Number(timeData.evening || 0)
-                            ],
+                            data: todValues,
                             backgroundColor: ['#333', '#555', '#777', '#999']
                         }]
                     },
@@ -3466,8 +3530,9 @@
                                 }
                             }
                         },
-                        scales: { y: { beginAtZero: true } }
-                    }
+                        scales: { y: { beginAtZero: true, grace: '15%' } }
+                    },
+                    plugins: [barLabelPlugin(todValues, todPcts)]
                 });
             }
 
