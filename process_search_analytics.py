@@ -524,6 +524,23 @@ def add_calculated_columns(con, has_department_mapping=False):
     location_candidates = [c for c in ['CP_userDetails_location'] if c in col_names]
     location_expr = f"COALESCE({', '.join(location_candidates)})" if location_candidates else 'NULL'
 
+    # Region mapping (country name → region)
+    region_expr = f"""CASE
+                WHEN {location_expr} = 'Switzerland' THEN 'SWITZERLAND'
+                WHEN {location_expr} IN ('United States', 'Canada', 'Mexico', 'Brazil', 'Argentina', 'Chile',
+                    'Colombia', 'Peru', 'Venezuela', 'Ecuador', 'Uruguay', 'Paraguay', 'Bolivia',
+                    'Costa Rica', 'Panama', 'Dominican Republic', 'Guatemala', 'Honduras', 'El Salvador',
+                    'Nicaragua', 'Jamaica', 'Trinidad and Tobago', 'Bahamas', 'Barbados', 'Bermuda',
+                    'Cayman Islands', 'Puerto Rico', 'Cuba') THEN 'AMERICAS'
+                WHEN {location_expr} IN ('China', 'Japan', 'South Korea', 'India', 'Australia', 'New Zealand',
+                    'Singapore', 'Hong Kong', 'Taiwan', 'Thailand', 'Indonesia', 'Malaysia', 'Philippines',
+                    'Vietnam', 'Pakistan', 'Bangladesh', 'Sri Lanka', 'Myanmar', 'Cambodia', 'Laos',
+                    'Mongolia', 'Nepal', 'Kazakhstan', 'Uzbekistan', 'Fiji', 'Papua New Guinea',
+                    'Brunei', 'Maldives', 'Macau') THEN 'APAC'
+                WHEN {location_expr} IS NOT NULL THEN 'EMEA'
+                ELSE NULL
+            END""" if location_candidates else 'NULL'
+
     # Job title
     job_title_candidates = [c for c in ['CP_userDetails_jobTitle'] if c in col_names]
     job_title_expr = f"COALESCE({', '.join(job_title_candidates)})" if job_title_candidates else 'NULL'
@@ -631,6 +648,7 @@ def add_calculated_columns(con, has_department_mapping=False):
             {ou_code_expr} as department_ou_code,
             {department_mapped_expr} as department,
             {location_expr} as location,
+            {region_expr} as region,
             {job_title_expr} as job_title,
             {latency_expr} as search_latency
         FROM searches_raw r
@@ -877,6 +895,7 @@ def export_parquet_files(con, output_dir):
                     MIN(device_type) as device_type,
                     MIN(department) as department,
                     MIN(location) as location,
+                    MIN(region) as region,
                     MIN(job_title) as job_title,
                     MIN(query_language) as query_language,
                     -- Click position metrics (result clicks only)
@@ -1025,6 +1044,7 @@ def export_parquet_files(con, output_dir):
                 device_type,
                 department,
                 location,
+                region,
                 job_title,
                 query_language,
                 -- Click position metrics
@@ -1070,6 +1090,7 @@ def export_parquet_files(con, output_dir):
                     query_language,
                     department,
                     location,
+                    region,
                     device_type,
                     news_result_count,
                     search_latency,
@@ -1100,6 +1121,7 @@ def export_parquet_files(con, output_dir):
                     -- Demographic dimensions (for Power BI slicing)
                     stc.department,
                     stc.location,
+                    stc.region,
                     stc.device_type,
                     stc.query_language,
                     -- Word count for query length analysis
@@ -1159,7 +1181,7 @@ def export_parquet_files(con, output_dir):
                 LEFT JOIN term_first_seen tfs ON stc.active_search_term = tfs.search_term_normalized
                 WHERE stc.active_search_term IS NOT NULL
                   AND stc.active_search_term != ''
-                GROUP BY stc.session_date, stc.active_search_term, stc.department, stc.location, stc.device_type, stc.query_language
+                GROUP BY stc.session_date, stc.active_search_term, stc.department, stc.location, stc.region, stc.device_type, stc.query_language
             )
             SELECT t.*
             FROM term_aggregates t
@@ -1329,6 +1351,7 @@ def print_summary(con, output_dir=None):
             COUNT(*) as total,
             COUNT(department) as department,
             COUNT(location) as location,
+            COUNT(region) as region,
             COUNT(job_title) as job_title,
             COUNT(device_type) as device_type,
             COUNT(query_language) as query_language,
@@ -1344,7 +1367,7 @@ def print_summary(con, output_dir=None):
     total = int(coverage['total'])
     log("\n  FIELD COVERAGE (non-null values)")
     log("  " + "-" * 60)
-    for field in ['department', 'location', 'job_title', 'device_type',
+    for field in ['department', 'location', 'region', 'job_title', 'device_type',
                   'query_language', 'clicked_position', 'search_latency',
                   'clicked_result_title', 'clicked_tab', 'applied_filter',
                   'news_result_count']:
