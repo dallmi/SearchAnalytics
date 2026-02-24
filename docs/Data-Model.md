@@ -607,7 +607,8 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `query_language` | String | Detected query language (UPPER, or "Unknown") | EN |
 | `device_type` | String | User's device type | Desktop |
 | `department` | String | User's department | Finance |
-| `location` | String | User's location | Berlin |
+| `location` | String | User's country | Switzerland |
+| `region` | String | Geographic region (mapped from country) | EMEA |
 | `job_title` | String | User's job title | Analyst |
 | `search_latency` | Double | Search latency in milliseconds | 234.5 |
 
@@ -666,7 +667,8 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `viewmore_clicks` | Integer | SEARCH_VIEW_MORE_LINK events | COUNT(click_category='ViewMore') |
 | `device_type` | String | User's device type | MIN(device_type) per session |
 | `department` | String | User's department | MIN(department) per session |
-| `location` | String | User's location | MIN(location) per session |
+| `location` | String | User's country | MIN(location) per session |
+| `region` | String | Geographic region | MIN(region) per session |
 | `job_title` | String | User's job title | MIN(job_title) per session |
 | `query_language` | String | Query language (UPPER, or "Unknown") | MIN(query_language) per session |
 | `avg_click_position` | Float | Avg position of result clicks | AVG(clicked_position) for Result clicks |
@@ -731,7 +733,7 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 
 ### searches_terms.parquet
 
-**Granularity:** One row per search term per day per demographic combination (department, location, device_type, query_language)
+**Granularity:** One row per search term per day per demographic combination (department, region, device_type, query_language)
 
 **Use case:** Search term performance analysis, content gap identification, demographic segmentation
 
@@ -740,7 +742,7 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `session_date` | Date | The day | |
 | `search_term` | String | Normalized search query | LOWER(TRIM(query)) |
 | `department` | String | User's department | Dimension for slicing |
-| `location` | String | User's location | Dimension for slicing |
+| `region` | String | Geographic region (SWITZERLAND, EMEA, AMERICAS, APAC) | Dimension for slicing |
 | `device_type` | String | User's device type | Dimension for slicing |
 | `query_language` | String | Query language (UPPER, or "Unknown") | Dimension for slicing |
 | `word_count` | Integer | Words in query | COUNT of spaces + 1 |
@@ -776,7 +778,7 @@ returning_users = COUNT(DISTINCT CASE WHEN session_date > first_seen_date THEN u
 | `is_new_term` | Boolean | First appearance today | session_date = first_seen_date |
 | `month_num` | Integer | Month number (1-12) | For seasonality analysis |
 
-**Granularity note:** Each unique combination of (session_date, search_term, department, location, device_type, query_language) produces a separate row. To get totals for a term across all demographics, use `SUM()` in your queries or DAX measures — all metric columns (search_count, click_count, etc.) are additive and aggregate correctly. `unique_users` and `unique_sessions` are per-demographic-combo counts and may overcount when summed across dimensions.
+**Granularity note:** Each unique combination of (session_date, search_term, department, region, device_type, query_language) produces a separate row. To get totals for a term across all demographics, use `SUM()` in your queries or DAX measures — all metric columns (search_count, click_count, etc.) are additive and aggregate correctly. `unique_users` and `unique_sessions` are per-demographic-combo counts and may overcount when summed across dimensions.
 
 ---
 
@@ -1180,3 +1182,4 @@ timestamp,name,user_Id,session_Id,CP_searchQuery,CP_totalResultCount
 | 2.0 | 2025-02-09 | Adapted to new App Insights 4-level nesting structure. Added SEARCH_RESULT_CLICKED and SEARCH_VIEW_MORE_LINK events. Added ViewMore click category. Added 12 new fields from dynamic column resolution: clicked_position, clicked_tab, applied_filter, clicked_result_title, clicked_result_url, news_result_count, query_language, device_type, department, location, job_title, search_latency. Updated all three aggregation files (daily, journeys, terms) with new metrics. Added new Power BI measures (Avg Search Latency, Avg News Results, ViewMore Click Rate) and calculated columns (Latency_Bucket, Click_Position_Bucket). |
 | 2.1 | 2025-02-10 | Added searches_term_clicks.parquet (term → clicked content mapping). Normalized query_language to UPPER with "Unknown" title case. Added Term Lifecycle Filter and Term Lifecycle Filter Sort calculated columns for slicer usage. |
 | 2.2 | 2025-02-10 | Added demographic dimensions (department, location, device_type, query_language) to searches_terms.parquet. Granularity changed from "term per day" to "term per day per demographic combination" to enable slicing by user demographics in Power BI. |
+| 2.3 | 2026-02-24 | Added `region` column (SWITZERLAND, EMEA, AMERICAS, APAC) to searches_raw, searches_journeys, and searches_terms parquets. Region mapped from country via GEDULD lookup with hardcoded fallback. searches_terms granularity now uses region instead of location as demographic dimension. Added `department_raw` and `department_ou_code` traceability columns. |

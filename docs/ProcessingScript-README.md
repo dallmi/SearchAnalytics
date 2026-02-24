@@ -172,8 +172,11 @@ The script creates a `searches` table with all calculated analytics columns:
 | `news_result_count` | Number of news results |
 | `query_language` | Detected query language |
 | `device_type` | User's device type |
-| `department` | User's department |
-| `location` | User's location |
+| `department` | User's department (mapped to Business Division via GEDULD if available) |
+| `department_raw` | Original department value from App Insights |
+| `department_ou_code` | Extracted OU Code from department field |
+| `location` | User's country |
+| `region` | Geographic region (SWITZERLAND, EMEA, AMERICAS, APAC) |
 | `job_title` | User's job title |
 | `search_latency` | Search latency in milliseconds |
 
@@ -197,7 +200,7 @@ Four Parquet files are generated for Power BI (plus one for search term analysis
     - `search_term_count` - Count of search terms (denominator for weighted avg)
   - `first_searches_of_day`
   - Click breakdowns by category (`clicks_result`, `clicks_trending`, `clicks_tab`, `clicks_filter`, `clicks_pagination`, `clicks_viewmore`)
-  - **New field metrics**: `avg_click_position`, `sum_news_result_count`, `unique_device_types`, `unique_departments`, `unique_locations`, `sum_search_latency_ms`, `latency_event_count`, `unique_languages`
+  - **New field metrics**: `avg_click_position`, `sum_news_result_count`, `unique_device_types`, `unique_departments`, `unique_locations`, `unique_regions`, `sum_search_latency_ms`, `latency_event_count`, `unique_languages`
   - **Time distribution (CET-based regional business hours)**:
     - `searches_night` (03-09 CET, APAC), `searches_morning` (09-16 CET, CET)
     - `searches_afternoon` (16-22 CET, Americas), `searches_evening` (22-03 CET, Dead time)
@@ -218,7 +221,7 @@ Four Parquet files are generated for Power BI (plus one for search term analysis
   - `had_reformulation` (user modified search query)
   - `session_complexity` (`Single Action`, `Simple`, `Medium`, `Complex`) - based on user actions (searches + clicks)
 - **Click breakdown**: `result_clicks`, `trending_clicks`, `tab_clicks`, `pagination_clicks`, `filter_clicks`, `viewmore_clicks`
-- **New dimension fields**: `device_type`, `department`, `location`, `job_title`, `query_language`
+- **New dimension fields**: `device_type`, `department`, `department_raw`, `department_ou_code`, `location`, `region`, `job_title`, `query_language`
 - **New metrics**: `avg_click_position`, `min_click_position`, `max_news_results`, `avg_search_latency_ms`, `distinct_tabs_clicked`, `distinct_filters_used`
 
 #### 4. `searches_terms.parquet`

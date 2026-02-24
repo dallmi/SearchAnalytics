@@ -59,6 +59,8 @@ Place GEDULD files in the `mappings/` folder with the naming convention `GEDULD_
 |--------|-------------|
 | `OU Code` | Organizational unit code (matches prefix in department field) |
 | `GCRS Division Desc` | Business Division name to use as the mapped department |
+| `Work Location Country` | Country name (used for region mapping) |
+| `Work Location Region` | Region name (e.g., EMEA, AMERICAS, APAC, SWITZERLAND) |
 
 ### Temporal Matching
 
@@ -74,6 +76,24 @@ People can change divisions over time. The script uses a **best-available** fall
 The processing script adds two extra columns to the enriched data for debugging:
 - `department_raw` — the original department value from App Insights
 - `department_ou_code` — the extracted OU Code
+
+## Region Mapping
+
+The processing script maps each user's country (location) to a geographic region. This is used in the dashboard to show Region instead of individual country names.
+
+### How It Works
+
+1. **GEDULD-based lookup (primary):** If GEDULD files are present, the script reads the `Work Location Country` → `Work Location Region` relationship from the most recent file
+2. **Hardcoded fallback:** If a country is not found in the GEDULD data, a built-in mapping assigns it to one of four regions:
+
+| Region | Description |
+|--------|-------------|
+| `SWITZERLAND` | Switzerland |
+| `EMEA` | Europe (excl. Switzerland), Middle East, Africa |
+| `AMERICAS` | North and South America |
+| `APAC` | Asia-Pacific |
+
+Region mapping is **not time-aware** — countries don't change regions, so the most recent GEDULD file is always used. Both `location` (country) and `region` columns are available in the parquet files.
 
 ## Starting the Dashboard
 
@@ -395,13 +415,13 @@ The data export and deep-dive tab with 4 sub-tabs. Each sub-tab has KPI summary 
 
 #### Search Terms
 - **KPI Cards**: Total Terms, Content Gaps (null rate >= 50%), Avg Success CTR, High Priority Terms (priority >= 10)
-- **Table columns**: Search Term, Department, Location, Words, Searches, Users, Null Rate %, Avg Results, CTR %, Avg Pos, Engagement %, Priority, Lifecycle, Outcome, Peak Region, First Seen
+- **Table columns**: Search Term, Department, Region, Words, Searches, Users, Null Rate %, Avg Results, CTR %, Avg Pos, Engagement %, Priority, Lifecycle, Outcome, Peak Region, First Seen
 - All columns sortable. Text search with autocomplete. Filterable by Outcome and Lifecycle.
 - XLSX export includes a Glossary sheet with column definitions.
 
 #### Sessions
 - **KPI Cards**: Total Sessions, Success Rate, Avg Duration, Reformulation Rate
-- **Table columns**: Date, Department, Location, Device, Searches, Clicks, Success, Outcome, Complexity, Duration, Reformulated
+- **Table columns**: Date, Department, Region, Device, Searches, Clicks, Success, Outcome, Complexity, Duration, Reformulated
 - Sortable. Filterable by Outcome and Complexity.
 
 #### Daily Trends
@@ -507,5 +527,6 @@ All processing happens client-side; no data is sent to external servers.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 3.0 | 2026-02-24 | Added department mapping (GEDULD temporal lookup), region mapping (GEDULD + hardcoded fallback), Location→Region in dashboard display |
 | 2.0 | 2026-02-24 | Added executive questions, metric calculations, tab walkthrough |
 | 1.0 | 2026-01-27 | Initial documentation |

@@ -125,7 +125,7 @@ Senior management lacks systematic visibility into Intranet search usage pattern
 | O1 | Establish baseline search analytics capability | Dashboard operational and accessible to stakeholders | AppInsights |
 | O2 | Provide visibility into search query patterns | Top 100 queries identified and categorized | AppInsights |
 | O3 | Track search performance metrics | Latency, error rates, and zero-result rates monitored | AppInsights |
-| O4 | Monitor adoption across departments and devices | Usage breakdown by department, location, device available | AppInsights |
+| O4 | Monitor adoption across departments, regions, and devices | Usage breakdown by department, region, device available | AppInsights + GEDULD |
 
 ### 3.2 Tactical Solution Limitations
 
@@ -342,7 +342,8 @@ The tactical solution captures and organizes data across logical groupings. **Ph
 |------------|-----------|-------------|---------|----------|
 | `user_id` | String | Anonymized user identifier | `USR_A1B2C3` | Required |
 | `department` | String | User's organizational department | `Finance`, `HR`, `IT` | Required |
-| `location` | String | User's office location / country | `DE-Munich`, `US-NYC` | Required |
+| `location` | String | User's country | `Switzerland`, `Germany` | Required |
+| `region` | String | Geographic region (mapped from country via GEDULD or hardcoded fallback) | `EMEA`, `AMERICAS`, `APAC`, `SWITZERLAND` | Required |
 | `role` | String | User's job title or role category | `Manager`, `Analyst` | Optional |
 
 #### 6.2.2 Query Details

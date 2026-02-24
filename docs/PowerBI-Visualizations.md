@@ -418,7 +418,8 @@ The `searches_journeys.parquet` file contains **one row per session**. Each row 
 | `viewmore_clicks` | Integer | SEARCH_VIEW_MORE_LINK events in session |
 | `device_type` | String | User's device type |
 | `department` | String | User's department |
-| `location` | String | User's location |
+| `location` | String | User's country |
+| `region` | String | Geographic region (SWITZERLAND, EMEA, AMERICAS, APAC) |
 | `job_title` | String | User's job title |
 | `query_language` | String | Query language |
 | `avg_click_position` | Float | Average position of result clicks |
@@ -758,7 +759,7 @@ Add slicers for:
 - `search_to_result_bucket`
 - `device_type` (new)
 - `department` (new)
-- `location` (new)
+- `location` / `region` (new)
 - `query_language` (new)
 
 ### Chart 1: Heatmap - Hour of Day Activity
@@ -786,7 +787,7 @@ Add slicers for:
 
 ### Understanding the Terms File
 
-The `searches_terms.parquet` file contains **one row per search term per day per demographic combination**. It enables analysis of which terms users search for, how successful those searches are, and how search behavior varies by department, location, device type, and language.
+The `searches_terms.parquet` file contains **one row per search term per day per demographic combination**. It enables analysis of which terms users search for, how successful those searches are, and how search behavior varies by department, region, device type, and language.
 
 **Key columns:**
 
@@ -795,7 +796,7 @@ The `searches_terms.parquet` file contains **one row per search term per day per
 | `session_date` | Date | Date |
 | `search_term` | String | The normalized search query |
 | `department` | String | User's department (slicer/filter dimension) |
-| `location` | String | User's location (slicer/filter dimension) |
+| `region` | String | Geographic region — SWITZERLAND, EMEA, AMERICAS, APAC (slicer/filter dimension) |
 | `device_type` | String | User's device type (slicer/filter dimension) |
 | `query_language` | String | Query language — UPPER or "Unknown" (slicer/filter dimension) |
 | `word_count` | Integer | Number of words in search term |
@@ -944,7 +945,7 @@ DIVIDE(
 
 ### Demographic Slicing
 
-The `searches_terms` table includes `department`, `location`, `device_type`, and `query_language` as dimension columns. Use these as **slicers or filters** in Power BI to segment term analysis by audience.
+The `searches_terms` table includes `department`, `region`, `device_type`, and `query_language` as dimension columns. Use these as **slicers or filters** in Power BI to segment term analysis by audience.
 
 **Slicer setup:** Drag any demographic column to a Slicer visual. All SUM-based measures (search_count, click_count, etc.) aggregate correctly across demographic dimensions.
 
@@ -971,7 +972,7 @@ DIVIDE(
 | What does Finance search for? | `department` = Finance | Top terms by search_count |
 | Do mobile users search differently? | `device_type` slicer | Compare top terms Desktop vs Mobile |
 | What languages are used? | `query_language` slicer | Search volume by language |
-| Regional search patterns? | `location` slicer | Compare terms across offices |
+| Regional search patterns? | `region` slicer | Compare terms across regions |
 | Department-specific success rates? | `department` slicer | Term Success CTR % per department |
 
 ### Term Status Classification (Dynamic DAX Measures)
