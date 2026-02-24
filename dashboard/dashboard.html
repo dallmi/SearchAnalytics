@@ -2102,11 +2102,22 @@
                     const meta = chart.getDatasetMeta(0);
                     meta.data.forEach((bar, i) => {
                         if (horizontal) {
+                            const barLeft = chart.scales.x.getPixelForValue(0);
+                            const barWidth = bar.x - barLeft;
+                            // White % inside bar (if wide enough)
+                            if (barWidth > 50) {
+                                c.font = '11px -apple-system, sans-serif';
+                                c.fillStyle = '#fff';
+                                c.textBaseline = 'middle';
+                                c.textAlign = 'right';
+                                c.fillText(`${pcts[i]}%`, bar.x - 6, bar.y);
+                            }
+                            // Count to the right of bar
                             c.font = '11px -apple-system, sans-serif';
                             c.fillStyle = '#555';
                             c.textBaseline = 'middle';
                             c.textAlign = 'left';
-                            c.fillText(`${formatNumber(values[i])} (${pcts[i]}%)`, bar.x + 6, bar.y);
+                            c.fillText(formatNumber(values[i]), bar.x + 6, bar.y);
                         } else {
                             const barTop = bar.y;
                             const barBottom = chart.scales.y.getPixelForValue(0);
@@ -2732,7 +2743,7 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     indexAxis: 'y',
-                    layout: { padding: { right: 120 } },
+                    layout: { padding: { right: 80 } },
                     scales: { x: { display: false } },
                     plugins: { legend: { display: false } }
                 },
@@ -2772,7 +2783,7 @@
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     indexAxis: 'y',
-                    layout: { padding: { right: 120 } },
+                    layout: { padding: { right: 80 } },
                     scales: { x: { display: false } },
                     plugins: {
                         legend: { display: false },
