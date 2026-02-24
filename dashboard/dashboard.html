@@ -1661,7 +1661,7 @@
                                     <tr>
                                         <th class="sort-header" data-sort="search_term">Search Term</th>
                                         <th class="sort-header" data-sort="department">Department</th>
-                                        <th class="sort-header" data-sort="location">Location</th>
+                                        <th class="sort-header" data-sort="region">Region</th>
                                         <th class="sort-header text-right" data-sort="words">Words</th>
                                         <th class="sort-header text-right desc" data-sort="searches">Searches</th>
                                         <th class="sort-header text-right" data-sort="users">Users</th>
@@ -1705,7 +1705,7 @@
                         <div class="insights-controls">
                             <label>Search</label>
                             <div class="autocomplete-wrapper">
-                                <input type="text" id="sessionsSearch" placeholder="Filter by dept, location, job..." autocomplete="off">
+                                <input type="text" id="sessionsSearch" placeholder="Filter by dept, region, job..." autocomplete="off">
                                 <div class="autocomplete-list" id="sessionsSearchAc"></div>
                             </div>
                             <label>Outcome</label>
@@ -1734,7 +1734,7 @@
                                     <tr>
                                         <th class="sort-header desc" data-sort="session_date">Date</th>
                                         <th class="sort-header" data-sort="department">Department</th>
-                                        <th class="sort-header" data-sort="location">Location</th>
+                                        <th class="sort-header" data-sort="region">Region</th>
                                         <th class="sort-header" data-sort="device_type">Device</th>
                                         <th class="sort-header text-right" data-sort="search_count_in_session">Searches</th>
                                         <th class="sort-header text-right" data-sort="click_count">Clicks</th>
@@ -3739,7 +3739,7 @@
                 SELECT
                     search_term,
                     COALESCE(department, '-') as department,
-                    COALESCE(location, '-') as location,
+                    COALESCE(region, '-') as region,
                     MIN(word_count) as words,
                     SUM(CAST(search_count AS DOUBLE)) as searches,
                     SUM(CAST(unique_users AS DOUBLE)) as users,
@@ -3757,7 +3757,7 @@
                     MIN(first_seen_date) as first_seen
                 FROM terms
                 WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('terms')}
-                GROUP BY search_term, department, location
+                GROUP BY search_term, department, region
                 ORDER BY searches DESC
             `);
             const raw = result.toArray();
@@ -3809,7 +3809,7 @@
                 return {
                     search_term: String(d.search_term),
                     department: String(d.department || '-'),
-                    location: String(d.location || '-'),
+                    region: String(d.region || '-'),
                     words: Number(d.words) || 0,
                     searches, users, null_rate, avg_results, ctr,
                     avg_click_pos, engagement, priority, outcome, lifecycle,
@@ -3906,7 +3906,7 @@
                 return `<tr class="clickable" onclick="showTermDetail('${escapeHtml(d.search_term)}')">
                     <td>${escapeHtml(d.search_term)}</td>
                     <td>${escapeHtml(d.department)}</td>
-                    <td>${escapeHtml(d.location)}</td>
+                    <td>${escapeHtml(d.region)}</td>
                     <td class="text-right">${d.words}</td>
                     <td class="text-right">${formatNumber(d.searches)}</td>
                     <td class="text-right">${formatNumber(d.users)}</td>
@@ -3958,10 +3958,10 @@
             const data = getFilteredInsightsForExport();
             if (data.length === 0) return;
 
-            const headers = ['Search Term','Department','Location','Words','Searches','Users','Null Rate %','Avg Results',
+            const headers = ['Search Term','Department','Region','Words','Searches','Users','Null Rate %','Avg Results',
                 'Success CTR %','Avg Click Pos','Engagement %','Priority Score','Lifecycle','Outcome','Peak Region','First Seen'];
             const rows = data.map(d => [
-                d.search_term, d.department, d.location, d.words, d.searches, d.users,
+                d.search_term, d.department, d.region, d.words, d.searches, d.users,
                 d.null_rate.toFixed(1), d.avg_results.toFixed(1),
                 d.ctr.toFixed(1), d.avg_click_pos > 0 ? d.avg_click_pos.toFixed(1) : '',
                 d.engagement.toFixed(1), d.priority.toFixed(1),
@@ -3994,10 +3994,10 @@
                 return;
             }
 
-            const headers = ['Search Term','Department','Location','Words','Searches','Users','Null Rate %','Avg Results',
+            const headers = ['Search Term','Department','Region','Words','Searches','Users','Null Rate %','Avg Results',
                 'Success CTR %','Avg Click Pos','Engagement %','Priority Score','Lifecycle','Outcome','Peak Region','First Seen'];
             const rows = data.map(d => [
-                d.search_term, d.department, d.location, d.words, d.searches, d.users,
+                d.search_term, d.department, d.region, d.words, d.searches, d.users,
                 parseFloat(d.null_rate.toFixed(1)), parseFloat(d.avg_results.toFixed(1)),
                 parseFloat(d.ctr.toFixed(1)), d.avg_click_pos > 0 ? parseFloat(d.avg_click_pos.toFixed(1)) : null,
                 parseFloat(d.engagement.toFixed(1)), parseFloat(d.priority.toFixed(1)),
@@ -4049,7 +4049,7 @@
                     session_start_str,
                     first_event_hour,
                     COALESCE(department, '-') as department,
-                    COALESCE(location, '-') as location,
+                    COALESCE(region, '-') as region,
                     COALESCE(device_type, '-') as device_type,
                     COALESCE(job_title, '-') as job_title,
                     COALESCE(query_language, '-') as query_language,
@@ -4118,7 +4118,7 @@
 
             let filtered = sessionsData.filter(d => {
                 if (search && !String(d.department).toLowerCase().includes(search)
-                    && !String(d.location).toLowerCase().includes(search)
+                    && !String(d.region).toLowerCase().includes(search)
                     && !String(d.job_title).toLowerCase().includes(search)) return false;
                 if (outcomeFilter && d.journey_outcome !== outcomeFilter) return false;
                 if (complexityFilter && d.session_complexity !== complexityFilter) return false;
@@ -4150,7 +4150,7 @@
                 <tr>
                     <td>${String(d.session_date).substring(0, 10)}</td>
                     <td>${escapeHtml(String(d.department))}</td>
-                    <td>${escapeHtml(String(d.location))}</td>
+                    <td>${escapeHtml(String(d.region))}</td>
                     <td>${escapeHtml(String(d.device_type))}</td>
                     <td class="text-right">${d.search_count_in_session}</td>
                     <td class="text-right">${d.click_count}</td>
@@ -4168,7 +4168,7 @@
                 sessionsSort.dir = sessionsSort.dir === 'asc' ? 'desc' : 'asc';
             } else {
                 sessionsSort.col = col;
-                sessionsSort.dir = col === 'department' || col === 'location' || col === 'device_type' ? 'asc' : 'desc';
+                sessionsSort.dir = col === 'department' || col === 'region' || col === 'device_type' ? 'asc' : 'desc';
             }
             document.querySelectorAll('#sessionsTable .sort-header').forEach(th => {
                 th.classList.remove('asc', 'desc');
@@ -4178,7 +4178,7 @@
         }
 
         function getSessionsExportHeaders() {
-            return ['Date','Session Start','Hour','Department','Location','Device Type','Job Title','Language',
+            return ['Date','Session Start','Hour','Department','Region','Device Type','Job Title','Language',
                 'Searches','Unique Terms','Clicks','Success Clicks','Null Results','Max Results',
                 'Result Clicks','Trending Clicks','Tab Clicks','Pagination Clicks','Filter Clicks','ViewMore Clicks',
                 'Search to Result (s)','Result to Click (s)','Duration (s)','Avg Click Position',
@@ -4189,7 +4189,7 @@
         function getSessionsExportRow(d) {
             return [
                 String(d.session_date).substring(0, 10), d.session_start_str, d.first_event_hour,
-                d.department, d.location, d.device_type, d.job_title, d.query_language,
+                d.department, d.region, d.device_type, d.job_title, d.query_language,
                 d.search_count_in_session, d.unique_search_terms, d.click_count, d.success_click_count,
                 d.null_result_count, d.max_total_results,
                 d.result_clicks, d.trending_clicks, d.tab_clicks, d.pagination_clicks, d.filter_clicks, d.viewmore_clicks,
@@ -4205,7 +4205,7 @@
             const complexityFilter = document.getElementById('sessionsComplexityFilter').value;
             return sessionsData.filter(d => {
                 if (search && !String(d.department).toLowerCase().includes(search)
-                    && !String(d.location).toLowerCase().includes(search)
+                    && !String(d.region).toLowerCase().includes(search)
                     && !String(d.job_title).toLowerCase().includes(search)) return false;
                 if (outcomeFilter && d.journey_outcome !== outcomeFilter) return false;
                 if (complexityFilter && d.session_complexity !== complexityFilter) return false;
@@ -4582,7 +4582,7 @@
                 terms: [
                     { column: 'Search Term', group: 'Term', description: 'The normalized search query entered by users' },
                     { column: 'Department', group: 'Demographics', description: 'User department who performed the search' },
-                    { column: 'Location', group: 'Demographics', description: 'User location (office/site)' },
+                    { column: 'Region', group: 'Demographics', description: 'Geographic region (SWITZERLAND, EMEA, AMERICAS, APAC)' },
                     { column: 'Words', group: 'Term', description: 'Word count of the search term' },
                     { column: 'Searches', group: 'Volume', description: 'Total number of SEARCH_TRIGGERED events (SUM across dates)' },
                     { column: 'Users', group: 'Volume', description: 'Approximate unique users (SUM of daily unique counts, may overcount across days)' },
@@ -4602,7 +4602,7 @@
                     { column: 'Session Start', group: 'Time', description: 'Timestamp of the first event in the session (CET, format: YYYY-MM-DD HH:MM:SS.mmm)' },
                     { column: 'Hour', group: 'Time', description: 'CET hour of the first event (0-23)' },
                     { column: 'Department', group: 'Demographics', description: 'User department (first non-null value in session)' },
-                    { column: 'Location', group: 'Demographics', description: 'User location / office site (first non-null value in session)' },
+                    { column: 'Region', group: 'Demographics', description: 'Geographic region (first non-null value in session)' },
                     { column: 'Device Type', group: 'Demographics', description: 'Device type: Desktop, Mobile, Tablet, etc.' },
                     { column: 'Job Title', group: 'Demographics', description: 'User job title (first non-null value in session)' },
                     { column: 'Language', group: 'Demographics', description: 'Detected query language (UPPER case, e.g., EN, DE)' },
@@ -4872,7 +4872,7 @@
             const items = [];
             for (const d of sessionsData) {
                 if (items.length >= 10) break;
-                for (const [field, hint] of [['department','Dept'],['location','Loc'],['job_title','Job']]) {
+                for (const [field, hint] of [['department','Dept'],['region','Region'],['job_title','Job']]) {
                     const v = String(d[field]);
                     if (v !== '-' && v.toLowerCase().includes(lower) && !seen.has(v + hint)) {
                         seen.add(v + hint);
