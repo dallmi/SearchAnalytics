@@ -1200,9 +1200,10 @@
         async function renderSnapshotKPIs() {
             const where = getSnapshotWhere() + getFilterWhere();
 
-            const currentRows = await query(`SELECT COUNT(*) as hc, SUM(CASE WHEN fte > 0 THEN 1 ELSE 0 END) as internal,
-                       SUM(CASE WHEN fte = 0 THEN 1 ELSE 0 END) as external,
-                       ROUND(SUM(fte), 1) as total_fte,
+            const currentRows = await query(`SELECT COUNT(*) as hc,
+                       COUNT(*) FILTER (WHERE fte > 0) as internal,
+                       COUNT(*) FILTER (WHERE fte = 0 OR fte IS NULL) as external,
+                       ROUND(CAST(SUM(fte) AS DOUBLE), 1) as total_fte,
                        COUNT(DISTINCT COALESCE(gcrs_division_desc, '(Unassigned)')) as divisions,
                        COUNT(DISTINCT COALESCE(work_location_country, '(Unknown)')) as countries
                        FROM hr WHERE ${where}`);
@@ -1578,7 +1579,7 @@
 
         async function renderHcFteTrend() {
             const rows = await query(`
-                SELECT snapshot_year, snapshot_month, COUNT(*) as hc, ROUND(SUM(fte), 1) as fte
+                SELECT snapshot_year, snapshot_month, COUNT(*) as hc, ROUND(CAST(SUM(fte) AS DOUBLE), 1) as fte
                 FROM hr ${getFilterWhere() ? 'WHERE 1=1' + getFilterWhere() : ''}
                 GROUP BY 1, 2 ORDER BY 1, 2
             `);
