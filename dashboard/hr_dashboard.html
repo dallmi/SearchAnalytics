@@ -1130,11 +1130,31 @@
 
                 await renderCurrentTab();
                 updateStatus('success', `Snapshot: ${monthLabel(selectedYear, selectedMonth)}`);
+
+                // Pre-compute other tabs in background so they're instant on first switch
+                prefetchOtherTabs();
             } catch (error) {
                 console.error('Initialization error:', error);
                 showError(`Failed to initialize: ${error.message}`);
                 updateStatus('error', 'Error loading data');
             }
+        }
+
+        async function prefetchOtherTabs() {
+            // Fire-and-forget: pre-compute movement data and export data in background
+            // so they're cached when the user first switches to those tabs
+            try {
+                await computeMovements();
+                // Pre-run the expensive joins/leaves CTE while we're at it
+                await renderJoinsLeavesChart().catch(() => {});
+            } catch (e) { /* non-critical */ }
+            try {
+                const where = getSnapshotWhere() + getFilterWhere();
+                const cacheKey = `export-${where}`;
+                if (exportSnapshotCacheKey !== cacheKey) {
+                    await renderExportSnapshotTable();
+                }
+            } catch (e) { /* non-critical */ }
         }
 
         async function loadParquetFile() {
