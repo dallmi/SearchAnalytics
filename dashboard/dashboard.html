@@ -22,14 +22,14 @@
     <style>
         :root {
             --primary: #E60000;
-            --primary-dark: #CC0000;
-            --primary-light: #FF3333;
+            --primary-dark: #8A000A;
+            --primary-light: #E60000;
             --black: #000000;
-            --dark-gray: #333333;
-            --medium-gray: #666666;
-            --light-gray: #D9D9D9;
-            --lighter-gray: #F5F5F5;
-            --row-alt: #FAFAFA;
+            --dark-gray: #404040;
+            --medium-gray: #7A7870;
+            --light-gray: #CCCABC;
+            --lighter-gray: #ECEBE4;
+            --row-alt: #F5F0E1;
             --white: #FFFFFF;
             --success: #6F7A1A;
             --success-light: #F0F2E6;
@@ -37,8 +37,8 @@
             --warning-light: #FDF6E3;
             --danger: #BD000C;
             --danger-light: #FFEBE6;
-            --info: #888888;
-            --info-light: #F5F5F5;
+            --info: #8E8D83;
+            --info-light: #ECEBE4;
         }
 
         * {
@@ -518,7 +518,7 @@
         .badge-danger { background: var(--danger-light); color: var(--danger); }
         .badge-info { background: var(--info-light); color: var(--info); }
         .badge-neutral { background: var(--light-gray); color: var(--medium-gray); }
-        .badge-secondary { background: #E8E8E8; color: #666666; }
+        .badge-secondary { background: #ECEBE4; color: #7A7870; }
 
         /* Search/Filter */
         .table-controls {
@@ -1909,26 +1909,26 @@
         // Colors
         const COLORS = {
             primary: '#E60000',
-            primaryLight: '#FF3333',
+            primaryLight: '#E60000',
             success: '#6F7A1A',
             warning: '#E4A911',
             danger: '#BD000C',
-            info: '#888888',
-            gray: '#666666',
-            lightGray: '#D9D9D9',
-            dark: '#333333',
-            chart: '#555555',
-            chartLight: '#77777799',
+            info: '#8E8D83',
+            gray: '#7A7870',
+            lightGray: '#CCCABC',
+            dark: '#404040',
+            chart: '#5A5D5C',
+            chartLight: '#8E8D8399',
             // Gray palette for multi-series categorical charts
-            palette: ['#333', '#555', '#777', '#999', '#BBB', '#666', '#888', '#AAA']
+            palette: ['#404040', '#5A5D5C', '#8E8D83', '#B8B3A2', '#CCCABC', '#7A7870', '#8E8D83', '#CCCABC']
         };
 
         const OUTCOME_COLORS = {
             'Success': COLORS.success,
-            'Engaged': '#888888',
+            'Engaged': '#8E8D83',
             'Abandoned': COLORS.warning,
             'No Results': COLORS.danger,
-            'Unknown': '#BBBBBB'
+            'Unknown': '#CCCABC'
         };
 
         // Initialize
@@ -2114,7 +2114,7 @@
                             }
                             // Count (and % if bar was too narrow) to the right of bar
                             c.font = '11px -apple-system, sans-serif';
-                            c.fillStyle = '#555';
+                            c.fillStyle = '#5A5D5C';
                             c.textBaseline = 'middle';
                             c.textAlign = 'left';
                             const outsideLabel = barWidth > 50
@@ -2126,7 +2126,7 @@
                             const barBottom = chart.scales.y.getPixelForValue(0);
                             const barHeight = barBottom - barTop;
                             c.font = '10px -apple-system, sans-serif';
-                            c.fillStyle = '#555';
+                            c.fillStyle = '#5A5D5C';
                             c.textAlign = 'center';
                             c.textBaseline = 'bottom';
                             const topLabel = barHeight > minBarSize
@@ -2472,7 +2472,7 @@
                         {
                             label: 'Searches',
                             data: data.map(d => Number(d.search_starts)),
-                            borderColor: '#444444',
+                            borderColor: '#404040',
                             backgroundColor: 'rgba(68, 68, 68, 0.1)',
                             fill: true,
                             tension: 0.3,
@@ -2481,7 +2481,7 @@
                         {
                             label: 'Sessions',
                             data: data.map(d => Number(d.unique_sessions)),
-                            borderColor: '#999999',
+                            borderColor: '#B8B3A2',
                             backgroundColor: 'transparent',
                             borderDash: [5, 5],
                             tension: 0.3,
@@ -2613,7 +2613,7 @@
                     datasets: [{
                         label: 'Searches',
                         data: hourlyValues,
-                        backgroundColor: ['#333', '#555', '#777', '#999']
+                        backgroundColor: ['#404040', '#5A5D5C', '#8E8D83', '#B8B3A2']
                     }]
                 },
                 options: {
@@ -2643,7 +2643,7 @@
             const ctx = document.getElementById('weekdayChart').getContext('2d');
             const weekLabels = data.map(d => d.day_of_week.trim());
             const weekColors = getFilteredColors(
-                weekLabels.map(() => '#555555'), weekLabels, 'Day'
+                weekLabels.map(() => '#5A5D5C'), weekLabels, 'Day'
             );
             charts.weekday = new Chart(ctx, {
                 type: 'bar',
@@ -2692,12 +2692,12 @@
                         {
                             label: 'New Users',
                             data: data.map(d => Number(d.new_users || 0)),
-                            backgroundColor: '#555'
+                            backgroundColor: '#5A5D5C'
                         },
                         {
                             label: 'Returning Users',
                             data: data.map(d => Number(d.returning_users || 0)),
-                            backgroundColor: '#AAA'
+                            backgroundColor: '#CCCABC'
                         }
                     ]
                 },
@@ -2742,7 +2742,7 @@
                     datasets: [{
                         label: 'Clicks',
                         data: clickValues,
-                        backgroundColor: ['#333', '#555', '#777', '#999', '#BBB']
+                        backgroundColor: ['#404040', '#5A5D5C', '#8E8D83', '#B8B3A2', '#CCCABC']
                     }]
                 },
                 options: {
@@ -2827,11 +2827,11 @@
             const values = data.map(d => Number(d.sessions));
             const pcts = data.map(d => Number(d.pct));
             const REGION_COLORS = {
-                'SWITZERLAND': '#BD000C', 'EMEA': '#333333',
-                'AMERICAS': '#E4A911', 'APAC': '#888888', 'Unknown': '#BBBBBB'
+                'SWITZERLAND': '#BD000C', 'EMEA': '#404040',
+                'AMERICAS': '#E4A911', 'APAC': '#8E8D83', 'Unknown': '#CCCABC'
             };
             const colors = getFilteredColors(
-                labels.map(l => REGION_COLORS[l] || '#BBBBBB'),
+                labels.map(l => REGION_COLORS[l] || '#CCCABC'),
                 labels, 'Region'
             );
 
@@ -3054,7 +3054,7 @@
                     labels: data.map(d => d.category),
                     datasets: [{
                         data: tpValues,
-                        backgroundColor: [COLORS.success, COLORS.warning, '#888888', COLORS.danger, '#9A000A']
+                        backgroundColor: [COLORS.success, COLORS.warning, '#8E8D83', COLORS.danger, '#8A000A']
                     }]
                 },
                 options: {
@@ -3094,7 +3094,7 @@
                     datasets: [{
                         label: 'Searches',
                         data: values,
-                        backgroundColor: '#555555'
+                        backgroundColor: '#5A5D5C'
                     }]
                 },
                 options: {
@@ -3127,7 +3127,7 @@
             const ctx = document.getElementById('complexityChart').getContext('2d');
             const complexLabels = data.map(d => d.session_complexity);
             const complexColors = getFilteredColors(
-                ['#CCC', '#999', '#666', '#333'].slice(0, complexLabels.length),
+                ['#CCCABC', '#B8B3A2', '#7A7870', '#404040'].slice(0, complexLabels.length),
                 complexLabels, 'Complexity'
             );
             charts.complexity = new Chart(ctx, {
@@ -3173,7 +3173,7 @@
             const ctx = document.getElementById('durationChart').getContext('2d');
             const durationLabels = data.map(d => d.session_duration_bucket);
             const durationColors = getFilteredColors(
-                durationLabels.map(() => '#555555'), durationLabels, 'Duration'
+                durationLabels.map(() => '#5A5D5C'), durationLabels, 'Duration'
             );
             charts.duration = new Chart(ctx, {
                 type: 'bar',
@@ -3223,7 +3223,7 @@
             const reformLabels = ['Refined Query', 'Single Query'];
             const reformValues = ['true', 'false'];
             const reformColors = getFilteredColors(
-                [COLORS.warning, '#888888'], reformLabels, 'Reformulation',
+                [COLORS.warning, '#8E8D83'], reformLabels, 'Reformulation',
                 (label, i) => reformValues[i]
             );
             charts.reformulation = new Chart(ctx, {
@@ -3402,7 +3402,7 @@
                     datasets: [{
                         label: 'Sessions',
                         data: ttcValues,
-                        backgroundColor: '#555555'
+                        backgroundColor: '#5A5D5C'
                     }]
                 },
                 options: {
@@ -3438,14 +3438,14 @@
                         {
                             label: 'Avg Latency (sec)',
                             data: data.map(d => Number(d.avg_latency || 0)),
-                            borderColor: '#444444',
+                            borderColor: '#404040',
                             backgroundColor: 'transparent',
                             tension: 0.3
                         },
                         {
                             label: 'Avg Time to Click (sec)',
                             data: data.map(d => Number(d.avg_click_time || 0)),
-                            borderColor: '#999999',
+                            borderColor: '#B8B3A2',
                             backgroundColor: 'transparent',
                             borderDash: [5, 5],
                             tension: 0.3
@@ -3532,7 +3532,7 @@
                         datasets: [{
                             label: 'Searches',
                             data: todValues,
-                            backgroundColor: ['#333', '#555', '#777', '#999']
+                            backgroundColor: ['#404040', '#5A5D5C', '#8E8D83', '#B8B3A2']
                         }]
                     },
                     options: {
@@ -3571,7 +3571,7 @@
                         labels: ['APAC (03-09 CET)', 'CET (09-16 CET)', 'Americas (16-22 CET)', 'Dead Time (22-03 CET)'],
                         datasets: [{
                             data: [apac, cet, americas, dead],
-                            backgroundColor: ['#333', '#555', '#777', '#999']
+                            backgroundColor: ['#404040', '#5A5D5C', '#8E8D83', '#B8B3A2']
                         }]
                     },
                     options: {
@@ -3621,10 +3621,10 @@
 
                 const maxPct = Math.max(apacPct, cetPct, americasPct, deadPct);
                 let peakPeriod = 'CET';
-                let peakColor = '#333';
-                if (apacPct === maxPct) { peakPeriod = 'APAC'; peakColor = '#555'; }
-                else if (americasPct === maxPct) { peakPeriod = 'Americas'; peakColor = '#777'; }
-                else if (deadPct === maxPct) { peakPeriod = 'Dead Time'; peakColor = '#999'; }
+                let peakColor = '#404040';
+                if (apacPct === maxPct) { peakPeriod = 'APAC'; peakColor = '#5A5D5C'; }
+                else if (americasPct === maxPct) { peakPeriod = 'Americas'; peakColor = '#8E8D83'; }
+                else if (deadPct === maxPct) { peakPeriod = 'Dead Time'; peakColor = '#B8B3A2'; }
 
                 const concentration = maxPct;
                 const concentrationClass = concentration > 40 ? 'danger' : concentration > 30 ? 'warning' : '';
@@ -3679,7 +3679,7 @@
                             data: monthlySearches,
                             backgroundColor: monthlySearches.map((v, i) => {
                                 // Highlight Q4 (Oct-Dec) in darker tone
-                                return i >= 9 ? '#333' : '#888';
+                                return i >= 9 ? '#404040' : '#8E8D83';
                             })
                         }]
                     },
@@ -3921,7 +3921,7 @@
                     datasets: [{
                         label: 'Searches',
                         data: data.map(d => Number(d.searches)),
-                        borderColor: '#444444',
+                        borderColor: '#404040',
                         backgroundColor: 'rgba(68, 68, 68, 0.1)',
                         fill: true,
                         tension: 0.3
