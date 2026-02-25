@@ -1817,11 +1817,11 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: { display: false },
-                        tooltip: { callbacks: { label: ctx => `${ctx.raw >= 0 ? '+' : ''}${ctx.raw}%` } }
+                        tooltip: { callbacks: { label: ctx => `${ctx.raw >= 0 ? '+' : ''}${ctx.raw.toFixed(2)}%` } }
                     },
                     scales: {
                         x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-                        y: { grid: { color: '#eee' }, ticks: { font: { size: 10 }, callback: v => v + '%' } }
+                        y: { grid: { color: '#eee' }, ticks: { font: { size: 10 }, callback: v => v.toFixed(2) + '%' } }
                     }
                 }
             });
