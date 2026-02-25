@@ -2164,16 +2164,16 @@
         async function renderExportSnapshotTable() {
             const where = getSnapshotWhere() + getFilterWhere();
             exportSnapshotData = await query(`
-                SELECT gpn, COALESCE(business_name, '') as business_name, COALESCE(email, '') as email,
-                       COALESCE(hc_cluster, '') as hc_cluster, fte,
-                       COALESCE(employee_class_desc, '') as employee_class_desc,
-                       COALESCE(corporate_title, '') as corporate_title,
-                       COALESCE(gcrs_division_desc, '') as gcrs_division_desc,
-                       COALESCE(ou_desc, '') as ou_desc,
-                       COALESCE(work_location_country, '') as work_location_country,
-                       COALESCE(UPPER(work_location_region), '') as work_location_region
-                FROM hr WHERE ${where}
-                ORDER BY business_name
+                SELECT h.gpn, COALESCE(h.business_name, '') as business_name, COALESCE(h.email, '') as email,
+                       COALESCE(h.hc_cluster, '') as hc_cluster, h.fte,
+                       COALESCE(h.employee_class_desc, '') as employee_class_desc,
+                       COALESCE(h.corporate_title, '') as corporate_title,
+                       COALESCE(h.gcrs_division_desc, '') as gcrs_division_desc,
+                       COALESCE(h.ou_desc, '') as ou_desc,
+                       COALESCE(h.work_location_country, '') as work_location_country,
+                       COALESCE(UPPER(h.work_location_region), '') as work_location_region
+                FROM hr h WHERE ${where}
+                ORDER BY h.business_name
             `);
 
             renderExportSnapshotRows();
