@@ -1846,23 +1846,26 @@
             const py = prev.snapshot_year;
             const pm = prev.snapshot_month;
 
+            // Detect available columns once so queries don't fail on missing columns
+            const colRows = await query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'hr'`);
+            const hrCols = new Set(colRows.map(r => r.column_name));
+            const nameCol = hrCols.has('business_name') ? 'business_name' : "'' as business_name";
+            const emailCol = hrCols.has('email') ? 'email' : "'' as email";
+
             // Create temp tables for current and previous
-            await conn.query(`CREATE OR REPLACE TEMP TABLE curr AS
-                SELECT gpn, business_name, email, COALESCE(gcrs_division_desc, '(Unassigned)') as division,
+            const tempSelect = `gpn, ${nameCol}, ${emailCol}, COALESCE(gcrs_division_desc, '(Unassigned)') as division,
                        COALESCE(ou_desc, '(Unassigned)') as ou_desc,
                        COALESCE(UPPER(work_location_region), 'Unknown') as region,
                        COALESCE(corporate_title, 'Others') as corporate_title,
                        COALESCE(work_location_country, '(Unknown)') as country,
-                       fte
+                       fte`;
+
+            await conn.query(`CREATE OR REPLACE TEMP TABLE curr AS
+                SELECT ${tempSelect}
                 FROM hr WHERE snapshot_year = ${selectedYear} AND snapshot_month = ${selectedMonth}`);
 
             await conn.query(`CREATE OR REPLACE TEMP TABLE prev AS
-                SELECT gpn, business_name, email, COALESCE(gcrs_division_desc, '(Unassigned)') as division,
-                       COALESCE(ou_desc, '(Unassigned)') as ou_desc,
-                       COALESCE(UPPER(work_location_region), 'Unknown') as region,
-                       COALESCE(corporate_title, 'Others') as corporate_title,
-                       COALESCE(work_location_country, '(Unknown)') as country,
-                       fte
+                SELECT ${tempSelect}
                 FROM hr WHERE snapshot_year = ${py} AND snapshot_month = ${pm}`);
 
             // Joins: in current but not previous
