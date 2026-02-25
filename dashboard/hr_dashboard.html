@@ -828,6 +828,7 @@
         // ── Color palettes ──
         const DIVISION_PALETTE = ['#AF8626', '#00759E', '#879420', '#4B2D58', '#9F8865', '#2E476B', '#469A6C', '#AD3E4A'];
         const REGION_COLORS = { 'SWITZERLAND': '#00759E', 'EMEA': '#2E476B', 'AMERICAS': '#AF8626', 'APAC': '#4B2D58', 'Unknown': '#B8B3A2' };
+        const COUNTRY_PALETTE = ['#879420', '#9F8865', '#469A6C', '#AD3E4A', '#8489BD', '#0C7EC6', '#654D16', '#804C95', '#45999C', '#4972AC'];
         const GRAY_PALETTE = ['#404040', '#5A5D5C', '#8E8D83', '#B8B3A2', '#CCCABC', '#7A7870', '#8E8D83', '#CCCABC', '#404040', '#7A7870'];
 
         // ── Utility functions ──
@@ -1566,7 +1567,7 @@
             const labels = rows.map(r => r.country);
             const values = rows.map(r => Number(r.cnt));
             const pcts = pctArray(values);
-            const colors = labels.map((_, i) => GRAY_PALETTE[i % GRAY_PALETTE.length]);
+            const colors = labels.map((_, i) => COUNTRY_PALETTE[i % COUNTRY_PALETTE.length]);
 
             destroyChart('country');
             const ctx = document.getElementById('countryChart').getContext('2d');
