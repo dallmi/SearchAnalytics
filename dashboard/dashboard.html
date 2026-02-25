@@ -1923,6 +1923,16 @@
             palette: ['#404040', '#5A5D5C', '#8E8D83', '#B8B3A2', '#CCCABC', '#7A7870', '#8E8D83', '#CCCABC']
         };
 
+        // Stable division→gray mapping (same division = same gray everywhere)
+        const DIVISION_GRAYS = ['#404040', '#B8B3A2', '#5A5D5C', '#CCCABC', '#7A7870', '#8E8D83'];
+        let divisionColorMap = {};
+        function getDivisionColor(divName) {
+            if (divisionColorMap[divName]) return divisionColorMap[divName];
+            const idx = Object.keys(divisionColorMap).length;
+            divisionColorMap[divName] = DIVISION_GRAYS[idx % DIVISION_GRAYS.length];
+            return divisionColorMap[divName];
+        }
+
         const OUTCOME_COLORS = {
             'Success': COLORS.success,
             'Engaged': '#8E8D83',
@@ -1979,6 +1989,13 @@
                 document.getElementById('loadingState').style.display = 'none';
                 document.getElementById('dashboardContent').style.display = 'block';
                 document.getElementById('dateFilterControls').classList.remove('loading');
+
+                // Build stable division→gray mapping (sorted by session count)
+                try {
+                    const divResult = await conn.query(`SELECT COALESCE(department, 'Unknown') as dept, COUNT(*) as cnt FROM journeys GROUP BY 1 ORDER BY cnt DESC`);
+                    divisionColorMap = {};
+                    divResult.toArray().forEach((r, i) => { divisionColorMap[r.dept] = DIVISION_GRAYS[i % DIVISION_GRAYS.length]; });
+                } catch (e) { /* non-critical */ }
 
                 await renderDashboard();
 
@@ -2772,9 +2789,8 @@
             const labels = data.map(d => d.dept);
             const values = data.map(d => Number(d.sessions));
             const pcts = data.map(d => Number(d.pct));
-            const DIVISION_PALETTE = ['#AF8626', '#00759E', '#879420', '#4B2D58', '#9F8865', '#2E476B', '#469A6C', '#AD3E4A'];
             const colors = getFilteredColors(
-                DIVISION_PALETTE.slice(0, labels.length),
+                labels.map(l => getDivisionColor(l)),
                 labels, 'Division'
             );
 
