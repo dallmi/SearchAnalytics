@@ -102,12 +102,37 @@ def read_geduld_file(filepath, file_date):
     if 'gpn' in df.columns:
         df['gpn'] = df['gpn'].astype(str).str.strip()
 
+    # Robustly convert date columns to proper datetime for parquet compatibility.
+    # Excel dates may arrive as: datetime objects, serial numbers, or locale-
+    # formatted strings (e.g. "28.02.2026", "28 Februar 2026", "2026-02-28").
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            continue  # already datetime
+        sample = df[col].dropna().head(10)
+        if len(sample) == 0:
+            continue
+        # Strategy 1: column is numeric and values look like Excel serial dates (30000-60000 range)
+        if pd.api.types.is_numeric_dtype(df[col]):
+            median = sample.median()
+            if 25000 < median < 65000:
+                df[col] = pd.to_timedelta(df[col], unit='D') + pd.Timestamp('1899-12-30')
+                log(f"    Converted {col} from Excel serial number to datetime")
+                continue
+        # Strategy 2: string column — try pd.to_datetime with dayfirst=True
+        if df[col].dtype == 'object':
+            try:
+                parsed = pd.to_datetime(sample.astype(str), dayfirst=True, errors='coerce')
+                if parsed.notna().sum() >= len(sample) * 0.8:
+                    df[col] = pd.to_datetime(df[col].astype(str), dayfirst=True, errors='coerce')
+                    log(f"    Converted {col} to datetime (parsed from string)")
+            except Exception:
+                pass
+
     # Extract snapshot date from headcount_date column if available
     snapshot_year = None
     snapshot_month = None
 
     if 'headcount_date' in df.columns:
-        # Try to parse the first non-null headcount date
         valid_dates = df['headcount_date'].dropna()
         if len(valid_dates) > 0:
             first_date = valid_dates.iloc[0]
@@ -116,7 +141,7 @@ def read_geduld_file(filepath, file_date):
                     snapshot_year = first_date.year
                     snapshot_month = first_date.month
                 elif isinstance(first_date, str):
-                    parsed = pd.to_datetime(first_date)
+                    parsed = pd.to_datetime(first_date, dayfirst=True)
                     snapshot_year = parsed.year
                     snapshot_month = parsed.month
             except Exception:
