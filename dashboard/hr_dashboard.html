@@ -1121,23 +1121,22 @@
         }
 
         async function loadParquetFile() {
-            const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^\/]*$/, '');
-            const pathsToTry = [
-                `${baseUrl}/../output/hr_history.parquet`,
-                `${window.location.origin}/output/hr_history.parquet`,
-                `${baseUrl}/output/hr_history.parquet`
-            ];
+            const pathsToTry = ['../output/hr_history.parquet', '/output/hr_history.parquet', 'output/hr_history.parquet'];
 
-            for (const fullPath of pathsToTry) {
+            for (const path of pathsToTry) {
                 try {
-                    await conn.query(`CREATE VIEW hr AS SELECT * FROM read_parquet('${fullPath}')`);
+                    const response = await fetch(path);
+                    if (!response.ok) continue;
+                    const buffer = await response.arrayBuffer();
+                    await db.registerFileBuffer('hr_history.parquet', new Uint8Array(buffer));
+                    await conn.query(`CREATE VIEW hr AS SELECT * FROM read_parquet('hr_history.parquet')`);
                     setLoadingText('Loaded HR data...');
                     return;
                 } catch (e) {
                     // Try next path
                 }
             }
-            throw new Error('Could not find hr_history.parquet');
+            throw new Error('Could not find hr_history.parquet — run process_hr_history.py first');
         }
 
         async function populateSnapshots() {
