@@ -26,7 +26,7 @@ def format_tables(doc_path, output_path=None):
     # Colors
     HEADER_BG = "1F4E79"  # Dark blue
     HEADER_TEXT = RGBColor(255, 255, 255)  # White
-    ALT_ROW_BG = "F2F2F2"  # Light gray
+    ALT_ROW_BG = "F8F7F2"  # Subtle warm tint
 
     for table in doc.tables:
         for row_idx, row in enumerate(table.rows):
