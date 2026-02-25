@@ -804,6 +804,9 @@
         let activeFilters = {};
         let charts = {};
 
+        // Cached column set (populated on init, avoids repeated schema queries)
+        let hrColumns = new Set();
+
         // Movement data caches
         let movementData = [];
         let movementSort = { col: 'type', dir: 'asc' };
@@ -1091,7 +1094,13 @@
                 updateStatus('loading', 'Initializing DuckDB...');
                 const duckdbModule = window.duckdb;
                 const JSDELIVR_BUNDLES = duckdbModule.getJsDelivrBundles();
+                // Use MVP bundle (smaller WASM, faster download) instead of auto-selected EH bundle
                 const bundle = await duckdbModule.selectBundle(JSDELIVR_BUNDLES);
+                if (JSDELIVR_BUNDLES.mvp) {
+                    bundle.mainModule = JSDELIVR_BUNDLES.mvp.mainModule;
+                    bundle.mainWorker = JSDELIVR_BUNDLES.mvp.mainWorker;
+                    bundle.pthreadWorker = null;
+                }
                 const worker_url = URL.createObjectURL(
                     new Blob([`importScripts("${bundle.mainWorker}");`], { type: 'text/javascript' })
                 );
@@ -1106,7 +1115,11 @@
                 await loadParquetFile();
 
                 setLoadingText('Populating snapshots...');
-                await populateSnapshots();
+                const [, colRows] = await Promise.all([
+                    populateSnapshots(),
+                    query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'hr'`)
+                ]);
+                hrColumns = new Set(colRows.map(r => r.column_name));
 
                 document.getElementById('loadingState').style.display = 'none';
                 document.getElementById('dashboardContent').style.display = 'block';
@@ -1223,24 +1236,21 @@
 
         async function renderSnapshotKPIs() {
             const where = getSnapshotWhere() + getFilterWhere();
+            const prevYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
+            const prevMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
 
-            const currentRows = await query(`SELECT COUNT(*) as hc,
+            const [currentRows, prevRows] = await Promise.all([
+                query(`SELECT COUNT(*) as hc,
                        COUNT(*) FILTER (WHERE fte > 0) as internal,
                        COUNT(*) FILTER (WHERE fte = 0 OR fte IS NULL) as external,
                        ROUND(CAST(SUM(fte) AS DOUBLE), 1) as total_fte,
                        COUNT(DISTINCT COALESCE(gcrs_division_desc, '(Unassigned)')) as divisions,
                        COUNT(DISTINCT COALESCE(work_location_country, '(Unknown)')) as countries
-                       FROM hr WHERE ${where}`);
+                       FROM hr WHERE ${where}`),
+                query(`SELECT COUNT(*) as hc FROM hr WHERE snapshot_year = ${prevYear} AND snapshot_month = ${prevMonth} ${getFilterWhere()}`)
+            ]);
 
-            // For previous month, handle year boundary
-            let prevHc = 0;
-            if (selectedMonth === 1) {
-                const prevRows2 = await query(`SELECT COUNT(*) as hc FROM hr WHERE snapshot_year = ${selectedYear - 1} AND snapshot_month = 12 ${getFilterWhere()}`);
-                prevHc = prevRows2.length > 0 ? Number(prevRows2[0].hc) : 0;
-            } else {
-                const prevRows2 = await query(`SELECT COUNT(*) as hc FROM hr WHERE snapshot_year = ${selectedYear} AND snapshot_month = ${selectedMonth - 1} ${getFilterWhere()}`);
-                prevHc = prevRows2.length > 0 ? Number(prevRows2[0].hc) : 0;
-            }
+            const prevHc = prevRows.length > 0 ? Number(prevRows[0].hc) : 0;
 
             const c = currentRows[0];
             const hc = Number(c.hc);
@@ -1846,11 +1856,9 @@
             const py = prev.snapshot_year;
             const pm = prev.snapshot_month;
 
-            // Detect available columns once so queries don't fail on missing columns
-            const colRows = await query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'hr'`);
-            const hrCols = new Set(colRows.map(r => r.column_name));
-            const nameCol = hrCols.has('business_name') ? 'business_name' : "'' as business_name";
-            const emailCol = hrCols.has('email') ? 'email' : "'' as email";
+            // Use cached column set to handle missing columns gracefully
+            const nameCol = hrColumns.has('business_name') ? 'business_name' : "'' as business_name";
+            const emailCol = hrColumns.has('email') ? 'email' : "'' as email";
 
             // Create temp tables for current and previous
             const tempSelect = `gpn, ${nameCol}, ${emailCol}, COALESCE(gcrs_division_desc, '(Unassigned)') as division,
