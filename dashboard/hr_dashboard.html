@@ -1145,12 +1145,11 @@
         }
 
         async function populateSnapshots() {
-            const result = await conn.query(`
+            const rows = await query(`
                 SELECT DISTINCT snapshot_year, snapshot_month
                 FROM hr
                 ORDER BY snapshot_year, snapshot_month
             `);
-            const rows = result.toArray();
             const sel = document.getElementById('snapshotSelect');
             sel.innerHTML = '';
 
@@ -1173,7 +1172,13 @@
         // ── Helper: run query and return rows ──
         async function query(sql) {
             const result = await conn.query(sql);
-            return result.toArray();
+            return result.toArray().map(row => {
+                const obj = {};
+                for (const [k, v] of Object.entries(row)) {
+                    obj[k] = typeof v === 'bigint' ? Number(v) : v;
+                }
+                return obj;
+            });
         }
 
         // ══════════════════════════════════════
