@@ -807,10 +807,14 @@
         // Cached column set (populated on init, avoids repeated schema queries)
         let hrColumns = new Set();
 
-        // Movement data caches
+        // Movement data caches (keyed by snapshot to avoid recomputation)
         let movementData = [];
+        let movementCacheKey = null;
+        let joinsLeavesCacheKey = null;
+        let joinsLeavesCache = null;
         let movementSort = { col: 'type', dir: 'asc' };
         let exportSnapshotData = [];
+        let exportSnapshotCacheKey = null;
         let exportSnapshotSort = { col: 'business_name', dir: 'asc' };
         let exportMovementData = [];
         let exportMovementSort = { col: 'type', dir: 'asc' };
@@ -1837,7 +1841,10 @@
 
         // Movement detection: compare current snapshot to previous
         async function computeMovements() {
-            // Find previous snapshot
+            // Skip if already computed for this snapshot
+            const cacheKey = `${selectedYear}-${selectedMonth}`;
+            if (movementCacheKey === cacheKey) return;
+
             const snapshots = await query(`
                 SELECT DISTINCT snapshot_year, snapshot_month FROM hr ORDER BY 1, 2
             `);
@@ -1847,8 +1854,8 @@
             );
 
             if (currentIdx <= 0) {
-                // No previous snapshot to compare
                 movementData = [];
+                movementCacheKey = cacheKey;
                 return;
             }
 
@@ -1871,38 +1878,25 @@
             await conn.query(`CREATE OR REPLACE TEMP TABLE curr AS
                 SELECT ${tempSelect}
                 FROM hr WHERE snapshot_year = ${selectedYear} AND snapshot_month = ${selectedMonth}`);
-
             await conn.query(`CREATE OR REPLACE TEMP TABLE prev AS
                 SELECT ${tempSelect}
                 FROM hr WHERE snapshot_year = ${py} AND snapshot_month = ${pm}`);
 
-            // Joins: in current but not previous
-            const joins = await query(`
-                SELECT 'Join' as type, c.gpn, c.business_name, c.email, c.division, c.ou_desc, c.region, c.corporate_title, 'New joiner' as detail
-                FROM curr c LEFT JOIN prev p ON c.gpn = p.gpn
-                WHERE p.gpn IS NULL
-            `);
-
-            // Leaves: in previous but not current
-            const leaves = await query(`
-                SELECT 'Leave' as type, p.gpn, p.business_name, p.email, p.division, p.ou_desc, p.region, p.corporate_title, 'Left organization' as detail
-                FROM prev p LEFT JOIN curr c ON p.gpn = c.gpn
-                WHERE c.gpn IS NULL
-            `);
-
-            // Changes for people in both
-            const changes = await query(`
-                SELECT c.gpn, c.business_name, c.email,
+            // Run joins, leaves, and changes queries in parallel
+            const [joins, leaves, changes] = await Promise.all([
+                query(`SELECT 'Join' as type, c.gpn, c.business_name, c.email, c.division, c.ou_desc, c.region, c.corporate_title, 'New joiner' as detail
+                    FROM curr c LEFT JOIN prev p ON c.gpn = p.gpn WHERE p.gpn IS NULL`),
+                query(`SELECT 'Leave' as type, p.gpn, p.business_name, p.email, p.division, p.ou_desc, p.region, p.corporate_title, 'Left organization' as detail
+                    FROM prev p LEFT JOIN curr c ON p.gpn = c.gpn WHERE c.gpn IS NULL`),
+                query(`SELECT c.gpn, c.business_name, c.email,
                        c.division as c_div, p.division as p_div,
                        c.ou_desc as c_ou, p.ou_desc as p_ou,
                        c.region as c_region, p.region as p_region,
                        c.corporate_title as c_title, p.corporate_title as p_title
-                FROM curr c INNER JOIN prev p ON c.gpn = p.gpn
-                WHERE c.division != p.division
-                   OR c.ou_desc != p.ou_desc
-                   OR c.region != p.region
-                   OR c.corporate_title != p.corporate_title
-            `);
+                    FROM curr c INNER JOIN prev p ON c.gpn = p.gpn
+                    WHERE c.division != p.division OR c.ou_desc != p.ou_desc
+                       OR c.region != p.region OR c.corporate_title != p.corporate_title`)
+            ]);
 
             const movements = [...joins, ...leaves];
             for (const ch of changes) {
@@ -1945,6 +1939,7 @@
             }
 
             movementData = movements;
+            movementCacheKey = cacheKey;
         }
 
         async function renderMovementKPIs() {
@@ -1992,8 +1987,14 @@
         }
 
         async function renderJoinsLeavesChart() {
-            // Compute joins/leaves across all consecutive snapshot pairs in a single query
-            const rows = await query(`
+            // Cache this expensive query — it scans all snapshots and doesn't change on tab switch
+            const filterKey = getFilterWhere();
+            const cacheKey = `jl-${filterKey}`;
+            let rows;
+            if (joinsLeavesCacheKey === cacheKey && joinsLeavesCache) {
+                rows = joinsLeavesCache;
+            } else {
+                rows = await query(`
                 WITH snapshots AS (
                     SELECT DISTINCT snapshot_year, snapshot_month FROM hr ORDER BY 1, 2
                 ),
@@ -2027,6 +2028,9 @@
                 LEFT JOIN leaves l ON l.cy = p.cy AND l.cm = p.cm
                 ORDER BY p.cy, p.cm
             `);
+                joinsLeavesCache = rows;
+                joinsLeavesCacheKey = cacheKey;
+            }
 
             const labels = rows.map(r => monthLabel(r.snapshot_year, r.snapshot_month));
             const joinsArr = rows.map(r => Number(r.joins));
@@ -2198,10 +2202,47 @@
 
         async function renderExportSnapshotTable() {
             const where = getSnapshotWhere() + getFilterWhere();
-            exportSnapshotData = await query(`
+            const cacheKey = `export-${where}`;
+            if (exportSnapshotCacheKey === cacheKey && exportSnapshotData.length > 0) {
+                renderExportSnapshotRows();
+                return;
+            }
+            // Use lightweight query path: fetch raw Arrow result and convert in bulk
+            const result = await conn.query(`
                 SELECT * FROM hr WHERE ${where}
                 ORDER BY COALESCE(business_name, gpn)
             `);
+            // Detect date columns from schema
+            const dateCols = new Set();
+            if (result.schema && result.schema.fields) {
+                for (const field of result.schema.fields) {
+                    const t = String(field.type).toLowerCase();
+                    const n = field.name.toLowerCase();
+                    if (t.includes('date') || t.includes('timestamp') || n.includes('date')) {
+                        dateCols.add(field.name);
+                    }
+                }
+            }
+            const cols = result.schema ? result.schema.fields.map(f => f.name) : [];
+            const raw = result.toArray();
+            exportSnapshotData = new Array(raw.length);
+            for (let i = 0; i < raw.length; i++) {
+                const row = raw[i];
+                const obj = {};
+                for (const k of cols) {
+                    const v = row[k];
+                    if (v === null || v === undefined) { obj[k] = null; }
+                    else if (dateCols.has(k)) {
+                        if (typeof v === 'bigint') obj[k] = new Date(Number(v / 1000n));
+                        else if (typeof v === 'number') obj[k] = v < 100000 ? new Date(v * 86400000) : new Date(v);
+                        else obj[k] = v instanceof Date ? v : null;
+                    }
+                    else if (typeof v === 'bigint') { obj[k] = Number(v); }
+                    else { obj[k] = v; }
+                }
+                exportSnapshotData[i] = obj;
+            }
+            exportSnapshotCacheKey = cacheKey;
 
             renderExportSnapshotRows();
         }
