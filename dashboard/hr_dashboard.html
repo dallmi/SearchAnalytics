@@ -826,10 +826,18 @@
         let gcrsFilters = []; // [{level, value}]
 
         // ── Color palettes ──
-        const DIVISION_PALETTE = ['#AF8626', '#00759E', '#879420', '#4B2D58', '#9F8865', '#2E476B', '#469A6C', '#AD3E4A'];
+        const DIVISION_GRAYS = ['#404040', '#B8B3A2', '#5A5D5C', '#CCCABC', '#7A7870', '#8E8D83']; // high-contrast alternating order
+        let divisionColorMap = {}; // stable division→gray mapping, built on first data load
         const REGION_COLORS = { 'SWITZERLAND': '#00759E', 'EMEA': '#2E476B', 'AMERICAS': '#AF8626', 'APAC': '#4B2D58', 'Unknown': '#B8B3A2' };
         const COUNTRY_PALETTE = ['#879420', '#9F8865', '#469A6C', '#AD3E4A', '#8489BD', '#0C7EC6', '#654D16', '#804C95', '#45999C', '#4972AC'];
         const GRAY_PALETTE = ['#404040', '#5A5D5C', '#8E8D83', '#B8B3A2', '#CCCABC', '#7A7870', '#8E8D83', '#CCCABC', '#404040', '#7A7870'];
+
+        function getDivisionColor(divName) {
+            if (divisionColorMap[divName]) return divisionColorMap[divName];
+            const idx = Object.keys(divisionColorMap).length;
+            divisionColorMap[divName] = DIVISION_GRAYS[idx % DIVISION_GRAYS.length];
+            return divisionColorMap[divName];
+        }
 
         // ── Utility functions ──
         function formatNumber(num) {
@@ -1126,6 +1134,11 @@
                 ]);
                 hrColumns = new Set(colRows.map(r => r.column_name));
 
+                // Build stable division→gray mapping (sorted by headcount so largest divisions get first colors)
+                const divRows = await query(`SELECT COALESCE(gcrs_division_desc, '(Unassigned)') as division, COUNT(*) as cnt FROM hr GROUP BY 1 ORDER BY cnt DESC`);
+                divisionColorMap = {};
+                divRows.forEach((r, i) => { divisionColorMap[r.division] = DIVISION_GRAYS[i % DIVISION_GRAYS.length]; });
+
                 document.getElementById('loadingState').style.display = 'none';
                 document.getElementById('dashboardContent').style.display = 'block';
 
@@ -1334,7 +1347,7 @@
             const labels = rows.map(r => r.division);
             const values = rows.map(r => Number(r.cnt));
             const pcts = pctArray(values);
-            const colors = labels.map((_, i) => DIVISION_PALETTE[i % DIVISION_PALETTE.length]);
+            const colors = labels.map(l => getDivisionColor(l));
             const filteredColors = getFilteredColors(colors, labels, 'Division');
 
             destroyChart('division');
@@ -1497,7 +1510,9 @@
             const labels = rows.map(r => r.name);
             const values = rows.map(r => Number(r.cnt));
             const pcts = pctArray(values);
-            const colors = labels.map((_, i) => GRAY_PALETTE[i % GRAY_PALETTE.length]);
+            const colors = gcrsLevel === 0
+                ? labels.map(l => getDivisionColor(l))
+                : labels.map((_, i) => GRAY_PALETTE[i % GRAY_PALETTE.length]);
 
             // Build breadcrumb
             const bc = document.getElementById('gcrsBreadcrumb');
@@ -1725,7 +1740,7 @@
             const datasets = divisions.map((div, i) => ({
                 label: div,
                 data: monthKeys.map(k => dataMap[div]?.[k] || 0),
-                backgroundColor: DIVISION_PALETTE[i % DIVISION_PALETTE.length],
+                backgroundColor: getDivisionColor(div),
                 borderWidth: 0
             }));
 
@@ -2131,7 +2146,7 @@
             const labels = sorted.map(s => s[0]);
             const values = sorted.map(s => s[1]);
             const pcts = pctArray(values);
-            const colors = labels.map((_, i) => GRAY_PALETTE[i % GRAY_PALETTE.length]);
+            const colors = labels.map(l => getDivisionColor(l));
 
             destroyChart('transferDiv');
             const ctx = document.getElementById('transferDivChart').getContext('2d');
