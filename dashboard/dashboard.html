@@ -2843,8 +2843,8 @@
             const values = data.map(d => Number(d.sessions));
             const pcts = data.map(d => Number(d.pct));
             const REGION_COLORS = {
-                'SWITZERLAND': '#00759E', 'EMEA': '#2E476B',
-                'AMERICAS': '#AF8626', 'APAC': '#4B2D58', 'Unknown': '#B8B3A2'
+                'SWITZERLAND': '#404040', 'EMEA': '#B8B3A2',
+                'AMERICAS': '#5A5D5C', 'APAC': '#7A7870', 'Unknown': '#CCCABC'
             };
             const colors = getFilteredColors(
                 labels.map(l => REGION_COLORS[l] || '#CCCABC'),
