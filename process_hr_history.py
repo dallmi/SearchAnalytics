@@ -129,9 +129,9 @@ def read_geduld_file(filepath, file_date):
         # Strategy 2: string column — try pd.to_datetime with dayfirst=True
         if df[col].dtype == 'object':
             try:
-                parsed = pd.to_datetime(sample.astype(str), dayfirst=True, errors='coerce')
+                parsed = pd.to_datetime(sample.astype(str), dayfirst=True, format='mixed', errors='coerce')
                 if parsed.notna().sum() >= len(sample) * 0.8:
-                    df[col] = pd.to_datetime(df[col].astype(str), dayfirst=True, errors='coerce')
+                    df[col] = pd.to_datetime(df[col].astype(str), dayfirst=True, format='mixed', errors='coerce')
                     log(f"    Converted {col} to datetime (parsed from string)")
             except Exception:
                 pass
