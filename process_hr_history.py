@@ -98,9 +98,14 @@ def read_geduld_file(filepath, file_date):
     # Normalize column names
     df = normalize_columns(df)
 
-    # Ensure gpn is string (in case it was read as numeric)
+    # Ensure gpn is string and drop non-data rows (e.g. filter info rows at end of file)
     if 'gpn' in df.columns:
         df['gpn'] = df['gpn'].astype(str).str.strip()
+        before = len(df)
+        df = df[~df['gpn'].isin(['', 'nan', 'None', 'NaN', 'null'])]
+        dropped = before - len(df)
+        if dropped > 0:
+            log(f"    Dropped {dropped} non-data row(s) (empty/invalid GPN)")
 
     # Robustly convert date columns to proper datetime for parquet compatibility.
     # Excel dates may arrive as: datetime objects, serial numbers, or locale-
