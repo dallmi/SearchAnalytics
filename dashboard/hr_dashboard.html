@@ -749,21 +749,7 @@
                     <div class="insights-count" id="exportSnapshotCount"></div>
                     <div class="table-container" style="max-height:600px;">
                         <table id="exportSnapshotTable">
-                            <thead>
-                                <tr>
-                                    <th class="sort-header" data-sort="gpn">GPN</th>
-                                    <th class="sort-header" data-sort="business_name">Name</th>
-                                    <th class="sort-header" data-sort="email">Email</th>
-                                    <th class="sort-header" data-sort="hc_cluster">HC Cluster</th>
-                                    <th class="sort-header text-right" data-sort="fte">FTE</th>
-                                    <th class="sort-header" data-sort="employee_class_desc">Employee Class</th>
-                                    <th class="sort-header" data-sort="corporate_title">Title</th>
-                                    <th class="sort-header" data-sort="gcrs_division_desc">Division</th>
-                                    <th class="sort-header" data-sort="ou_desc">OU</th>
-                                    <th class="sort-header" data-sort="work_location_country">Country</th>
-                                    <th class="sort-header" data-sort="work_location_region">Region</th>
-                                </tr>
-                            </thead>
+                            <thead id="exportSnapshotHead"></thead>
                             <tbody id="exportSnapshotBody"></tbody>
                         </table>
                     </div>
@@ -2164,27 +2150,46 @@
         async function renderExportSnapshotTable() {
             const where = getSnapshotWhere() + getFilterWhere();
             exportSnapshotData = await query(`
-                SELECT h.gpn, COALESCE(h.business_name, '') as business_name, COALESCE(h.email, '') as email,
-                       COALESCE(h.hc_cluster, '') as hc_cluster, h.fte,
-                       COALESCE(h.employee_class_desc, '') as employee_class_desc,
-                       COALESCE(h.corporate_title, '') as corporate_title,
-                       COALESCE(h.gcrs_division_desc, '') as gcrs_division_desc,
-                       COALESCE(h.ou_desc, '') as ou_desc,
-                       COALESCE(h.work_location_country, '') as work_location_country,
-                       COALESCE(UPPER(h.work_location_region), '') as work_location_region
-                FROM hr h WHERE ${where}
-                ORDER BY h.business_name
+                SELECT * FROM hr WHERE ${where}
+                ORDER BY COALESCE(business_name, gpn)
             `);
 
             renderExportSnapshotRows();
         }
 
+        // Columns to hide from the export table (internal/redundant)
+        const EXPORT_HIDE_COLS = new Set(['snapshot_year', 'snapshot_month']);
+        let exportSnapshotCols = [];
+
         function renderExportSnapshotRows() {
+            if (exportSnapshotData.length === 0) {
+                document.getElementById('exportSnapshotHead').innerHTML = '';
+                document.getElementById('exportSnapshotBody').innerHTML = '<tr><td>No data</td></tr>';
+                document.getElementById('exportSnapshotCount').textContent = '0 records';
+                return;
+            }
+
+            // Derive columns from first row, excluding hidden ones
+            exportSnapshotCols = Object.keys(exportSnapshotData[0]).filter(c => !EXPORT_HIDE_COLS.has(c));
+
+            // Render header
+            const numericCols = new Set(['fte']);
+            document.getElementById('exportSnapshotHead').innerHTML = '<tr>' +
+                exportSnapshotCols.map(col =>
+                    `<th class="sort-header${numericCols.has(col) ? ' text-right' : ''}" data-sort="${col}">${escapeHtml(col.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}</th>`
+                ).join('') + '</tr>';
+
+            // Attach sort handlers via global handleSortClick
+            document.querySelectorAll('#exportSnapshotHead .sort-header').forEach(th => {
+                th.onclick = () => handleSortClick(th);
+            });
+
+            // Filter
             const searchVal = (document.getElementById('exportSnapshotSearch').value || '').toLowerCase();
             let filtered = exportSnapshotData;
             if (searchVal) {
                 filtered = filtered.filter(r =>
-                    Object.values(r).some(v => String(v).toLowerCase().includes(searchVal))
+                    Object.values(r).some(v => String(v ?? '').toLowerCase().includes(searchVal))
                 );
             }
 
@@ -2192,33 +2197,25 @@
             filtered.sort((a, b) => {
                 let aVal = a[exportSnapshotSort.col];
                 let bVal = b[exportSnapshotSort.col];
-                if (exportSnapshotSort.col === 'fte') {
+                if (numericCols.has(exportSnapshotSort.col)) {
                     aVal = Number(aVal) || 0;
                     bVal = Number(bVal) || 0;
                     return exportSnapshotSort.dir === 'asc' ? aVal - bVal : bVal - aVal;
                 }
-                const cmp = String(aVal || '').localeCompare(String(bVal || ''));
+                const cmp = String(aVal ?? '').localeCompare(String(bVal ?? ''));
                 return exportSnapshotSort.dir === 'asc' ? cmp : -cmp;
             });
 
             document.getElementById('exportSnapshotCount').textContent = `Showing ${Math.min(filtered.length, 1000)} of ${filtered.length} records`;
 
             const tbody = document.getElementById('exportSnapshotBody');
-            tbody.innerHTML = filtered.slice(0, 1000).map(r => `
-                <tr>
-                    <td>${escapeHtml(r.gpn)}</td>
-                    <td>${escapeHtml(r.business_name)}</td>
-                    <td>${escapeHtml(r.email)}</td>
-                    <td>${escapeHtml(r.hc_cluster)}</td>
-                    <td class="text-right">${formatDecimal(r.fte, 2)}</td>
-                    <td>${escapeHtml(r.employee_class_desc)}</td>
-                    <td>${escapeHtml(r.corporate_title)}</td>
-                    <td>${escapeHtml(r.gcrs_division_desc)}</td>
-                    <td>${escapeHtml(r.ou_desc)}</td>
-                    <td>${escapeHtml(r.work_location_country)}</td>
-                    <td>${escapeHtml(r.work_location_region)}</td>
-                </tr>
-            `).join('');
+            tbody.innerHTML = filtered.slice(0, 1000).map(r => '<tr>' +
+                exportSnapshotCols.map(col =>
+                    numericCols.has(col)
+                        ? `<td class="text-right">${formatDecimal(r[col], 2)}</td>`
+                        : `<td>${escapeHtml(String(r[col] ?? ''))}</td>`
+                ).join('') + '</tr>'
+            ).join('');
         }
 
         document.getElementById('exportSnapshotSearch').addEventListener('input', () => renderExportSnapshotRows());
@@ -2337,13 +2334,11 @@
         }
 
         function exportSnapshotCsv() {
-            const cols = ['gpn', 'business_name', 'email', 'hc_cluster', 'fte', 'employee_class_desc', 'corporate_title', 'gcrs_division_desc', 'ou_desc', 'work_location_country', 'work_location_region'];
-            downloadCsv(exportSnapshotData, cols, `hr_snapshot_${selectedYear}_${selectedMonth}.csv`);
+            downloadCsv(exportSnapshotData, exportSnapshotCols, `hr_snapshot_${selectedYear}_${selectedMonth}.csv`);
         }
 
         function exportSnapshotXlsx() {
-            const cols = ['gpn', 'business_name', 'email', 'hc_cluster', 'fte', 'employee_class_desc', 'corporate_title', 'gcrs_division_desc', 'ou_desc', 'work_location_country', 'work_location_region'];
-            downloadXlsx(exportSnapshotData, cols, `hr_snapshot_${selectedYear}_${selectedMonth}.xlsx`);
+            downloadXlsx(exportSnapshotData, exportSnapshotCols, `hr_snapshot_${selectedYear}_${selectedMonth}.xlsx`);
         }
 
         function exportMovementCsv() {
