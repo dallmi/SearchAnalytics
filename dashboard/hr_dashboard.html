@@ -2247,8 +2247,7 @@
                     if (numericCols.has(col)) return `<td class="text-right">${formatDecimal(v, 2)}</td>`;
                     if (v instanceof Date) return `<td>${formatDate(v)}</td>`;
                     return `<td>${escapeHtml(String(v ?? ''))}</td>`;
-                })
-                ).join('') + '</tr>'
+                }).join('') + '</tr>'
             ).join('');
         }
 
