@@ -22,14 +22,14 @@
     <style>
         :root {
             --primary: #E60000;
-            --primary-dark: #CC0000;
-            --primary-light: #FF3333;
+            --primary-dark: #8A000A;
+            --primary-light: #E60000;
             --black: #000000;
-            --dark-gray: #333333;
-            --medium-gray: #666666;
-            --light-gray: #D9D9D9;
-            --lighter-gray: #F5F5F5;
-            --row-alt: #FAFAFA;
+            --dark-gray: #404040;
+            --medium-gray: #7A7870;
+            --light-gray: #CCCABC;
+            --lighter-gray: #ECEBE4;
+            --row-alt: #F5F0E1;
             --white: #FFFFFF;
             --success: #6F7A1A;
             --success-light: #F0F2E6;
@@ -37,8 +37,8 @@
             --warning-light: #FDF6E3;
             --danger: #BD000C;
             --danger-light: #FFEBE6;
-            --info: #888888;
-            --info-light: #F5F5F5;
+            --info: #8E8D83;
+            --info-light: #ECEBE4;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -827,8 +827,8 @@
 
         // ── Color palettes ──
         const DIVISION_PALETTE = ['#AF8626', '#00759E', '#879420', '#4B2D58', '#9F8865', '#2E476B', '#469A6C', '#AD3E4A'];
-        const REGION_COLORS = { 'SWITZERLAND': '#BD000C', 'EMEA': '#333333', 'AMERICAS': '#E4A911', 'APAC': '#888888', 'Unknown': '#BBBBBB' };
-        const GRAY_PALETTE = ['#333', '#555', '#777', '#999', '#BBB', '#666', '#888', '#AAA', '#444', '#6A6A6A'];
+        const REGION_COLORS = { 'SWITZERLAND': '#BD000C', 'EMEA': '#404040', 'AMERICAS': '#E4A911', 'APAC': '#8E8D83', 'Unknown': '#CCCABC' };
+        const GRAY_PALETTE = ['#404040', '#5A5D5C', '#8E8D83', '#B8B3A2', '#CCCABC', '#7A7870', '#8E8D83', '#CCCABC', '#404040', '#7A7870'];
 
         // ── Utility functions ──
         function formatNumber(num) {
@@ -887,7 +887,7 @@
                                 c.fillText(`${pcts[i]}%`, bar.x - 6, bar.y);
                             }
                             c.font = '11px -apple-system, sans-serif';
-                            c.fillStyle = '#555';
+                            c.fillStyle = '#5A5D5C';
                             c.textBaseline = 'middle';
                             c.textAlign = 'left';
                             const outsideLabel = barWidth > 50
@@ -899,7 +899,7 @@
                             const barBottom = chart.scales.y.getPixelForValue(0);
                             const barHeight = barBottom - barTop;
                             c.font = '10px -apple-system, sans-serif';
-                            c.fillStyle = '#555';
+                            c.fillStyle = '#5A5D5C';
                             c.textAlign = 'center';
                             c.textBaseline = 'bottom';
                             const topLabel = barHeight > minBarSize
@@ -1376,7 +1376,7 @@
             const labels = rows.map(r => r.region);
             const values = rows.map(r => Number(r.cnt));
             const pcts = pctArray(values);
-            const colors = labels.map(l => REGION_COLORS[l] || '#BBBBBB');
+            const colors = labels.map(l => REGION_COLORS[l] || '#CCCABC');
             const filteredColors = getFilteredColors(colors, labels, 'Region');
 
             destroyChart('region');
@@ -1602,7 +1602,7 @@
             const labels = rows.map(r => r.type);
             const values = rows.map(r => Number(r.cnt));
             const pcts = pctArray(values);
-            const colors = ['#555', '#BBB'];
+            const colors = ['#5A5D5C', '#CCCABC'];
 
             destroyChart('intExt');
             const ctx = document.getElementById('intExtChart').getContext('2d');
@@ -1656,8 +1656,8 @@
                         {
                             label: 'Headcount',
                             data: hcValues,
-                            borderColor: '#333',
-                            backgroundColor: '#33333320',
+                            borderColor: '#404040',
+                            backgroundColor: '#40404020',
                             fill: false,
                             tension: 0.3,
                             yAxisID: 'y',
@@ -1667,11 +1667,11 @@
                         {
                             label: 'FTE',
                             data: fteValues,
-                            borderColor: '#999',
-                            backgroundColor: '#99999920',
+                            borderColor: '#B8B3A2',
+                            backgroundColor: '#B8B3A220',
                             fill: false,
                             tension: 0.3,
-                            yAxisID: 'y1',
+                            yAxisID: 'y',
                             pointRadius: 3,
                             pointHoverRadius: 5,
                             borderDash: [5, 5]
@@ -1690,18 +1690,9 @@
                         x: { grid: { display: false }, ticks: { font: { size: 10 } } },
                         y: {
                             type: 'linear',
-                            position: 'left',
                             beginAtZero: true,
-                            title: { display: true, text: 'Headcount', font: { size: 11 } },
-                            grid: { color: '#eee' },
-                            ticks: { font: { size: 10 } }
-                        },
-                        y1: {
-                            type: 'linear',
-                            position: 'right',
-                            beginAtZero: true,
-                            title: { display: true, text: 'FTE', font: { size: 11 } },
-                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'Headcount / FTE', font: { size: 11 } },
+                            grid: { color: '#ECEBE4' },
                             ticks: { font: { size: 10 } }
                         }
                     }
@@ -1751,7 +1742,7 @@
                     },
                     scales: {
                         x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
-                        y: { stacked: true, grid: { color: '#eee' }, ticks: { font: { size: 10 } } }
+                        y: { stacked: true, grid: { color: '#ECEBE4' }, ticks: { font: { size: 10 } } }
                     }
                 }
             });
@@ -1780,7 +1771,7 @@
             const datasets = regions.map(reg => ({
                 label: reg,
                 data: monthKeys.map(k => dataMap[reg]?.[k] || 0),
-                backgroundColor: REGION_COLORS[reg] || '#BBBBBB',
+                backgroundColor: REGION_COLORS[reg] || '#CCCABC',
                 borderWidth: 0
             }));
 
@@ -1798,7 +1789,7 @@
                     },
                     scales: {
                         x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
-                        y: { stacked: true, grid: { color: '#eee' }, ticks: { font: { size: 10 } } }
+                        y: { stacked: true, grid: { color: '#ECEBE4' }, ticks: { font: { size: 10 } } }
                     }
                 }
             });
@@ -1841,7 +1832,7 @@
                     },
                     scales: {
                         x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-                        y: { grid: { color: '#eee' }, ticks: { font: { size: 10 }, callback: v => v.toFixed(2) + '%' } }
+                        y: { grid: { color: '#ECEBE4' }, ticks: { font: { size: 10 }, callback: v => v.toFixed(2) + '%' } }
                     }
                 }
             });
@@ -2092,7 +2083,7 @@
                     },
                     scales: {
                         x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
-                        y: { stacked: true, grid: { color: '#eee' }, ticks: { font: { size: 10 } } }
+                        y: { stacked: true, grid: { color: '#ECEBE4' }, ticks: { font: { size: 10 } } }
                     }
                 }
             });
