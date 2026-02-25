@@ -1167,30 +1167,36 @@
         // ── Helper: run query and return rows ──
         async function query(sql) {
             const result = await conn.query(sql);
-            // Detect date/timestamp columns from Arrow schema
+            // Detect date/timestamp columns from Arrow schema + column name heuristic
             const dateFields = new Set();
             if (result.schema && result.schema.fields) {
                 for (const field of result.schema.fields) {
                     const t = String(field.type).toLowerCase();
-                    if (t.includes('date') || t.includes('timestamp')) {
+                    const n = field.name.toLowerCase();
+                    if (t.includes('date') || t.includes('timestamp') || n.includes('date')) {
                         dateFields.add(field.name);
                     }
                 }
             }
-            const EPOCH = new Date('1970-01-01');
             return result.toArray().map(row => {
                 const obj = {};
                 for (const [k, v] of Object.entries(row)) {
-                    if (dateFields.has(k)) {
+                    if (v === null || v === undefined) {
+                        obj[k] = null;
+                    } else if (dateFields.has(k)) {
+                        let d;
                         if (typeof v === 'bigint') {
-                            // TIMESTAMP: microseconds since epoch
-                            obj[k] = new Date(Number(v / 1000n));
+                            d = new Date(Number(v / 1000n)); // TIMESTAMP µs→ms
                         } else if (typeof v === 'number') {
-                            // DATE: days since epoch
-                            obj[k] = new Date(v * 86400000);
+                            // Heuristic: small number = days since epoch, large = ms since epoch
+                            d = v < 100000 ? new Date(v * 86400000) : new Date(v);
+                        } else if (v instanceof Date) {
+                            d = v;
                         } else {
-                            obj[k] = v;
+                            // String or other — try parsing
+                            d = new Date(String(v));
                         }
+                        obj[k] = (d instanceof Date && !isNaN(d)) ? d : null;
                     } else {
                         obj[k] = typeof v === 'bigint' ? Number(v) : v;
                     }
