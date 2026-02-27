@@ -25,25 +25,26 @@ SearchAnalytics/
 │   ├── searches_daily.parquet
 │   ├── searches_journeys.parquet
 │   └── searches_terms.parquet
-└── process_search_analytics.py
+└── scripts/
+    └── process_search_analytics.py
 ```
 
 ## Usage
 
 ### Basic Usage (Auto-detect latest file)
 ```bash
-python process_search_analytics.py
+python scripts/process_search_analytics.py
 ```
 The script automatically finds the file with the most recent date suffix in the `input/` folder.
 
 ### Process a Specific File
 ```bash
-python process_search_analytics.py input/search_export_2025_01_13.xlsx
+python scripts/process_search_analytics.py input/search_export_2025_01_13.xlsx
 ```
 
 ### Full Refresh (Reprocess all files)
 ```bash
-python process_search_analytics.py --full-refresh
+python scripts/process_search_analytics.py --full-refresh
 ```
 This deletes the existing database and reprocesses all files in chronological order.
 
@@ -310,7 +311,7 @@ Four Parquet files are generated for Power BI (plus one for search term analysis
 
 3. **Run the processing script**
    ```bash
-   python process_search_analytics.py
+   python scripts/process_search_analytics.py
    ```
 
 4. **Refresh Power BI**
@@ -328,7 +329,7 @@ If your weekly exports have overlapping date ranges (e.g., last 30 days each tim
 
 If you need to rebuild from scratch:
 ```bash
-python process_search_analytics.py --full-refresh
+python scripts/process_search_analytics.py --full-refresh
 ```
 This processes all files in `input/` in chronological order (oldest first).
 

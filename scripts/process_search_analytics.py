@@ -7,9 +7,9 @@ It creates/updates a DuckDB database with all calculated columns and exports
 Parquet files for Power BI consumption.
 
 Usage:
-    python process_search_analytics.py                    # Auto-detect latest file in input/
-    python process_search_analytics.py input/export.xlsx  # Process specific file
-    python process_search_analytics.py --full-refresh     # Delete DB and reprocess all files
+    python scripts/process_search_analytics.py                    # Auto-detect latest file in input/
+    python scripts/process_search_analytics.py input/export.xlsx  # Process specific file
+    python scripts/process_search_analytics.py --full-refresh     # Delete DB and reprocess all files
 
 Input folder: input/
     Place your KQL export files here with date suffix _YYYY_MM_DD, e.g.:
@@ -1557,11 +1557,11 @@ def process_search_analytics(input_file=None, full_refresh=False):
         full_refresh: If True, delete DB and reprocess all files
     """
     # Determine paths
-    script_dir = Path(__file__).parent
-    input_dir = script_dir / 'input'
-    data_dir = script_dir / 'data'
-    output_dir = script_dir / 'output'
-    mappings_dir = script_dir / 'mappings'
+    project_dir = Path(__file__).parent.parent
+    input_dir = project_dir / 'input'
+    data_dir = project_dir / 'data'
+    output_dir = project_dir / 'output'
+    mappings_dir = project_dir / 'mappings'
     db_path = data_dir / 'searchanalytics.db'
 
     # Create directories

@@ -6,8 +6,8 @@ Reads GEDULD Excel files from mappings/ and consolidates them into a single
 Parquet file for historical headcount analysis.
 
 Usage:
-    python process_hr_history.py              # Append only new GEDULD files
-    python process_hr_history.py --force      # Full rebuild from all GEDULD files
+    python scripts/process_hr_history.py              # Append only new GEDULD files
+    python scripts/process_hr_history.py --force      # Full rebuild from all GEDULD files
 
 Input folder: mappings/
     Place your monthly GEDULD files here with date suffix _YYYY_MM_DD, e.g.:
@@ -222,9 +222,9 @@ def log_summary(output_file, files_processed, mode='full'):
 
 def process_hr_history(force=False):
     """Main processing function."""
-    script_dir = Path(os.path.dirname(os.path.abspath(__file__)))
-    mappings_dir = script_dir / 'mappings'
-    output_dir = script_dir / 'output'
+    project_dir = Path(os.path.dirname(os.path.abspath(__file__))).parent
+    mappings_dir = project_dir / 'mappings'
+    output_dir = project_dir / 'output'
     output_file = output_dir / 'hr_history.parquet'
 
     log("=" * 60)
