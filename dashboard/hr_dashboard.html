@@ -561,6 +561,7 @@
                 <button class="nav-tab" data-nav="trends">Trends</button>
                 <button class="nav-tab" data-nav="movement">Movement</button>
                 <button class="nav-tab" data-nav="export">Export</button>
+                <button class="nav-tab" data-nav="smallous">Small OUs</button>
             </div>
 
             <!-- Snapshot Tab -->
@@ -792,6 +793,41 @@
                 </div>
             </div>
 
+            <!-- Small OUs Tab -->
+            <div class="nav-content" id="navSmallous">
+                <div class="kpi-grid" id="smallOUsKpiGrid"></div>
+
+                <div class="chart-card full-width" style="margin:1rem 2rem;">
+                    <div class="chart-title">
+                        OUs with fewer than
+                        <input type="number" id="smallOUThreshold" value="10" min="1" max="500"
+                            style="width:60px; border:1px solid var(--light-gray); border-radius:4px; padding:2px 6px; font-size:inherit; text-align:center;">
+                        people
+                    </div>
+                    <div class="table-controls">
+                        <input type="text" class="search-input" id="smallOUSearch" placeholder="Search OU code, description, division..." style="max-width:350px;">
+                        <div style="flex:1;"></div>
+                        <button class="export-btn" onclick="exportSmallOUsCsv()">Export CSV</button>
+                        <button class="export-btn" onclick="exportSmallOUsXlsx()">Export XLSX</button>
+                    </div>
+                    <div class="insights-count" id="smallOUsCount"></div>
+                    <div class="table-container" style="max-height:600px;">
+                        <table id="smallOUsTable">
+                            <thead>
+                                <tr>
+                                    <th class="sort-header" data-sort="ou_code">OU Code</th>
+                                    <th class="sort-header" data-sort="ou_desc">OU Description</th>
+                                    <th class="sort-header" data-sort="division">Division</th>
+                                    <th class="sort-header text-right" data-sort="headcount">Headcount</th>
+                                    <th class="sort-header text-right" data-sort="total_fte">FTE</th>
+                                </tr>
+                            </thead>
+                            <tbody id="smallOUsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </main>
 
@@ -818,6 +854,9 @@
         let exportSnapshotSort = { col: 'business_name', dir: 'asc' };
         let exportMovementData = [];
         let exportMovementSort = { col: 'type', dir: 'asc' };
+        let smallOUsSort = { col: 'headcount', dir: 'asc' };
+        let smallOUsData = [];
+        let smallOUsCacheKey = null;
 
         // GCRS drill state
         const GCRS_LEVELS = ['gcrs_division_desc', 'gcrs_unit_desc', 'gcrs_area_desc', 'gcrs_sector_desc', 'gcrs_segment_desc', 'gcrs_function_desc'];
@@ -1083,6 +1122,7 @@
                 else if (tab === 'trends') await renderTrendsTab();
                 else if (tab === 'movement') await renderMovementTab();
                 else if (tab === 'export') await renderExportTab();
+                else if (tab === 'smallous') await renderSmallOUsTab();
                 updateStatus('success', `Snapshot: ${monthLabel(selectedYear, selectedMonth)}`);
             } catch (err) {
                 console.error('Render error:', err);
@@ -2393,6 +2433,126 @@
         document.getElementById('exportMovementSearch').addEventListener('input', () => renderExportMovementRows());
         document.getElementById('exportMovementTypeFilter').addEventListener('change', () => renderExportMovementRows());
 
+        // ══════════════════════════════════════
+        //  SMALL OUs TAB
+        // ══════════════════════════════════════
+        async function renderSmallOUsTab() {
+            const threshold = parseInt(document.getElementById('smallOUThreshold').value) || 10;
+            const where = getSnapshotWhere() + getFilterWhere();
+            const cacheKey = `smallous-${where}-${threshold}`;
+
+            if (smallOUsCacheKey !== cacheKey) {
+                const ouCodeExpr = hrColumns.has('ou_code') ? "COALESCE(ou_code, '(Unknown)')" : "'(Unknown)'";
+                const ouDescExpr = hrColumns.has('ou_desc') ? "COALESCE(ou_desc, '(Unassigned)')" : "'(Unassigned)'";
+
+                const rows = await query(`
+                    SELECT
+                        ${ouCodeExpr} as ou_code,
+                        ${ouDescExpr} as ou_desc,
+                        COALESCE(gcrs_division_desc, '(Unassigned)') as division,
+                        COUNT(*) as headcount,
+                        ROUND(CAST(SUM(fte) AS DOUBLE), 1) as total_fte
+                    FROM hr
+                    WHERE ${where}
+                    GROUP BY 1, 2, 3
+                    HAVING COUNT(*) < ${threshold}
+                    ORDER BY headcount ASC, ou_desc ASC
+                `);
+
+                smallOUsData = rows.map(r => ({
+                    ou_code: r.ou_code,
+                    ou_desc: r.ou_desc,
+                    division: r.division,
+                    headcount: Number(r.headcount),
+                    total_fte: r.total_fte !== null && r.total_fte !== undefined ? Number(r.total_fte) : null
+                }));
+                smallOUsCacheKey = cacheKey;
+            }
+
+            const totalOUs = smallOUsData.length;
+            const totalHc = smallOUsData.reduce((s, r) => s + r.headcount, 0);
+            const totalFte = smallOUsData.reduce((s, r) => s + (r.total_fte || 0), 0);
+
+            document.getElementById('smallOUsKpiGrid').innerHTML = `
+                <div class="kpi-card highlight">
+                    <div class="kpi-label">Small OUs</div>
+                    <div class="kpi-value">${formatNumber(totalOUs)}</div>
+                    <div class="kpi-subtitle">OUs with &lt; ${threshold} people</div>
+                </div>
+                <div class="kpi-card info">
+                    <div class="kpi-label">Total Headcount</div>
+                    <div class="kpi-value">${formatNumber(totalHc)}</div>
+                    <div class="kpi-subtitle">Across all small OUs</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Total FTE</div>
+                    <div class="kpi-value">${formatDecimal(totalFte, 1)}</div>
+                    <div class="kpi-subtitle">FTE in small OUs</div>
+                </div>
+            `;
+
+            renderSmallOUsRows();
+        }
+
+        function renderSmallOUsRows() {
+            const searchVal = (document.getElementById('smallOUSearch').value || '').toLowerCase();
+            const threshold = parseInt(document.getElementById('smallOUThreshold').value) || 10;
+
+            let filtered = smallOUsData;
+            if (searchVal) {
+                filtered = filtered.filter(r =>
+                    Object.values(r).some(v => String(v ?? '').toLowerCase().includes(searchVal))
+                );
+            }
+
+            filtered.sort((a, b) => {
+                let aVal = a[smallOUsSort.col];
+                let bVal = b[smallOUsSort.col];
+                if (smallOUsSort.col === 'headcount' || smallOUsSort.col === 'total_fte') {
+                    aVal = Number(aVal) || 0;
+                    bVal = Number(bVal) || 0;
+                    return smallOUsSort.dir === 'asc' ? aVal - bVal : bVal - aVal;
+                }
+                const cmp = String(aVal ?? '').localeCompare(String(bVal ?? ''));
+                return smallOUsSort.dir === 'asc' ? cmp : -cmp;
+            });
+
+            document.getElementById('smallOUsCount').textContent =
+                `${filtered.length} OU${filtered.length !== 1 ? 's' : ''} with fewer than ${threshold} people`;
+
+            const hcBadge = (hc) => {
+                const cls = hc === 1 ? 'badge-danger' : hc <= 3 ? 'badge-warning' : 'badge-info';
+                return `<span class="badge ${cls}">${formatNumber(hc)}</span>`;
+            };
+
+            const tbody = document.getElementById('smallOUsBody');
+            tbody.innerHTML = filtered.map(r => `
+                <tr>
+                    <td><code style="font-size:0.78rem; background:var(--lighter-gray); padding:2px 5px; border-radius:3px;">${escapeHtml(r.ou_code)}</code></td>
+                    <td>${escapeHtml(r.ou_desc)}</td>
+                    <td>${escapeHtml(r.division)}</td>
+                    <td class="text-right">${hcBadge(r.headcount)}</td>
+                    <td class="text-right">${r.total_fte !== null ? formatDecimal(r.total_fte, 1) : '\u2014'}</td>
+                </tr>
+            `).join('');
+        }
+
+        document.getElementById('smallOUSearch').addEventListener('input', () => renderSmallOUsRows());
+        document.getElementById('smallOUThreshold').addEventListener('change', () => {
+            smallOUsCacheKey = null; // invalidate cache so query re-runs with new threshold
+            renderCurrentTab();
+        });
+
+        function exportSmallOUsCsv() {
+            downloadCsv(smallOUsData, ['ou_code', 'ou_desc', 'division', 'headcount', 'total_fte'],
+                `small_ous_lt${document.getElementById('smallOUThreshold').value}_${selectedYear}-${String(selectedMonth).padStart(2,'0')}.csv`);
+        }
+
+        function exportSmallOUsXlsx() {
+            downloadXlsx(smallOUsData, ['ou_code', 'ou_desc', 'division', 'headcount', 'total_fte'],
+                `small_ous_lt${document.getElementById('smallOUThreshold').value}_${selectedYear}-${String(selectedMonth).padStart(2,'0')}.xlsx`);
+        }
+
         // ── Sort handler ──
         function handleSortClick(th) {
             const table = th.closest('table');
@@ -2404,6 +2564,7 @@
             if (table.id === 'movementTable') sortState = movementSort;
             else if (table.id === 'exportSnapshotTable') sortState = exportSnapshotSort;
             else if (table.id === 'exportMovementTable') sortState = exportMovementSort;
+            else if (table.id === 'smallOUsTable') sortState = smallOUsSort;
             else return;
 
             if (sortState.col === col) {
@@ -2425,6 +2586,7 @@
             if (table.id === 'movementTable') renderMovementTable();
             else if (table.id === 'exportSnapshotTable') renderExportSnapshotRows();
             else if (table.id === 'exportMovementTable') renderExportMovementRows();
+            else if (table.id === 'smallOUsTable') renderSmallOUsRows();
         }
 
         // ── CSV / XLSX Export ──
