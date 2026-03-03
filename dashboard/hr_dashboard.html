@@ -2496,10 +2496,11 @@
                 });
                 const [rows, hcRows] = await Promise.all([
                     query(parts.join('\nUNION ALL\n')),
-                    query(`SELECT CAST(COUNT(*) AS INTEGER) as total_hc FROM hr WHERE ${where}`)
+                    query(`SELECT CAST(COUNT(*) AS INTEGER) as total_hc, ROUND(CAST(SUM(fte) AS DOUBLE), 1) as total_fte FROM hr WHERE ${where}`)
                 ]);
-                const totalHc = Number(hcRows[0].total_hc);
-                const summary = { _totalHc: totalHc };
+                const totalHc  = Number(hcRows[0].total_hc);
+                const totalFte = Number(hcRows[0].total_fte);
+                const summary = { _totalHc: totalHc, _totalFte: totalFte };
                 rows.forEach(r => {
                     summary[r.key] = {
                         small:   Number(r.small_count),
@@ -2571,10 +2572,14 @@
                 smallOUsCacheKey = cacheKey;
             }
 
-            const levelLabel = levelCfg.label;
+            const levelLabel  = levelCfg.label;
             const totalGroups = smallOUsData.length;
-            const totalHc = smallOUsData.reduce((s, r) => s + r.headcount, 0);
-            const totalFte = smallOUsData.reduce((s, r) => s + (r.total_fte || 0), 0);
+            const totalHc     = smallOUsData.reduce((s, r) => s + r.headcount, 0);
+            const totalFte    = smallOUsData.reduce((s, r) => s + (r.total_fte || 0), 0);
+            const companyHc   = (smallGroupsSummaryCache && smallGroupsSummaryCache._totalHc)  || 0;
+            const companyFte  = (smallGroupsSummaryCache && smallGroupsSummaryCache._totalFte) || 0;
+            const hcPct       = companyHc  > 0 ? (totalHc  / companyHc  * 100).toFixed(1) : '0.0';
+            const ftePct      = companyFte > 0 ? (totalFte / companyFte * 100).toFixed(1) : '0.0';
 
             document.getElementById('smallOUsKpiGrid').innerHTML = `
                 <div class="kpi-card highlight">
@@ -2583,14 +2588,14 @@
                     <div class="kpi-subtitle">${levelLabel}s with &lt; ${threshold} people</div>
                 </div>
                 <div class="kpi-card info">
-                    <div class="kpi-label">Total Headcount</div>
+                    <div class="kpi-label">Headcount in small ${levelLabel}s</div>
                     <div class="kpi-value">${formatNumber(totalHc)}</div>
-                    <div class="kpi-subtitle">Across all small ${levelLabel}s</div>
+                    <div class="kpi-subtitle">${hcPct}% of ${formatNumber(companyHc)} total workforce</div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">Total FTE</div>
+                    <div class="kpi-label">FTE in small ${levelLabel}s</div>
                     <div class="kpi-value">${formatDecimal(totalFte, 1)}</div>
-                    <div class="kpi-subtitle">FTE in small ${levelLabel}s</div>
+                    <div class="kpi-subtitle">${ftePct}% of ${formatDecimal(companyFte, 1)} total FTE</div>
                 </div>
             `;
 
