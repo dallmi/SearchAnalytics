@@ -814,10 +814,7 @@
                     <button class="level-tab" data-level="division">Division</button>
                     <button class="level-tab" data-level="unit">Unit</button>
                     <button class="level-tab" data-level="area">Area</button>
-                    <button class="level-tab" data-level="sector">Sector</button>
-                    <button class="level-tab" data-level="segment">Segment</button>
-                    <button class="level-tab" data-level="function">Function</button>
-                    <button class="level-tab active" data-level="ou">OU</button>
+                    <button class="level-tab active" data-level="sector">Sector</button>
                 </div>
 
                 <div class="chart-card full-width" style="margin:0 2rem 1rem;">
@@ -872,7 +869,7 @@
         let smallOUsSort = { col: 'headcount', dir: 'asc' };
         let smallOUsData = [];
         let smallOUsCacheKey = null;
-        let smallGroupsLevel = 'ou';
+        let smallGroupsLevel = 'sector';
         let smallGroupsSummaryCache = null;
         let smallGroupsSummaryCacheKey = null;
 
@@ -881,14 +878,11 @@
             { key: 'unit',     label: 'Unit',     col: 'gcrs_unit_desc',     parentCol: 'gcrs_division_desc', parentLabel: 'Division' },
             { key: 'area',     label: 'Area',     col: 'gcrs_area_desc',     parentCol: 'gcrs_unit_desc',     parentLabel: 'Unit' },
             { key: 'sector',   label: 'Sector',   col: 'gcrs_sector_desc',   parentCol: 'gcrs_area_desc',     parentLabel: 'Area' },
-            { key: 'segment',  label: 'Segment',  col: 'gcrs_segment_desc',  parentCol: 'gcrs_sector_desc',   parentLabel: 'Sector' },
-            { key: 'function', label: 'Function', col: 'gcrs_function_desc', parentCol: 'gcrs_segment_desc',  parentLabel: 'Segment' },
-            { key: 'ou',       label: 'OU',       col: 'ou_desc',            parentCol: 'gcrs_function_desc', parentLabel: 'Function', codeCol: 'ou_code' },
         ];
 
         // GCRS drill state
-        const GCRS_LEVELS = ['gcrs_division_desc', 'gcrs_unit_desc', 'gcrs_area_desc', 'gcrs_sector_desc', 'gcrs_segment_desc', 'gcrs_function_desc'];
-        const GCRS_LABELS = ['Division', 'Unit', 'Area', 'Sector', 'Segment', 'Function'];
+        const GCRS_LEVELS = ['gcrs_division_desc', 'gcrs_unit_desc', 'gcrs_area_desc', 'gcrs_sector_desc'];
+        const GCRS_LABELS = ['Division', 'Unit', 'Area', 'Sector'];
         let gcrsLevel = 0;
         let gcrsFilters = []; // [{level, value}]
 
