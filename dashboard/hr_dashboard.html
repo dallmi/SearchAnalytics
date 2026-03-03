@@ -2485,31 +2485,45 @@
             const cacheKey = `overview-${where}-${threshold}`;
 
             if (smallGroupsSummaryCacheKey !== cacheKey) {
-                // Single UNION ALL query — one subquery per level
+                // UNION ALL — one subquery per level, plus total headcount in parallel
                 const parts = SMALL_GROUPS_LEVELS.map(l => {
                     const col = hrColumns.has(l.col) ? `COALESCE(${l.col}, '(Unassigned)')` : `'(Unassigned)'`;
                     return `SELECT '${l.key}' as key,
                         SUM(CASE WHEN hc < ${threshold} THEN 1 ELSE 0 END) as small_count,
-                        COUNT(*) as total_count
+                        COUNT(*) as total_count,
+                        SUM(CASE WHEN hc < ${threshold} THEN hc ELSE 0 END) as small_hc
                     FROM (SELECT ${col} as grp, COUNT(*) as hc FROM hr WHERE ${where} GROUP BY 1)`;
                 });
-                const rows = await query(parts.join('\nUNION ALL\n'));
-                const summary = {};
-                rows.forEach(r => { summary[r.key] = { small: Number(r.small_count), total: Number(r.total_count) }; });
+                const [rows, hcRows] = await Promise.all([
+                    query(parts.join('\nUNION ALL\n')),
+                    query(`SELECT COUNT(*) as total_hc FROM hr WHERE ${where}`)
+                ]);
+                const totalHc = Number(hcRows[0].total_hc);
+                const summary = { _totalHc: totalHc };
+                rows.forEach(r => {
+                    summary[r.key] = {
+                        small:   Number(r.small_count),
+                        total:   Number(r.total_count),
+                        smallHc: Number(r.small_hc)
+                    };
+                });
                 smallGroupsSummaryCache = summary;
                 smallGroupsSummaryCacheKey = cacheKey;
             }
 
+            const totalHc = smallGroupsSummaryCache._totalHc;
             const grid = document.getElementById('smallGroupsOverview');
             grid.innerHTML = SMALL_GROUPS_LEVELS.map(l => {
-                const s = smallGroupsSummaryCache[l.key] || { small: 0, total: 0 };
+                const s = smallGroupsSummaryCache[l.key] || { small: 0, total: 0, smallHc: 0 };
                 const cardClass = s.small === 0 ? 'success' : '';
-                const pct = s.total > 0 ? Math.round(s.small / s.total * 100) : 0;
+                const groupPct = s.total > 0 ? Math.round(s.small / s.total * 100) : 0;
+                const hcPct = totalHc > 0 ? (s.smallHc / totalHc * 100).toFixed(1) : '0.0';
                 const isActive = smallGroupsLevel === l.key;
                 return `<div class="kpi-card ${cardClass}${isActive ? ' active-level' : ''}" onclick="setSmallGroupsLevel('${l.key}')">
                     <div class="kpi-label">${l.label}</div>
                     <div class="kpi-value">${formatNumber(s.small)}</div>
-                    <div class="kpi-subtitle">of ${formatNumber(s.total)}${s.small > 0 ? ' (' + pct + '%)' : ''}</div>
+                    <div class="kpi-subtitle">of ${formatNumber(s.total)} groups${s.small > 0 ? ' (' + groupPct + '%)' : ''}</div>
+                    <div class="kpi-subtitle">${formatNumber(s.smallHc)} people &middot; ${hcPct}% of total</div>
                 </div>`;
             }).join('');
         }
