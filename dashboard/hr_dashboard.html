@@ -389,6 +389,11 @@
         .level-tab:hover { color: var(--dark-gray); }
         .level-tab.active { color: var(--black); border-bottom-color: var(--primary); font-weight: 500; }
 
+        #smallGroupsOverview { padding: 0 2rem 0.5rem; grid-template-columns: repeat(7, 1fr); }
+        #smallGroupsOverview .kpi-card { cursor: pointer; }
+        #smallGroupsOverview .kpi-card .kpi-value { font-size: 1.5rem; }
+        #smallGroupsOverview .kpi-card.active-level { outline: 2px solid var(--primary); outline-offset: 2px; }
+
         .tab-content { display: none; }
         .tab-content.active { display: block; }
 
@@ -800,6 +805,9 @@
 
             <!-- Small Groups Tab -->
             <div class="nav-content" id="navSmallous">
+                <!-- Overview: one card per level, click to drill in -->
+                <div class="kpi-grid" id="smallGroupsOverview"></div>
+
                 <div class="kpi-grid" id="smallOUsKpiGrid"></div>
 
                 <div class="level-tabs">
@@ -865,6 +873,8 @@
         let smallOUsData = [];
         let smallOUsCacheKey = null;
         let smallGroupsLevel = 'ou';
+        let smallGroupsSummaryCache = null;
+        let smallGroupsSummaryCacheKey = null;
 
         const SMALL_GROUPS_LEVELS = [
             { key: 'division', label: 'Division', col: 'gcrs_division_desc', parentCol: null,                 parentLabel: null },
@@ -1123,12 +1133,7 @@
 
             // Level tabs (Small Groups)
             if (e.target.classList.contains('level-tab')) {
-                document.querySelectorAll('.level-tab').forEach(t => t.classList.remove('active'));
-                e.target.classList.add('active');
-                smallGroupsLevel = e.target.dataset.level;
-                smallOUsCacheKey = null;
-                smallOUsSort = { col: 'headcount', dir: 'asc' };
-                renderCurrentTab();
+                setSmallGroupsLevel(e.target.dataset.level);
             }
 
             // Sort headers
@@ -2464,7 +2469,54 @@
         // ══════════════════════════════════════
         //  SMALL GROUPS TAB
         // ══════════════════════════════════════
+        function setSmallGroupsLevel(key) {
+            document.querySelectorAll('.level-tab').forEach(t => t.classList.remove('active'));
+            const btn = document.querySelector(`.level-tab[data-level="${key}"]`);
+            if (btn) btn.classList.add('active');
+            smallGroupsLevel = key;
+            smallOUsCacheKey = null;
+            smallOUsSort = { col: 'headcount', dir: 'asc' };
+            renderCurrentTab();
+        }
+
+        async function renderSmallGroupsOverview() {
+            const threshold = parseInt(document.getElementById('smallOUThreshold').value) || 10;
+            const where = getSnapshotWhere() + getFilterWhere();
+            const cacheKey = `overview-${where}-${threshold}`;
+
+            if (smallGroupsSummaryCacheKey !== cacheKey) {
+                // Single UNION ALL query — one subquery per level
+                const parts = SMALL_GROUPS_LEVELS.map(l => {
+                    const col = hrColumns.has(l.col) ? `COALESCE(${l.col}, '(Unassigned)')` : `'(Unassigned)'`;
+                    return `SELECT '${l.key}' as key,
+                        SUM(CASE WHEN hc < ${threshold} THEN 1 ELSE 0 END) as small_count,
+                        COUNT(*) as total_count
+                    FROM (SELECT ${col} as grp, COUNT(*) as hc FROM hr WHERE ${where} GROUP BY 1)`;
+                });
+                const rows = await query(parts.join('\nUNION ALL\n'));
+                const summary = {};
+                rows.forEach(r => { summary[r.key] = { small: Number(r.small_count), total: Number(r.total_count) }; });
+                smallGroupsSummaryCache = summary;
+                smallGroupsSummaryCacheKey = cacheKey;
+            }
+
+            const grid = document.getElementById('smallGroupsOverview');
+            grid.innerHTML = SMALL_GROUPS_LEVELS.map(l => {
+                const s = smallGroupsSummaryCache[l.key] || { small: 0, total: 0 };
+                const cardClass = s.small === 0 ? 'success' : '';
+                const pct = s.total > 0 ? Math.round(s.small / s.total * 100) : 0;
+                const isActive = smallGroupsLevel === l.key;
+                return `<div class="kpi-card ${cardClass}${isActive ? ' active-level' : ''}" onclick="setSmallGroupsLevel('${l.key}')">
+                    <div class="kpi-label">${l.label}</div>
+                    <div class="kpi-value">${formatNumber(s.small)}</div>
+                    <div class="kpi-subtitle">of ${formatNumber(s.total)}${s.small > 0 ? ' (' + pct + '%)' : ''}</div>
+                </div>`;
+            }).join('');
+        }
+
         async function renderSmallOUsTab() {
+            await renderSmallGroupsOverview();
+
             const threshold = parseInt(document.getElementById('smallOUThreshold').value) || 10;
             const where = getSnapshotWhere() + getFilterWhere();
             const levelCfg = SMALL_GROUPS_LEVELS.find(l => l.key === smallGroupsLevel);
@@ -2596,6 +2648,7 @@
         document.getElementById('smallOUSearch').addEventListener('input', () => renderSmallOUsRows());
         document.getElementById('smallOUThreshold').addEventListener('change', () => {
             smallOUsCacheKey = null;
+            smallGroupsSummaryCacheKey = null;
             renderCurrentTab();
         });
 
