@@ -384,6 +384,11 @@
         .tab:hover { color: var(--dark-gray); }
         .tab.active { color: var(--black); border-bottom-color: var(--primary); }
 
+        .level-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--light-gray); padding: 0 2rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .level-tab { padding: 0.45rem 1rem; font-size: 0.8rem; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; color: var(--medium-gray); white-space: nowrap; }
+        .level-tab:hover { color: var(--dark-gray); }
+        .level-tab.active { color: var(--black); border-bottom-color: var(--primary); font-weight: 500; }
+
         .tab-content { display: none; }
         .tab-content.active { display: block; }
 
@@ -561,7 +566,7 @@
                 <button class="nav-tab" data-nav="trends">Trends</button>
                 <button class="nav-tab" data-nav="movement">Movement</button>
                 <button class="nav-tab" data-nav="export">Export</button>
-                <button class="nav-tab" data-nav="smallous">Small OUs</button>
+                <button class="nav-tab" data-nav="smallous">Small Groups</button>
             </div>
 
             <!-- Snapshot Tab -->
@@ -793,19 +798,29 @@
                 </div>
             </div>
 
-            <!-- Small OUs Tab -->
+            <!-- Small Groups Tab -->
             <div class="nav-content" id="navSmallous">
                 <div class="kpi-grid" id="smallOUsKpiGrid"></div>
 
-                <div class="chart-card full-width" style="margin:1rem 2rem;">
+                <div class="level-tabs">
+                    <button class="level-tab" data-level="division">Division</button>
+                    <button class="level-tab" data-level="unit">Unit</button>
+                    <button class="level-tab" data-level="area">Area</button>
+                    <button class="level-tab" data-level="sector">Sector</button>
+                    <button class="level-tab" data-level="segment">Segment</button>
+                    <button class="level-tab" data-level="function">Function</button>
+                    <button class="level-tab active" data-level="ou">OU</button>
+                </div>
+
+                <div class="chart-card full-width" style="margin:0 2rem 1rem;">
                     <div class="chart-title">
-                        OUs with fewer than
+                        Groups with fewer than
                         <input type="number" id="smallOUThreshold" value="10" min="1" max="500"
                             style="width:60px; border:1px solid var(--light-gray); border-radius:4px; padding:2px 6px; font-size:inherit; text-align:center;">
                         people
                     </div>
                     <div class="table-controls">
-                        <input type="text" class="search-input" id="smallOUSearch" placeholder="Search OU code, description, division..." style="max-width:350px;">
+                        <input type="text" class="search-input" id="smallOUSearch" placeholder="Search..." style="max-width:350px;">
                         <div style="flex:1;"></div>
                         <button class="export-btn" onclick="exportSmallOUsCsv()">Export CSV</button>
                         <button class="export-btn" onclick="exportSmallOUsXlsx()">Export XLSX</button>
@@ -813,15 +828,7 @@
                     <div class="insights-count" id="smallOUsCount"></div>
                     <div class="table-container" style="max-height:600px;">
                         <table id="smallOUsTable">
-                            <thead>
-                                <tr>
-                                    <th class="sort-header" data-sort="ou_code">OU Code</th>
-                                    <th class="sort-header" data-sort="ou_desc">OU Description</th>
-                                    <th class="sort-header" data-sort="division">Division</th>
-                                    <th class="sort-header text-right" data-sort="headcount">Headcount</th>
-                                    <th class="sort-header text-right" data-sort="total_fte">FTE</th>
-                                </tr>
-                            </thead>
+                            <thead id="smallOUsHead"></thead>
                             <tbody id="smallOUsBody"></tbody>
                         </table>
                     </div>
@@ -857,6 +864,17 @@
         let smallOUsSort = { col: 'headcount', dir: 'asc' };
         let smallOUsData = [];
         let smallOUsCacheKey = null;
+        let smallGroupsLevel = 'ou';
+
+        const SMALL_GROUPS_LEVELS = [
+            { key: 'division', label: 'Division', col: 'gcrs_division_desc', parentCol: null,                 parentLabel: null },
+            { key: 'unit',     label: 'Unit',     col: 'gcrs_unit_desc',     parentCol: 'gcrs_division_desc', parentLabel: 'Division' },
+            { key: 'area',     label: 'Area',     col: 'gcrs_area_desc',     parentCol: 'gcrs_unit_desc',     parentLabel: 'Unit' },
+            { key: 'sector',   label: 'Sector',   col: 'gcrs_sector_desc',   parentCol: 'gcrs_area_desc',     parentLabel: 'Area' },
+            { key: 'segment',  label: 'Segment',  col: 'gcrs_segment_desc',  parentCol: 'gcrs_sector_desc',   parentLabel: 'Sector' },
+            { key: 'function', label: 'Function', col: 'gcrs_function_desc', parentCol: 'gcrs_segment_desc',  parentLabel: 'Segment' },
+            { key: 'ou',       label: 'OU',       col: 'ou_desc',            parentCol: 'gcrs_function_desc', parentLabel: 'Function', codeCol: 'ou_code' },
+        ];
 
         // GCRS drill state
         const GCRS_LEVELS = ['gcrs_division_desc', 'gcrs_unit_desc', 'gcrs_area_desc', 'gcrs_sector_desc', 'gcrs_segment_desc', 'gcrs_function_desc'];
@@ -1100,6 +1118,16 @@
                 parent.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
                 e.target.classList.add('active');
                 document.getElementById(e.target.dataset.tab + 'Tab').classList.add('active');
+                renderCurrentTab();
+            }
+
+            // Level tabs (Small Groups)
+            if (e.target.classList.contains('level-tab')) {
+                document.querySelectorAll('.level-tab').forEach(t => t.classList.remove('active'));
+                e.target.classList.add('active');
+                smallGroupsLevel = e.target.dataset.level;
+                smallOUsCacheKey = null;
+                smallOUsSort = { col: 'headcount', dir: 'asc' };
                 renderCurrentTab();
             }
 
@@ -2434,69 +2462,83 @@
         document.getElementById('exportMovementTypeFilter').addEventListener('change', () => renderExportMovementRows());
 
         // ══════════════════════════════════════
-        //  SMALL OUs TAB
+        //  SMALL GROUPS TAB
         // ══════════════════════════════════════
         async function renderSmallOUsTab() {
             const threshold = parseInt(document.getElementById('smallOUThreshold').value) || 10;
             const where = getSnapshotWhere() + getFilterWhere();
-            const cacheKey = `smallous-${where}-${threshold}`;
+            const levelCfg = SMALL_GROUPS_LEVELS.find(l => l.key === smallGroupsLevel);
+            const cacheKey = `smallous-${where}-${threshold}-${smallGroupsLevel}`;
 
             if (smallOUsCacheKey !== cacheKey) {
-                const ouCodeExpr = hrColumns.has('ou_code') ? "COALESCE(ou_code, '(Unknown)')" : "'(Unknown)'";
-                const ouDescExpr = hrColumns.has('ou_desc') ? "COALESCE(ou_desc, '(Unassigned)')" : "'(Unassigned)'";
+                // Build SELECT and GROUP BY dynamically based on active level
+                const selectParts = [];
+                if (levelCfg.parentCol) {
+                    selectParts.push(`COALESCE(${levelCfg.parentCol}, '(Unassigned)') as parent`);
+                }
+                if (levelCfg.codeCol) {
+                    const expr = hrColumns.has(levelCfg.codeCol) ? `COALESCE(${levelCfg.codeCol}, '(Unknown)')` : `'(Unknown)'`;
+                    selectParts.push(`${expr} as code`);
+                }
+                const nameExpr = hrColumns.has(levelCfg.col) ? `COALESCE(${levelCfg.col}, '(Unassigned)')` : `'(Unassigned)'`;
+                selectParts.push(`${nameExpr} as name`);
+                const groupByCount = selectParts.length;
+                selectParts.push('COUNT(*) as headcount', 'ROUND(CAST(SUM(fte) AS DOUBLE), 1) as total_fte');
+                const groupBy = Array.from({ length: groupByCount }, (_, i) => i + 1).join(', ');
 
                 const rows = await query(`
-                    SELECT
-                        ${ouCodeExpr} as ou_code,
-                        ${ouDescExpr} as ou_desc,
-                        COALESCE(gcrs_division_desc, '(Unassigned)') as division,
-                        COUNT(*) as headcount,
-                        ROUND(CAST(SUM(fte) AS DOUBLE), 1) as total_fte
+                    SELECT ${selectParts.join(', ')}
                     FROM hr
                     WHERE ${where}
-                    GROUP BY 1, 2, 3
+                    GROUP BY ${groupBy}
                     HAVING COUNT(*) < ${threshold}
-                    ORDER BY headcount ASC, ou_desc ASC
+                    ORDER BY headcount ASC, name ASC
                 `);
 
                 smallOUsData = rows.map(r => ({
-                    ou_code: r.ou_code,
-                    ou_desc: r.ou_desc,
-                    division: r.division,
+                    parent: r.parent ?? null,
+                    code:   r.code   ?? null,
+                    name:   r.name,
                     headcount: Number(r.headcount),
                     total_fte: r.total_fte !== null && r.total_fte !== undefined ? Number(r.total_fte) : null
                 }));
                 smallOUsCacheKey = cacheKey;
             }
 
-            const totalOUs = smallOUsData.length;
+            const levelLabel = levelCfg.label;
+            const totalGroups = smallOUsData.length;
             const totalHc = smallOUsData.reduce((s, r) => s + r.headcount, 0);
             const totalFte = smallOUsData.reduce((s, r) => s + (r.total_fte || 0), 0);
 
             document.getElementById('smallOUsKpiGrid').innerHTML = `
                 <div class="kpi-card highlight">
-                    <div class="kpi-label">Small OUs</div>
-                    <div class="kpi-value">${formatNumber(totalOUs)}</div>
-                    <div class="kpi-subtitle">OUs with &lt; ${threshold} people</div>
+                    <div class="kpi-label">Small ${levelLabel}s</div>
+                    <div class="kpi-value">${formatNumber(totalGroups)}</div>
+                    <div class="kpi-subtitle">${levelLabel}s with &lt; ${threshold} people</div>
                 </div>
                 <div class="kpi-card info">
                     <div class="kpi-label">Total Headcount</div>
                     <div class="kpi-value">${formatNumber(totalHc)}</div>
-                    <div class="kpi-subtitle">Across all small OUs</div>
+                    <div class="kpi-subtitle">Across all small ${levelLabel}s</div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Total FTE</div>
                     <div class="kpi-value">${formatDecimal(totalFte, 1)}</div>
-                    <div class="kpi-subtitle">FTE in small OUs</div>
+                    <div class="kpi-subtitle">FTE in small ${levelLabel}s</div>
                 </div>
             `;
+
+            // Update search placeholder to reflect current level
+            document.getElementById('smallOUSearch').placeholder =
+                `Search ${levelLabel.toLowerCase()}${levelCfg.parentCol ? ', ' + levelCfg.parentLabel.toLowerCase() : ''}...`;
 
             renderSmallOUsRows();
         }
 
         function renderSmallOUsRows() {
-            const searchVal = (document.getElementById('smallOUSearch').value || '').toLowerCase();
+            const levelCfg = SMALL_GROUPS_LEVELS.find(l => l.key === smallGroupsLevel);
             const threshold = parseInt(document.getElementById('smallOUThreshold').value) || 10;
+            const searchVal = (document.getElementById('smallOUSearch').value || '').toLowerCase();
 
             let filtered = smallOUsData;
             if (searchVal) {
@@ -2505,12 +2547,12 @@
                 );
             }
 
+            const numericCols = new Set(['headcount', 'total_fte']);
             filtered.sort((a, b) => {
                 let aVal = a[smallOUsSort.col];
                 let bVal = b[smallOUsSort.col];
-                if (smallOUsSort.col === 'headcount' || smallOUsSort.col === 'total_fte') {
-                    aVal = Number(aVal) || 0;
-                    bVal = Number(bVal) || 0;
+                if (numericCols.has(smallOUsSort.col)) {
+                    aVal = Number(aVal) || 0; bVal = Number(bVal) || 0;
                     return smallOUsSort.dir === 'asc' ? aVal - bVal : bVal - aVal;
                 }
                 const cmp = String(aVal ?? '').localeCompare(String(bVal ?? ''));
@@ -2518,39 +2560,67 @@
             });
 
             document.getElementById('smallOUsCount').textContent =
-                `${filtered.length} OU${filtered.length !== 1 ? 's' : ''} with fewer than ${threshold} people`;
+                `${filtered.length} ${levelCfg.label}${filtered.length !== 1 ? 's' : ''} with fewer than ${threshold} people`;
+
+            // Build header dynamically
+            const headers = [];
+            if (levelCfg.parentCol)  headers.push({ key: 'parent', label: levelCfg.parentLabel, numeric: false });
+            if (levelCfg.codeCol)    headers.push({ key: 'code',   label: `${levelCfg.label} Code`, numeric: false });
+            headers.push(            { key: 'name',      label: levelCfg.label,  numeric: false });
+            headers.push(            { key: 'headcount', label: 'Headcount',     numeric: true  });
+            headers.push(            { key: 'total_fte', label: 'FTE',           numeric: true  });
+
+            document.getElementById('smallOUsHead').innerHTML = '<tr>' + headers.map(h =>
+                `<th class="sort-header${h.numeric ? ' text-right' : ''}" data-sort="${h.key}">${h.label}` +
+                (smallOUsSort.col === h.key ? ` <span style="font-size:0.7em">${smallOUsSort.dir === 'asc' ? '▲' : '▼'}</span>` : '') +
+                `</th>`
+            ).join('') + '</tr>';
 
             const hcBadge = (hc) => {
                 const cls = hc === 1 ? 'badge-danger' : hc <= 3 ? 'badge-warning' : 'badge-info';
                 return `<span class="badge ${cls}">${formatNumber(hc)}</span>`;
             };
+            const codeChip = (v) =>
+                `<code style="font-size:0.78rem; background:var(--lighter-gray); padding:2px 5px; border-radius:3px;">${escapeHtml(v)}</code>`;
 
             const tbody = document.getElementById('smallOUsBody');
-            tbody.innerHTML = filtered.map(r => `
-                <tr>
-                    <td><code style="font-size:0.78rem; background:var(--lighter-gray); padding:2px 5px; border-radius:3px;">${escapeHtml(r.ou_code)}</code></td>
-                    <td>${escapeHtml(r.ou_desc)}</td>
-                    <td>${escapeHtml(r.division)}</td>
-                    <td class="text-right">${hcBadge(r.headcount)}</td>
-                    <td class="text-right">${r.total_fte !== null ? formatDecimal(r.total_fte, 1) : '\u2014'}</td>
-                </tr>
-            `).join('');
+            tbody.innerHTML = filtered.map(r => '<tr>' + headers.map(h => {
+                const v = r[h.key];
+                if (h.key === 'headcount') return `<td class="text-right">${hcBadge(r.headcount)}</td>`;
+                if (h.key === 'total_fte') return `<td class="text-right">${v !== null ? formatDecimal(v, 1) : '\u2014'}</td>`;
+                if (h.key === 'code')      return `<td>${codeChip(v ?? '')}</td>`;
+                return `<td>${escapeHtml(String(v ?? ''))}</td>`;
+            }).join('') + '</tr>').join('');
         }
 
         document.getElementById('smallOUSearch').addEventListener('input', () => renderSmallOUsRows());
         document.getElementById('smallOUThreshold').addEventListener('change', () => {
-            smallOUsCacheKey = null; // invalidate cache so query re-runs with new threshold
+            smallOUsCacheKey = null;
             renderCurrentTab();
         });
 
         function exportSmallOUsCsv() {
-            downloadCsv(smallOUsData, ['ou_code', 'ou_desc', 'division', 'headcount', 'total_fte'],
-                `small_ous_lt${document.getElementById('smallOUThreshold').value}_${selectedYear}-${String(selectedMonth).padStart(2,'0')}.csv`);
+            const levelCfg = SMALL_GROUPS_LEVELS.find(l => l.key === smallGroupsLevel);
+            const cols = [
+                ...(levelCfg.parentCol ? ['parent'] : []),
+                ...(levelCfg.codeCol   ? ['code']   : []),
+                'name', 'headcount', 'total_fte'
+            ];
+            const threshold = document.getElementById('smallOUThreshold').value;
+            downloadCsv(smallOUsData, cols,
+                `small_${levelCfg.key}s_lt${threshold}_${selectedYear}-${String(selectedMonth).padStart(2,'0')}.csv`);
         }
 
         function exportSmallOUsXlsx() {
-            downloadXlsx(smallOUsData, ['ou_code', 'ou_desc', 'division', 'headcount', 'total_fte'],
-                `small_ous_lt${document.getElementById('smallOUThreshold').value}_${selectedYear}-${String(selectedMonth).padStart(2,'0')}.xlsx`);
+            const levelCfg = SMALL_GROUPS_LEVELS.find(l => l.key === smallGroupsLevel);
+            const cols = [
+                ...(levelCfg.parentCol ? ['parent'] : []),
+                ...(levelCfg.codeCol   ? ['code']   : []),
+                'name', 'headcount', 'total_fte'
+            ];
+            const threshold = document.getElementById('smallOUThreshold').value;
+            downloadXlsx(smallOUsData, cols,
+                `small_${levelCfg.key}s_lt${threshold}_${selectedYear}-${String(selectedMonth).padStart(2,'0')}.xlsx`);
         }
 
         // ── Sort handler ──
