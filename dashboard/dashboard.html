@@ -434,6 +434,16 @@
             font-weight: 400;
         }
 
+        .gcrs-level-tabs { display: flex; gap: 2px; align-items: center; }
+        .gcrs-level-btn {
+            font-size: 0.62rem; padding: 2px 6px;
+            border: 1px solid var(--light-gray);
+            background: var(--light-gray); color: var(--medium-gray);
+            cursor: pointer; border-radius: 3px; font-weight: 500; line-height: 1.4;
+        }
+        .gcrs-level-btn.active { background: var(--dark-gray); color: var(--white); border-color: var(--dark-gray); }
+        .gcrs-level-btn:hover:not(.active) { background: var(--medium-gray); color: var(--white); }
+
         .chart-container {
             height: 200px;
             position: relative;
@@ -1272,8 +1282,13 @@
                 <div class="charts-grid">
                     <div class="chart-card clickable">
                         <div class="chart-title">
-                            Sessions by Business Division
-                            <span class="chart-subtitle">Click to filter</span>
+                            <span id="gcrsChartTitle">Sessions by Business Division</span>
+                            <span class="gcrs-level-tabs">
+                                <button class="gcrs-level-btn active" onclick="setGcrsChartLevel('Division')">Division</button>
+                                <button class="gcrs-level-btn" onclick="setGcrsChartLevel('Unit')">Unit</button>
+                                <button class="gcrs-level-btn" onclick="setGcrsChartLevel('Area')">Area</button>
+                                <button class="gcrs-level-btn" onclick="setGcrsChartLevel('Sector')">Sector</button>
+                            </span>
                         </div>
                         <div class="chart-container">
                             <canvas id="departmentChart"></canvas>
@@ -1923,6 +1938,16 @@
             palette: ['#404040', '#5A5D5C', '#8E8D83', '#B8B3A2', '#CCCABC', '#7A7870', '#8E8D83', '#CCCABC']
         };
 
+        // GCRS hierarchy level config for the department chart (capped at Sector)
+        const GCRS_CHART_LEVELS = [
+            { key: 'Division', col: 'department',      label: 'Business Division' },
+            { key: 'Unit',     col: 'gcrs_unit_desc',  label: 'Business Unit'     },
+            { key: 'Area',     col: 'gcrs_area_desc',  label: 'Business Area'     },
+            { key: 'Sector',   col: 'gcrs_sector_desc',label: 'Business Sector'   },
+        ];
+        let gcrsChartLevel = 'Division';
+        let journeyGcrsColumns = new Set(['department']); // populated after parquet load
+
         // Stable division→gray mapping (same division = same gray everywhere)
         const DIVISION_GRAYS = ['#404040', '#B8B3A2', '#5A5D5C', '#CCCABC', '#7A7870', '#8E8D83'];
         let divisionColorMap = {};
@@ -1995,6 +2020,21 @@
                     const divResult = await conn.query(`SELECT COALESCE(department, 'Unknown') as dept, COUNT(*) as cnt FROM journeys GROUP BY 1 ORDER BY cnt DESC`);
                     divisionColorMap = {};
                     divResult.toArray().forEach((r, i) => { divisionColorMap[r.dept] = DIVISION_GRAYS[i % DIVISION_GRAYS.length]; });
+                } catch (e) { /* non-critical */ }
+
+                // Detect which GCRS hierarchy columns are available in journeys parquet
+                try {
+                    const colsResult = await conn.query(`DESCRIBE journeys`);
+                    journeyGcrsColumns = new Set(colsResult.toArray().map(r => r.column_name));
+                    // Disable level buttons for unavailable columns
+                    GCRS_CHART_LEVELS.forEach(lvl => {
+                        const btn = document.querySelector(`.gcrs-level-btn[onclick*="${lvl.key}"]`);
+                        if (btn && !journeyGcrsColumns.has(lvl.col)) {
+                            btn.disabled = true;
+                            btn.title = 'Rebuild parquet to enable this level';
+                            btn.style.opacity = '0.4';
+                        }
+                    });
                 } catch (e) { /* non-critical */ }
 
                 await renderDashboard();
@@ -2096,6 +2136,20 @@
             }
             updateFiltersDisplay();
             renderDashboard();
+        }
+
+        function setGcrsChartLevel(levelKey) {
+            const cfg = GCRS_CHART_LEVELS.find(l => l.key === levelKey);
+            if (!cfg || (cfg.col !== 'department' && !journeyGcrsColumns.has(cfg.col))) return;
+            gcrsChartLevel = levelKey;
+            document.querySelectorAll('.gcrs-level-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.trim() === levelKey);
+            });
+            document.getElementById('gcrsChartTitle').textContent = `Sessions by ${cfg.label}`;
+            // Clear any active GCRS-level filter to avoid stale cross-level filters
+            GCRS_CHART_LEVELS.forEach(l => { delete activeFilters[l.key]; });
+            updateFiltersDisplay();
+            renderDepartmentDistribution();
         }
 
         function getFilteredColors(colors, labels, filterLabel, valueMapper) {
@@ -2774,10 +2828,12 @@
             });
         }
 
-        // Department distribution (horizontal bar with data labels)
+        // Department/GCRS distribution (horizontal bar with data labels)
         async function renderDepartmentDistribution() {
+            const cfg = GCRS_CHART_LEVELS.find(l => l.key === gcrsChartLevel) || GCRS_CHART_LEVELS[0];
+            const col = cfg.col;
             const result = await conn.query(`
-                SELECT COALESCE(department, 'Unknown') as dept, COUNT(*) as sessions,
+                SELECT COALESCE(${col}, 'Unknown') as dept, COUNT(*) as sessions,
                     ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER(), 1) as pct
                 FROM journeys
                 WHERE ${getDateWhereClause('session_date')}${getFilterWhereClause('journeys')}
@@ -2791,7 +2847,7 @@
             const pcts = data.map(d => Number(d.pct));
             const colors = getFilteredColors(
                 labels.map(l => getDivisionColor(l)),
-                labels, 'Division'
+                labels, cfg.key
             );
 
             if (charts.department) charts.department.destroy();
@@ -2817,7 +2873,7 @@
                     },
                     onClick: (event, elements) => {
                         if (elements.length > 0) {
-                            toggleChartFilter('Division', labels[elements[0].index], 'department', 'journeys');
+                            toggleChartFilter(cfg.key, labels[elements[0].index], col, 'journeys');
                         }
                     },
                     onHover: (event, elements) => {

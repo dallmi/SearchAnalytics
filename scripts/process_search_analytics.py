@@ -138,15 +138,24 @@ def load_department_mapping(con, mappings_dir):
     for filepath, file_date in mapping_files:
         df = pd.read_excel(filepath)
 
-        # Department mapping (OU Code → Division)
-        dept_cols = ['OU Code', 'GCRS Division Desc']
-        missing_dept = [c for c in dept_cols if c not in df.columns]
+        # Department mapping (OU Code → Division + optional GCRS hierarchy up to Sector)
+        required_dept_cols = ['OU Code', 'GCRS Division Desc']
+        optional_gcrs_cols = ['GCRS Unit Desc', 'GCRS Area Desc', 'GCRS Sector Desc']
+        missing_dept = [c for c in required_dept_cols if c not in df.columns]
         if missing_dept:
             log(f"  WARNING: {filepath.name} missing columns {missing_dept} - skipping department mapping")
         else:
-            df_dept = df[dept_cols].dropna(subset=dept_cols).copy()
+            available_gcrs = [c for c in optional_gcrs_cols if c in df.columns]
+            select_cols = required_dept_cols + available_gcrs
+            df_dept = df[select_cols].dropna(subset=required_dept_cols).copy()
             df_dept['OU Code'] = df_dept['OU Code'].astype(str).str.strip()
             df_dept['GCRS Division Desc'] = df_dept['GCRS Division Desc'].astype(str).str.strip()
+            for col in available_gcrs:
+                df_dept[col] = df_dept[col].astype(str).str.strip()
+            # Ensure all optional columns exist (fill with None if not in source file)
+            for col in optional_gcrs_cols:
+                if col not in df_dept.columns:
+                    df_dept[col] = None
             df_dept['valid_year'] = file_date.year
             df_dept['valid_month'] = file_date.month
             all_dept_mappings.append(df_dept)
@@ -181,6 +190,9 @@ def load_department_mapping(con, mappings_dir):
         SELECT
             "OU Code" as ou_code,
             "GCRS Division Desc" as division_name,
+            "GCRS Unit Desc" as unit_name,
+            "GCRS Area Desc" as area_name,
+            "GCRS Sector Desc" as sector_name,
             CAST(valid_year AS INTEGER) as valid_year,
             CAST(valid_month AS INTEGER) as valid_month
         FROM _dept_df
@@ -558,6 +570,36 @@ def add_calculated_columns(con, has_department_mapping=False):
     else:
         department_mapped_expr = raw_department_expr
 
+    # GCRS hierarchy lookups (Unit, Area, Sector) — same time-aware pattern as department
+    has_gcrs_hierarchy = False
+    if has_department_mapping and department_candidates:
+        try:
+            dm_cols = [r[0] for r in con.execute("DESCRIBE department_mapping").fetchall()]
+            has_gcrs_hierarchy = all(c in dm_cols for c in ['unit_name', 'area_name', 'sector_name'])
+        except Exception:
+            pass
+
+    def _make_gcrs_expr(col_name):
+        return f"""(SELECT dm.{col_name} FROM department_mapping dm
+               WHERE dm.ou_code = {ou_code_expr}
+                 AND (dm.valid_year * 100 + dm.valid_month) <= (YEAR(r.timestamp) * 100 + MONTH(r.timestamp))
+               ORDER BY dm.valid_year DESC, dm.valid_month DESC LIMIT 1)"""
+
+    def _make_gcrs_fallback_expr(col_name):
+        return f"""(SELECT dm.{col_name} FROM department_mapping dm
+               WHERE dm.ou_code = {ou_code_expr}
+                 AND (dm.valid_year * 100 + dm.valid_month) > (YEAR(r.timestamp) * 100 + MONTH(r.timestamp))
+               ORDER BY dm.valid_year ASC, dm.valid_month ASC LIMIT 1)"""
+
+    if has_gcrs_hierarchy:
+        unit_mapped_expr = f"COALESCE({_make_gcrs_expr('unit_name')}, {_make_gcrs_fallback_expr('unit_name')})"
+        area_mapped_expr = f"COALESCE({_make_gcrs_expr('area_name')}, {_make_gcrs_fallback_expr('area_name')})"
+        sector_mapped_expr = f"COALESCE({_make_gcrs_expr('sector_name')}, {_make_gcrs_fallback_expr('sector_name')})"
+    else:
+        unit_mapped_expr = 'NULL'
+        area_mapped_expr = 'NULL'
+        sector_mapped_expr = 'NULL'
+
     # Location
     location_candidates = [c for c in ['CP_userDetails_location'] if c in col_names]
     location_expr = f"COALESCE({', '.join(location_candidates)})" if location_candidates else 'NULL'
@@ -609,7 +651,10 @@ def add_calculated_columns(con, has_department_mapping=False):
         'applied_filter': applied_filter_candidates, 'result_title': result_title_candidates,
         'result_url': result_url_candidates, 'news_result_count': news_count_candidates,
         'query_language': query_lang_candidates, 'device_type': device_type_candidates,
-        'department': department_candidates, 'location': location_candidates,
+        'department': department_candidates, 'gcrs_unit': ['unit_name'] if has_gcrs_hierarchy else [],
+        'gcrs_area': ['area_name'] if has_gcrs_hierarchy else [],
+        'gcrs_sector': ['sector_name'] if has_gcrs_hierarchy else [],
+        'location': location_candidates,
         'job_title': job_title_candidates, 'search_latency': latency_candidates,
     }
     resolved_fields = [k for k, v in new_field_candidates.items() if v]
@@ -701,6 +746,9 @@ def add_calculated_columns(con, has_department_mapping=False):
             {raw_department_expr} as department_raw,
             {ou_code_expr} as department_ou_code,
             {department_mapped_expr} as department,
+            {unit_mapped_expr} as gcrs_unit_desc,
+            {area_mapped_expr} as gcrs_area_desc,
+            {sector_mapped_expr} as gcrs_sector_desc,
             {location_expr} as location,
             {region_expr} as region,
             {job_title_expr} as job_title,
@@ -948,6 +996,9 @@ def export_parquet_files(con, output_dir):
                     -- New dimension fields (first non-null value per session)
                     MIN(device_type) as device_type,
                     MIN(department) as department,
+                    MIN(gcrs_unit_desc) as gcrs_unit_desc,
+                    MIN(gcrs_area_desc) as gcrs_area_desc,
+                    MIN(gcrs_sector_desc) as gcrs_sector_desc,
                     MIN(location) as location,
                     MIN(region) as region,
                     MIN(job_title) as job_title,
@@ -1097,6 +1148,9 @@ def export_parquet_files(con, output_dir):
                 -- New dimension fields
                 device_type,
                 department,
+                gcrs_unit_desc,
+                gcrs_area_desc,
+                gcrs_sector_desc,
                 location,
                 region,
                 job_title,
