@@ -2489,14 +2489,14 @@
                 const parts = SMALL_GROUPS_LEVELS.map(l => {
                     const col = hrColumns.has(l.col) ? `COALESCE(${l.col}, '(Unassigned)')` : `'(Unassigned)'`;
                     return `SELECT '${l.key}' as key,
-                        SUM(CASE WHEN hc < ${threshold} THEN 1 ELSE 0 END) as small_count,
-                        COUNT(*) as total_count,
-                        SUM(CASE WHEN hc < ${threshold} THEN hc ELSE 0 END) as small_hc
-                    FROM (SELECT ${col} as grp, COUNT(*) as hc FROM hr WHERE ${where} GROUP BY 1)`;
+                        CAST(SUM(CASE WHEN hc < ${threshold} THEN 1 ELSE 0 END) AS INTEGER) as small_count,
+                        CAST(COUNT(*) AS INTEGER) as total_count,
+                        CAST(SUM(CASE WHEN hc < ${threshold} THEN hc ELSE 0 END) AS INTEGER) as small_hc
+                    FROM (SELECT ${col} as grp, CAST(COUNT(*) AS INTEGER) as hc FROM hr WHERE ${where} GROUP BY 1)`;
                 });
                 const [rows, hcRows] = await Promise.all([
                     query(parts.join('\nUNION ALL\n')),
-                    query(`SELECT COUNT(*) as total_hc FROM hr WHERE ${where}`)
+                    query(`SELECT CAST(COUNT(*) AS INTEGER) as total_hc FROM hr WHERE ${where}`)
                 ]);
                 const totalHc = Number(hcRows[0].total_hc);
                 const summary = { _totalHc: totalHc };
