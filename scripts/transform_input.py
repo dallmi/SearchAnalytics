@@ -199,7 +199,10 @@ def transform_file(input_path):
 
     # Write output
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    output_path = OUTPUT_DIR / input_path.name
+    # Convert dashes to underscores in date portion of filename
+    # e.g. search_analytics_2026-03-13.xlsx → search_analytics_2026_03_13.xlsx
+    output_name = re.sub(r'(\d{4})-(\d{2})-(\d{2})', r'\1_\2_\3', input_path.name)
+    output_path = OUTPUT_DIR / output_name
     df_out.to_excel(output_path, index=False)
 
     log(f"  Written {len(df_out):,} rows x {len(df_out.columns)} columns to {output_path}")
