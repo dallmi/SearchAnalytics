@@ -2059,9 +2059,10 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { position: 'top', labels: { font: { size: 10 }, boxWidth: 12 } },
+                        legend: { position: 'top', reverse: true, labels: { font: { size: 10 }, boxWidth: 12 } },
                         tooltip: {
                             mode: 'index',
+                            itemSort: (a, b) => b.datasetIndex - a.datasetIndex,
                             callbacks: {
                                 label: ctx => {
                                     const abs = ctx.dataset._absData[ctx.dataIndex];
