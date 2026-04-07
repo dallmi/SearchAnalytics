@@ -912,7 +912,7 @@
         // ── Color palettes ──
         const DIVISION_GRAYS = ['#404040', '#B8B3A2', '#5A5D5C', '#CCCABC', '#7A7870', '#8E8D83']; // high-contrast alternating order
         let divisionColorMap = {}; // stable division→gray mapping, built on first data load
-        const RANK_ORDER = ['MD', 'ED', 'DI', 'AD', 'AO', 'EE', 'NA', 'Other'];
+        const RANK_ORDER = ['Other', 'NA', 'EE', 'AO', 'AD', 'DI', 'ED', 'MD'];
         const RANK_COLORS = {
             'MD': '#404040', 'ED': '#5A5D5C', 'DI': '#00759E',
             'AD': '#879420', 'AO': '#AF8626', 'EE': '#804C95',
@@ -2027,17 +2027,25 @@
             const monthKeys = [...new Set(rows.map(r => `${r.snapshot_year}-${r.snapshot_month}`))];
             const labels = monthKeys.map(k => { const [y, m] = k.split('-'); return monthLabel(parseInt(y), parseInt(m)); });
 
-            const dataMap = {};
+            // Build absolute counts
+            const absMap = {};
+            const totals = {};
             rows.forEach(r => {
                 const key = `${r.snapshot_year}-${r.snapshot_month}`;
-                if (!dataMap[r.rank]) dataMap[r.rank] = {};
-                dataMap[r.rank][key] = Number(r.cnt);
+                if (!absMap[r.rank]) absMap[r.rank] = {};
+                absMap[r.rank][key] = Number(r.cnt);
+                totals[key] = (totals[key] || 0) + Number(r.cnt);
             });
 
-            // Use fixed RANK_ORDER so stacking is consistent (MD on top)
-            const datasets = RANK_ORDER.filter(rank => dataMap[rank]).map(rank => ({
+            // Convert to percentages, keep absolute for tooltips
+            const datasets = RANK_ORDER.filter(rank => absMap[rank]).map(rank => ({
                 label: rank,
-                data: monthKeys.map(k => dataMap[rank]?.[k] || 0),
+                data: monthKeys.map(k => {
+                    const abs = absMap[rank]?.[k] || 0;
+                    const total = totals[k] || 1;
+                    return +(abs / total * 100).toFixed(2);
+                }),
+                _absData: monthKeys.map(k => absMap[rank]?.[k] || 0),
                 backgroundColor: RANK_COLORS[rank],
                 borderWidth: 0
             }));
@@ -2052,11 +2060,23 @@
                     maintainAspectRatio: false,
                     plugins: {
                         legend: { position: 'top', labels: { font: { size: 10 }, boxWidth: 12 } },
-                        tooltip: { mode: 'index' }
+                        tooltip: {
+                            mode: 'index',
+                            callbacks: {
+                                label: ctx => {
+                                    const abs = ctx.dataset._absData[ctx.dataIndex];
+                                    return `${ctx.dataset.label}: ${formatNumber(abs)} (${ctx.raw.toFixed(1)}%)`;
+                                }
+                            }
+                        }
                     },
                     scales: {
                         x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
-                        y: { stacked: true, grid: { color: '#ECEBE4' }, ticks: { font: { size: 10 } } }
+                        y: {
+                            stacked: true, max: 100,
+                            grid: { color: '#ECEBE4' },
+                            ticks: { font: { size: 10 }, callback: v => v + '%' }
+                        }
                     }
                 }
             });
