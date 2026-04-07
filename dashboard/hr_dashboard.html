@@ -5,12 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HR History Dashboard</title>
 
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
-    <!-- SheetJS for XLSX export (last MIT-licensed release) -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- ExcelJS for styled XLSX export -->
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 
     <!-- DuckDB WASM - loaded as ES module -->
     <script type="module">
@@ -29,6 +31,7 @@
             --medium-gray: #7A7870;
             --light-gray: #CCCABC;
             --lighter-gray: #ECEBE4;
+            --page-bg: #F7F7F5;
             --row-alt: #F8F7F2;
             --white: #FFFFFF;
             --success: #6F7A1A;
@@ -45,7 +48,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background-color: var(--lighter-gray);
+            background-color: var(--page-bg);
             color: var(--dark-gray);
             line-height: 1.5;
         }
@@ -57,7 +60,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid var(--light-gray);
+            border-bottom: 2px solid var(--primary);
             position: sticky;
             top: 0;
             z-index: 100;
@@ -601,7 +604,7 @@
 
                 <div class="charts-grid">
                     <div class="chart-card">
-                        <div class="chart-title">Headcount by Corporate Title</div>
+                        <div class="chart-title">Headcount by Rank</div>
                         <div class="chart-container tall">
                             <canvas id="titleChart"></canvas>
                         </div>
@@ -656,15 +659,29 @@
 
                 <div class="charts-grid">
                     <div class="chart-card">
-                        <div class="chart-title">Headcount by Division Over Time</div>
+                        <div class="chart-title" id="divTrendTitle">Headcount by Division Over Time</div>
+                        <div id="divTrendBreadcrumbs" style="display:none; margin-bottom:0.5rem; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                        </div>
                         <div class="chart-container tall">
                             <canvas id="divTrendChart"></canvas>
                         </div>
                     </div>
                     <div class="chart-card">
-                        <div class="chart-title">Headcount by Region Over Time</div>
+                        <div class="chart-title" id="regionTrendTitle">Headcount by Region Over Time</div>
+                        <div id="regionTrendBack" style="display:none; margin-bottom:0.5rem;">
+                            <button class="btn btn-secondary" onclick="regionTrendDrillUp()" style="font-size:0.75rem; padding:0.25rem 0.6rem;">&larr; Back to Regions</button>
+                        </div>
                         <div class="chart-container tall">
                             <canvas id="regionTrendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-card full-width">
+                        <div class="chart-title">Headcount by Rank Over Time</div>
+                        <div class="chart-container tall">
+                            <canvas id="rankTrendChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -733,7 +750,7 @@
                                         <th class="sort-header" data-sort="division">Division</th>
                                         <th class="sort-header" data-sort="ou_desc">OU</th>
                                         <th class="sort-header" data-sort="region">Region</th>
-                                        <th class="sort-header" data-sort="corporate_title">Title</th>
+                                        <th class="sort-header" data-sort="corporate_title">Rank</th>
                                         <th class="sort-header" data-sort="detail">Detail</th>
                                     </tr>
                                 </thead>
@@ -793,7 +810,7 @@
                                     <th class="sort-header" data-sort="division">Division</th>
                                     <th class="sort-header" data-sort="ou_desc">OU</th>
                                     <th class="sort-header" data-sort="region">Region</th>
-                                    <th class="sort-header" data-sort="corporate_title">Title</th>
+                                    <th class="sort-header" data-sort="corporate_title">Rank</th>
                                     <th class="sort-header" data-sort="detail">Detail</th>
                                 </tr>
                             </thead>
@@ -895,6 +912,12 @@
         // ── Color palettes ──
         const DIVISION_GRAYS = ['#404040', '#B8B3A2', '#5A5D5C', '#CCCABC', '#7A7870', '#8E8D83']; // high-contrast alternating order
         let divisionColorMap = {}; // stable division→gray mapping, built on first data load
+        const RANK_ORDER = ['MD', 'ED', 'DI', 'AD', 'AO', 'EE', 'NA', 'Other'];
+        const RANK_COLORS = {
+            'MD': '#404040', 'ED': '#5A5D5C', 'DI': '#00759E',
+            'AD': '#879420', 'AO': '#AF8626', 'EE': '#804C95',
+            'NA': '#CCCABC', 'Other': '#B8B3A2'
+        };
         const REGION_COLORS = { 'SWITZERLAND': '#404040', 'EMEA': '#B8B3A2', 'AMERICAS': '#5A5D5C', 'APAC': '#7A7870', 'Unknown': '#CCCABC' };
         const COUNTRY_PALETTE = ['#879420', '#9F8865', '#469A6C', '#AD3E4A', '#8489BD', '#0C7EC6', '#654D16', '#804C95', '#45999C', '#4972AC'];
         const GRAY_PALETTE = ['#404040', '#5A5D5C', '#8E8D83', '#B8B3A2', '#CCCABC', '#7A7870', '#8E8D83', '#CCCABC', '#404040', '#7A7870'];
@@ -1720,6 +1743,7 @@
                 renderHcFteTrend(),
                 renderDivTrend(),
                 renderRegionTrend(),
+                renderRankTrend(),
                 renderGrowthRate()
             ]);
         }
@@ -1789,33 +1813,85 @@
             });
         }
 
+        // Division trend drilldown state: [{col, value, label}]
+        let divTrendDrillPath = [];
+
         async function renderDivTrend() {
+            const level = divTrendDrillPath.length;
+            const gcrsCol = GCRS_LEVELS[level] || GCRS_LEVELS[GCRS_LEVELS.length - 1];
+            const gcrsLabel = GCRS_LABELS[level] || GCRS_LABELS[GCRS_LABELS.length - 1];
+            const isTop = level === 0;
+
+            // Build breadcrumbs
+            const bcEl = document.getElementById('divTrendBreadcrumbs');
+            if (isTop) {
+                bcEl.style.display = 'none';
+                bcEl.innerHTML = '';
+            } else {
+                bcEl.style.display = 'flex';
+                let html = `<button class="btn btn-secondary" onclick="divTrendDrillTo(-1)" style="font-size:0.75rem; padding:0.25rem 0.6rem;">&larr; All Divisions</button>`;
+                divTrendDrillPath.forEach((step, i) => {
+                    html += `<span style="color:var(--medium-gray); font-size:0.75rem;">/</span>`;
+                    if (i < divTrendDrillPath.length - 1) {
+                        html += `<button class="btn btn-secondary" onclick="divTrendDrillTo(${i})" style="font-size:0.75rem; padding:0.25rem 0.6rem;">${escapeHtml(step.value)}</button>`;
+                    } else {
+                        html += `<span style="font-size:0.75rem; font-weight:600; color:var(--dark-gray);">${escapeHtml(step.value)}</span>`;
+                    }
+                });
+                bcEl.innerHTML = html;
+            }
+
+            // Title
+            document.getElementById('divTrendTitle').textContent = isTop
+                ? 'Headcount by Division Over Time'
+                : `Headcount by ${gcrsLabel} Over Time`;
+
+            // Build drill filter clause
+            let drillWhere = '';
+            divTrendDrillPath.forEach(step => {
+                drillWhere += ` AND ${step.col} = '${step.value.replace(/'/g, "''")}'`;
+            });
+
+            const filterWhere = getFilterWhere();
+            const whereClause = filterWhere || drillWhere
+                ? 'WHERE 1=1' + (filterWhere || '') + drillWhere
+                : '';
+
             const rows = await query(`
                 SELECT snapshot_year, snapshot_month,
-                       COALESCE(gcrs_division_desc, '(Unassigned)') as division,
+                       COALESCE(${gcrsCol}, '(Unassigned)') as grp,
                        COUNT(*) as cnt
-                FROM hr ${getFilterWhere() ? 'WHERE 1=1' + getFilterWhere() : ''}
+                FROM hr ${whereClause}
                 GROUP BY 1, 2, 3 ORDER BY 1, 2
             `);
 
-            // Pivot: one dataset per division
             const monthKeys = [...new Set(rows.map(r => `${r.snapshot_year}-${r.snapshot_month}`))];
-            const divisions = [...new Set(rows.map(r => r.division))];
+            const groups = [...new Set(rows.map(r => r.grp))];
             const labels = monthKeys.map(k => { const [y, m] = k.split('-'); return monthLabel(parseInt(y), parseInt(m)); });
 
             const dataMap = {};
             rows.forEach(r => {
                 const key = `${r.snapshot_year}-${r.snapshot_month}`;
-                if (!dataMap[r.division]) dataMap[r.division] = {};
-                dataMap[r.division][key] = Number(r.cnt);
+                if (!dataMap[r.grp]) dataMap[r.grp] = {};
+                dataMap[r.grp][key] = Number(r.cnt);
             });
 
-            const datasets = divisions.map((div, i) => ({
-                label: div,
-                data: monthKeys.map(k => dataMap[div]?.[k] || 0),
-                backgroundColor: getDivisionColor(div),
+            // Sort by total headcount descending at deeper levels
+            const sortedGroups = isTop ? groups : groups.sort((a, b) => {
+                const totalA = monthKeys.reduce((s, k) => s + (dataMap[a]?.[k] || 0), 0);
+                const totalB = monthKeys.reduce((s, k) => s + (dataMap[b]?.[k] || 0), 0);
+                return totalB - totalA;
+            });
+
+            const datasets = sortedGroups.map((grp, i) => ({
+                label: grp,
+                data: monthKeys.map(k => dataMap[grp]?.[k] || 0),
+                backgroundColor: isTop ? getDivisionColor(grp) : COUNTRY_PALETTE[i % COUNTRY_PALETTE.length],
                 borderWidth: 0
             }));
+
+            // Can drill deeper?
+            const canDrill = level < GCRS_LEVELS.length - 1;
 
             destroyChart('divTrend');
             const ctx = document.getElementById('divTrendChart').getContext('2d');
@@ -1825,6 +1901,15 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    onClick: canDrill ? (evt, elements) => {
+                        if (elements.length > 0) {
+                            const dsIdx = elements[0].datasetIndex;
+                            const clickedValue = datasets[dsIdx].label;
+                            if (clickedValue === '(Unassigned)') return;
+                            divTrendDrillPath.push({ col: gcrsCol, value: clickedValue, label: gcrsLabel });
+                            renderDivTrend();
+                        }
+                    } : undefined,
                     plugins: {
                         legend: { position: 'top', labels: { font: { size: 10 }, boxWidth: 12 } },
                         tooltip: { mode: 'index' }
@@ -1837,36 +1922,129 @@
             });
         }
 
-        async function renderRegionTrend() {
+        function divTrendDrillTo(idx) {
+            if (idx < 0) divTrendDrillPath = [];
+            else divTrendDrillPath = divTrendDrillPath.slice(0, idx + 1);
+            renderDivTrend();
+        }
+
+        let regionTrendDrilledRegion = null;
+
+        async function renderRegionTrend(drillRegion) {
+            regionTrendDrilledRegion = drillRegion || null;
+            const isDrilled = !!drillRegion;
+            document.getElementById('regionTrendBack').style.display = isDrilled ? 'block' : 'none';
+            document.getElementById('regionTrendTitle').textContent = isDrilled
+                ? `Headcount by Country — ${drillRegion}`
+                : 'Headcount by Region Over Time';
+
+            const filterWhere = getFilterWhere();
+            const regionFilter = isDrilled ? ` AND UPPER(work_location_region) = '${drillRegion}'` : '';
+            const groupCol = isDrilled
+                ? "COALESCE(UPPER(work_location_country), 'Unknown')"
+                : "COALESCE(UPPER(work_location_region), 'Unknown')";
+
             const rows = await query(`
                 SELECT snapshot_year, snapshot_month,
-                       COALESCE(UPPER(work_location_region), 'Unknown') as region,
+                       ${groupCol} as grp,
                        COUNT(*) as cnt
-                FROM hr ${getFilterWhere() ? 'WHERE 1=1' + getFilterWhere() : ''}
+                FROM hr ${filterWhere ? 'WHERE 1=1' + filterWhere + regionFilter : (regionFilter ? 'WHERE 1=1' + regionFilter : '')}
                 GROUP BY 1, 2, 3 ORDER BY 1, 2
             `);
 
             const monthKeys = [...new Set(rows.map(r => `${r.snapshot_year}-${r.snapshot_month}`))];
-            const regions = [...new Set(rows.map(r => r.region))];
+            const groups = [...new Set(rows.map(r => r.grp))];
             const labels = monthKeys.map(k => { const [y, m] = k.split('-'); return monthLabel(parseInt(y), parseInt(m)); });
 
             const dataMap = {};
             rows.forEach(r => {
                 const key = `${r.snapshot_year}-${r.snapshot_month}`;
-                if (!dataMap[r.region]) dataMap[r.region] = {};
-                dataMap[r.region][key] = Number(r.cnt);
+                if (!dataMap[r.grp]) dataMap[r.grp] = {};
+                dataMap[r.grp][key] = Number(r.cnt);
             });
 
-            const datasets = regions.map(reg => ({
-                label: reg,
-                data: monthKeys.map(k => dataMap[reg]?.[k] || 0),
-                backgroundColor: REGION_COLORS[reg] || '#CCCABC',
+            // Sort countries by total headcount descending for better readability
+            const sortedGroups = isDrilled
+                ? groups.sort((a, b) => {
+                    const totalA = monthKeys.reduce((s, k) => s + (dataMap[a]?.[k] || 0), 0);
+                    const totalB = monthKeys.reduce((s, k) => s + (dataMap[b]?.[k] || 0), 0);
+                    return totalB - totalA;
+                })
+                : groups;
+
+            const datasets = sortedGroups.map((grp, i) => ({
+                label: grp,
+                data: monthKeys.map(k => dataMap[grp]?.[k] || 0),
+                backgroundColor: isDrilled
+                    ? COUNTRY_PALETTE[i % COUNTRY_PALETTE.length]
+                    : (REGION_COLORS[grp] || '#CCCABC'),
                 borderWidth: 0
             }));
 
             destroyChart('regionTrend');
             const ctx = document.getElementById('regionTrendChart').getContext('2d');
             charts.regionTrend = new Chart(ctx, {
+                type: 'bar',
+                data: { labels, datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    onClick: isDrilled ? undefined : (evt, elements) => {
+                        if (elements.length > 0) {
+                            const dsIdx = elements[0].datasetIndex;
+                            const clickedRegion = datasets[dsIdx].label;
+                            renderRegionTrend(clickedRegion);
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'top', labels: { font: { size: 10 }, boxWidth: 12 } },
+                        tooltip: { mode: 'index' }
+                    },
+                    scales: {
+                        x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+                        y: { stacked: true, grid: { color: '#ECEBE4' }, ticks: { font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        function regionTrendDrillUp() {
+            renderRegionTrend(null);
+        }
+
+        async function renderRankTrend() {
+            const rows = await query(`
+                SELECT snapshot_year, snapshot_month,
+                       CASE
+                           WHEN corporate_title IN ('MD','ED','DI','AD','AO','EE','NA') THEN corporate_title
+                           ELSE 'Other'
+                       END as rank,
+                       COUNT(*) as cnt
+                FROM hr ${getFilterWhere() ? 'WHERE 1=1' + getFilterWhere() : ''}
+                GROUP BY 1, 2, 3 ORDER BY 1, 2
+            `);
+
+            const monthKeys = [...new Set(rows.map(r => `${r.snapshot_year}-${r.snapshot_month}`))];
+            const labels = monthKeys.map(k => { const [y, m] = k.split('-'); return monthLabel(parseInt(y), parseInt(m)); });
+
+            const dataMap = {};
+            rows.forEach(r => {
+                const key = `${r.snapshot_year}-${r.snapshot_month}`;
+                if (!dataMap[r.rank]) dataMap[r.rank] = {};
+                dataMap[r.rank][key] = Number(r.cnt);
+            });
+
+            // Use fixed RANK_ORDER so stacking is consistent (MD on top)
+            const datasets = RANK_ORDER.filter(rank => dataMap[rank]).map(rank => ({
+                label: rank,
+                data: monthKeys.map(k => dataMap[rank]?.[k] || 0),
+                backgroundColor: RANK_COLORS[rank],
+                borderWidth: 0
+            }));
+
+            destroyChart('rankTrend');
+            const ctx = document.getElementById('rankTrendChart').getContext('2d');
+            charts.rankTrend = new Chart(ctx, {
                 type: 'bar',
                 data: { labels, datasets },
                 options: {
@@ -2683,7 +2861,7 @@
                 `small_${levelCfg.key}s_lt${threshold}_${selectedYear}-${String(selectedMonth).padStart(2,'0')}.csv`);
         }
 
-        function exportSmallOUsXlsx() {
+        async function exportSmallOUsXlsx() {
             const levelCfg = SMALL_GROUPS_LEVELS.find(l => l.key === smallGroupsLevel);
             const cols = [
                 ...(levelCfg.parentCol ? ['parent'] : []),
@@ -2691,7 +2869,7 @@
                 'name', 'headcount', 'total_fte'
             ];
             const threshold = document.getElementById('smallOUThreshold').value;
-            downloadXlsx(smallOUsData, cols,
+            await downloadXlsx(smallOUsData, cols,
                 `small_${levelCfg.key}s_lt${threshold}_${selectedYear}-${String(selectedMonth).padStart(2,'0')}.xlsx`);
         }
 
@@ -2747,23 +2925,72 @@
             URL.revokeObjectURL(url);
         }
 
-        function downloadXlsx(data, columns, filename) {
-            const ws = XLSX.utils.json_to_sheet(data.map(r => {
-                const obj = {};
-                columns.forEach(c => { obj[c] = r[c] === null || r[c] === undefined ? '' : r[c]; });
-                return obj;
-            }));
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Data');
-            XLSX.writeFile(wb, filename);
+        async function downloadXlsx(data, columns, filename) {
+            const wb = new ExcelJS.Workbook();
+            const ws = wb.addWorksheet('Data');
+
+            // Header row
+            const headerRow = ws.addRow(columns.map(c => c));
+            headerRow.height = 30;
+            headerRow.eachCell(cell => {
+                cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF404040'}};
+                cell.font = {name:'Arial', bold:true, color:{argb:'FFFFFFFF'}, size:10};
+                cell.alignment = {horizontal:'left', vertical:'middle', wrapText:true};
+                cell.border = {
+                    bottom: {style:'medium', color:{argb:'FFE60000'}},
+                    right: {style:'thin', color:{argb:'FFCCCABC'}}
+                };
+            });
+
+            // Data rows
+            data.forEach((row, idx) => {
+                const dr = ws.addRow(columns.map(c => {
+                    const v = row[c];
+                    return v === null || v === undefined ? '' : v;
+                }));
+                dr.eachCell(cell => {
+                    cell.font = {name:'Arial', size:10};
+                    cell.alignment = {horizontal:'left', vertical:'top', wrapText:true};
+                    cell.border = {
+                        bottom: {style:'thin', color:{argb:'FFCCCABC'}},
+                        right: {style:'thin', color:{argb:'FFCCCABC'}}
+                    };
+                    if (idx % 2 === 0) {
+                        cell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FFF8F7F2'}};
+                    }
+                });
+            });
+
+            // Column widths (auto-calculated)
+            columns.forEach((c, i) => {
+                let mx = c.length;
+                data.slice(0, 100).forEach(r => {
+                    mx = Math.max(mx, String(r[c] ?? '').length);
+                });
+                ws.getColumn(i + 1).width = Math.min(mx + 2, 50);
+            });
+
+            // Freeze header & auto-filter
+            ws.views = [{state:'frozen', ySplit:1}];
+            ws.autoFilter = {from:{row:1,column:1}, to:{row:1,column:columns.length}};
+
+            // Download
+            const buffer = await wb.xlsx.writeBuffer();
+            const blob = new Blob([buffer], {
+                type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
         }
 
         function exportSnapshotCsv() {
             downloadCsv(exportSnapshotData, exportSnapshotCols, `hr_snapshot_${selectedYear}_${selectedMonth}.csv`);
         }
 
-        function exportSnapshotXlsx() {
-            downloadXlsx(exportSnapshotData, exportSnapshotCols, `hr_snapshot_${selectedYear}_${selectedMonth}.xlsx`);
+        async function exportSnapshotXlsx() {
+            await downloadXlsx(exportSnapshotData, exportSnapshotCols, `hr_snapshot_${selectedYear}_${selectedMonth}.xlsx`);
         }
 
         function exportMovementCsv() {
@@ -2771,9 +2998,9 @@
             downloadCsv(exportMovementData, cols, `hr_movements_${selectedYear}_${selectedMonth}.csv`);
         }
 
-        function exportMovementXlsx() {
+        async function exportMovementXlsx() {
             const cols = ['type', 'gpn', 'business_name', 'email', 'division', 'ou_desc', 'region', 'corporate_title', 'detail'];
-            downloadXlsx(exportMovementData, cols, `hr_movements_${selectedYear}_${selectedMonth}.xlsx`);
+            await downloadXlsx(exportMovementData, cols, `hr_movements_${selectedYear}_${selectedMonth}.xlsx`);
         }
 
         // ── Start ──
