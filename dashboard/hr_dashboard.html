@@ -648,9 +648,9 @@
 
             <!-- Trends Tab -->
             <div class="nav-content" id="navTrends">
-                <div class="loading" id="trendsLoading">
-                    <div class="spinner"></div>
-                    <div>Loading trends...</div>
+                <div id="trendsLoading" style="display:none; padding:2rem; text-align:center; color:var(--medium-gray);">
+                    <div class="spinner" style="margin:0 auto 0.5rem;"></div>
+                    <div style="font-size:0.8rem;">Loading trends...</div>
                 </div>
                 <div id="trendsContent" style="display:none;">
                 <div class="charts-grid">
@@ -1747,7 +1747,7 @@
         async function renderTrendsTab() {
             const loading = document.getElementById('trendsLoading');
             const content = document.getElementById('trendsContent');
-            loading.style.display = 'flex';
+            loading.style.display = 'block';
             content.style.display = 'none';
             await Promise.allSettled([
                 renderHcFteTrend(),
