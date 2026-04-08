@@ -2016,7 +2016,8 @@
             const rows = await query(`
                 SELECT snapshot_year, snapshot_month,
                        CASE
-                           WHEN corporate_title IN ('MD','ED','DI','AD','AO','EE','NA') THEN corporate_title
+                           WHEN corporate_title IS NULL OR TRIM(corporate_title) = '' THEN 'NA'
+                           WHEN corporate_title IN ('MD','ED','DI','AD','AO','EE') THEN corporate_title
                            ELSE 'Other'
                        END as rank,
                        COUNT(*) as cnt
@@ -2038,7 +2039,7 @@
             });
 
             // Convert to percentages, keep absolute for tooltips
-            const datasets = RANK_ORDER.filter(rank => absMap[rank]).map((rank, idx) => ({
+            const datasets = RANK_ORDER.filter(rank => absMap[rank]).map(rank => ({
                 label: rank,
                 data: monthKeys.map(k => {
                     const abs = absMap[rank]?.[k] || 0;
@@ -2047,8 +2048,7 @@
                 }),
                 _absData: monthKeys.map(k => absMap[rank]?.[k] || 0),
                 backgroundColor: RANK_COLORS[rank],
-                borderWidth: 0,
-                order: RANK_ORDER.length - idx
+                borderWidth: 0
             }));
 
             destroyChart('rankTrend');
