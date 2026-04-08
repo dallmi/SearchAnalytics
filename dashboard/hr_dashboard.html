@@ -2016,7 +2016,7 @@
             const rows = await query(`
                 SELECT snapshot_year, snapshot_month,
                        CASE
-                           WHEN corporate_title IS NULL OR TRIM(corporate_title) = '' THEN 'NA'
+                           WHEN corporate_title IS NULL OR TRIM(corporate_title) = '' OR corporate_title = 'NA' THEN 'NA'
                            WHEN corporate_title IN ('MD','ED','DI','AD','AO','EE') THEN corporate_title
                            ELSE 'Other'
                        END as rank,
