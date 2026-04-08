@@ -912,7 +912,7 @@
         // ── Color palettes ──
         const DIVISION_GRAYS = ['#404040', '#B8B3A2', '#5A5D5C', '#CCCABC', '#7A7870', '#8E8D83']; // high-contrast alternating order
         let divisionColorMap = {}; // stable division→gray mapping, built on first data load
-        const RANK_ORDER = ['Other', 'NA', 'EE', 'AO', 'AD', 'DI', 'ED', 'MD'];
+        const RANK_ORDER = ['MD', 'ED', 'DI', 'AD', 'AO', 'EE', 'NA', 'Other'];
         const RANK_COLORS = {
             'MD': '#404040', 'ED': '#5A5D5C', 'DI': '#00759E',
             'AD': '#879420', 'AO': '#AF8626', 'EE': '#804C95',
@@ -2059,10 +2059,9 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { position: 'top', reverse: true, labels: { font: { size: 10 }, boxWidth: 12 } },
+                        legend: { position: 'top', labels: { font: { size: 10 }, boxWidth: 12 } },
                         tooltip: {
                             mode: 'index',
-                            itemSort: (a, b) => b.datasetIndex - a.datasetIndex,
                             callbacks: {
                                 label: ctx => {
                                     const abs = ctx.dataset._absData[ctx.dataIndex];
