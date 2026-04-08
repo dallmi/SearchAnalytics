@@ -647,12 +647,11 @@
             </div>
 
             <!-- Trends Tab -->
-            <div class="nav-content" id="navTrends">
-                <div id="trendsLoading" style="display:none; padding:2rem; text-align:center; color:var(--medium-gray);">
-                    <div class="spinner" style="margin:0 auto 0.5rem;"></div>
+            <div class="nav-content" id="navTrends" style="position:relative;">
+                <div id="trendsLoading" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; z-index:10; background:var(--white); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:0.5rem; color:var(--medium-gray);">
+                    <div class="spinner"></div>
                     <div style="font-size:0.8rem;">Loading trends...</div>
                 </div>
-                <div id="trendsContent" style="display:none;">
                 <div class="charts-grid">
                     <div class="chart-card full-width">
                         <div class="chart-title">Total Headcount &amp; FTE Over Time</div>
@@ -698,7 +697,6 @@
                             <canvas id="growthRateChart"></canvas>
                         </div>
                     </div>
-                </div>
                 </div>
             </div>
 
@@ -1747,9 +1745,7 @@
         // ══════════════════════════════════════
         async function renderTrendsTab() {
             const loading = document.getElementById('trendsLoading');
-            const content = document.getElementById('trendsContent');
-            loading.style.display = 'block';
-            content.style.display = 'none';
+            loading.style.display = 'flex';
             await Promise.allSettled([
                 renderHcFteTrend(),
                 renderDivTrend(),
@@ -1758,7 +1754,6 @@
                 renderGrowthRate()
             ]);
             loading.style.display = 'none';
-            content.style.display = 'block';
         }
 
         async function renderHcFteTrend() {
