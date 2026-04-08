@@ -158,7 +158,7 @@
         .nav-content.active { display: block; }
 
 
-        .loading {
+        #loadingState {
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -649,11 +649,6 @@
 
             <!-- Trends Tab -->
             <div class="nav-content" id="navTrends">
-                <div id="trendsLoading" style="display:none; padding:2rem; text-align:center; color:var(--medium-gray);">
-                    <div class="spinner" style="margin:0 auto 0.5rem;"></div>
-                    <div style="font-size:0.8rem;">Loading trends...</div>
-                </div>
-                <div id="trendsCharts" style="visibility:hidden; height:0; overflow:hidden;">
                 <div class="charts-grid">
                     <div class="chart-card full-width">
                         <div class="chart-title">Total Headcount &amp; FTE Over Time</div>
@@ -699,7 +694,6 @@
                             <canvas id="growthRateChart"></canvas>
                         </div>
                     </div>
-                </div>
                 </div>
             </div>
 
@@ -1147,9 +1141,6 @@
                 document.querySelectorAll('.nav-content').forEach(c => c.classList.remove('active'));
                 e.target.classList.add('active');
                 const navId = 'nav' + e.target.dataset.nav.charAt(0).toUpperCase() + e.target.dataset.nav.slice(1);
-                // Pre-collapse trend charts before tab becomes visible to prevent empty whitespace
-                const tc = document.getElementById('trendsCharts');
-                if (tc) tc.style.cssText = 'visibility:hidden; height:0; overflow:hidden;';
                 document.getElementById(navId).classList.add('active');
                 document.querySelector('.nav-tabs').scrollIntoView({ behavior: 'smooth' });
                 renderCurrentTab();
@@ -1750,11 +1741,6 @@
         //  TRENDS TAB
         // ══════════════════════════════════════
         async function renderTrendsTab() {
-            const loading = document.getElementById('trendsLoading');
-            const charts = document.getElementById('trendsCharts');
-            // Collapse charts visually but keep in DOM so Chart.js gets dimensions
-            charts.style.cssText = 'visibility:hidden; height:0; overflow:hidden;';
-            loading.style.display = 'block';
             await Promise.allSettled([
                 renderHcFteTrend(),
                 renderDivTrend(),
@@ -1762,9 +1748,6 @@
                 renderRankTrend(),
                 renderGrowthRate()
             ]);
-            // Reveal rendered charts
-            charts.style.cssText = '';
-            loading.style.display = 'none';
         }
 
         async function renderHcFteTrend() {
