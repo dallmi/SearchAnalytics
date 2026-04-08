@@ -647,11 +647,12 @@
             </div>
 
             <!-- Trends Tab -->
-            <div class="nav-content" id="navTrends" style="position:relative;">
-                <div id="trendsLoading" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; z-index:10; background:var(--white); align-items:center; justify-content:center; flex-direction:column; gap:0.5rem; color:var(--medium-gray);">
-                    <div class="spinner"></div>
+            <div class="nav-content" id="navTrends">
+                <div id="trendsLoading" style="display:none; padding:2rem; text-align:center; color:var(--medium-gray);">
+                    <div class="spinner" style="margin:0 auto 0.5rem;"></div>
                     <div style="font-size:0.8rem;">Loading trends...</div>
                 </div>
+                <div id="trendsCharts">
                 <div class="charts-grid">
                     <div class="chart-card full-width">
                         <div class="chart-title">Total Headcount &amp; FTE Over Time</div>
@@ -664,7 +665,7 @@
                 <div class="charts-grid">
                     <div class="chart-card">
                         <div class="chart-title" id="divTrendTitle">Headcount by Division Over Time</div>
-                        <div id="divTrendBreadcrumbs" style="display:none; margin-bottom:0.5rem; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+                        <div id="divTrendBreadcrumbs" style="display:none; margin-bottom:0.5rem; align-items:center; gap:0.5rem; flex-wrap:wrap;">
                         </div>
                         <div class="chart-container tall">
                             <canvas id="divTrendChart"></canvas>
@@ -697,6 +698,7 @@
                             <canvas id="growthRateChart"></canvas>
                         </div>
                     </div>
+                </div>
                 </div>
             </div>
 
@@ -1745,7 +1747,10 @@
         // ══════════════════════════════════════
         async function renderTrendsTab() {
             const loading = document.getElementById('trendsLoading');
-            loading.style.display = 'flex';
+            const charts = document.getElementById('trendsCharts');
+            // Collapse charts visually but keep in DOM so Chart.js gets dimensions
+            charts.style.cssText = 'visibility:hidden; height:0; overflow:hidden;';
+            loading.style.display = 'block';
             await Promise.allSettled([
                 renderHcFteTrend(),
                 renderDivTrend(),
@@ -1753,6 +1758,8 @@
                 renderRankTrend(),
                 renderGrowthRate()
             ]);
+            // Reveal rendered charts
+            charts.style.cssText = '';
             loading.style.display = 'none';
         }
 
