@@ -37,8 +37,8 @@
             --warning-light: #FDF6E3;
             --danger: #BD000C;
             --danger-light: #FFEBE6;
-            --info: #8E8D83;
-            --info-light: #ECEBE4;
+            --info: #0C7EC6;
+            --info-light: #E6F1FA;
         }
 
         * {
@@ -1928,14 +1928,14 @@
             success: '#6F7A1A',
             warning: '#E4A911',
             danger: '#BD000C',
-            info: '#8E8D83',
+            info: '#0C7EC6',
             gray: '#7A7870',
             lightGray: '#CCCABC',
             dark: '#404040',
             chart: '#5A5D5C',
             chartLight: '#8E8D8399',
             // Gray palette for multi-series categorical charts
-            palette: ['#404040', '#5A5D5C', '#8E8D83', '#B8B3A2', '#CCCABC', '#7A7870', '#8E8D83', '#CCCABC']
+            palette: ['#404040', '#5A5D5C', '#8E8D83', '#B8B3A2', '#CCCABC', '#7A7870']
         };
 
         // GCRS hierarchy level config for the department chart (capped at Sector)
@@ -1948,15 +1948,35 @@
         let gcrsChartLevel = 'Division';
         let journeyGcrsColumns = new Set(['department']); // populated after parquet load
 
-        // Stable division→gray mapping (same division = same gray everywhere)
-        const DIVISION_GRAYS = ['#404040', '#B8B3A2', '#5A5D5C', '#CCCABC', '#7A7870', '#8E8D83'];
-        let divisionColorMap = {};
+        // Stable division→gray mapping — fixed by name, not by data order
+        const DIVISION_COLOR_MAP = {
+            'Investment Bank': '#404040', 'Global Wealth Management': '#B8B3A2',
+            'Asset Management': '#5A5D5C', 'Group Functions': '#CCCABC',
+            'Personal & Corporate Banking': '#7A7870'
+        };
+        const DIVISION_GRAYS_FALLBACK = ['#8E8D83', '#404040', '#B8B3A2', '#5A5D5C', '#CCCABC', '#7A7870'];
+        let divFallbackIdx = 0;
         function getDivisionColor(divName) {
-            if (divisionColorMap[divName]) return divisionColorMap[divName];
-            const idx = Object.keys(divisionColorMap).length;
-            divisionColorMap[divName] = DIVISION_GRAYS[idx % DIVISION_GRAYS.length];
-            return divisionColorMap[divName];
+            if (DIVISION_COLOR_MAP[divName]) return DIVISION_COLOR_MAP[divName];
+            const color = DIVISION_GRAYS_FALLBACK[divFallbackIdx % DIVISION_GRAYS_FALLBACK.length];
+            divFallbackIdx++;
+            return color;
         }
+
+        // Canonical entity color maps
+        const REGION_COLORS_MAP = {
+            'SWITZERLAND': '#404040', 'EMEA': '#B8B3A2',
+            'AMERICAS': '#5A5D5C', 'APAC': '#7A7870', 'Unknown': '#CCCABC'
+        };
+        const COUNTRY_PALETTE = [
+            '#879420', '#9F8865', '#469A6C', '#AD3E4A', '#8489BD',
+            '#0C7EC6', '#654D16', '#804C95', '#45999C', '#4972AC'
+        ];
+        const RANK_ORDER = ['Other', 'NA', 'EE', 'AO', 'AD', 'DI', 'ED', 'MD'];
+        const RANK_COLORS = {
+            'MD': '#404040', 'ED': '#CCCABC', 'DI': '#5A5D5C', 'AD': '#B8B3A2',
+            'AO': '#7A7870', 'EE': '#8E8D83', 'NA': '#785E4A', 'Other': '#AD3E4A'
+        };
 
         const OUTCOME_COLORS = {
             'Success': COLORS.success,
@@ -2015,11 +2035,10 @@
                 document.getElementById('dashboardContent').style.display = 'block';
                 document.getElementById('dateFilterControls').classList.remove('loading');
 
-                // Build stable division→gray mapping (sorted by session count)
+                // Pre-seed getDivisionColor for any unknown divisions in the dataset
                 try {
-                    const divResult = await conn.query(`SELECT COALESCE(department, 'Unknown') as dept, COUNT(*) as cnt FROM journeys GROUP BY 1 ORDER BY cnt DESC`);
-                    divisionColorMap = {};
-                    divResult.toArray().forEach((r, i) => { divisionColorMap[r.dept] = DIVISION_GRAYS[i % DIVISION_GRAYS.length]; });
+                    const divResult = await conn.query(`SELECT COALESCE(department, 'Unknown') as dept FROM journeys GROUP BY 1`);
+                    divResult.toArray().forEach(r => getDivisionColor(r.dept));
                 } catch (e) { /* non-critical */ }
 
                 // Detect which GCRS hierarchy columns are available in journeys parquet
@@ -2898,12 +2917,8 @@
             const labels = data.map(d => d.region);
             const values = data.map(d => Number(d.sessions));
             const pcts = data.map(d => Number(d.pct));
-            const REGION_COLORS = {
-                'SWITZERLAND': '#404040', 'EMEA': '#B8B3A2',
-                'AMERICAS': '#5A5D5C', 'APAC': '#7A7870', 'Unknown': '#CCCABC'
-            };
             const colors = getFilteredColors(
-                labels.map(l => REGION_COLORS[l] || '#CCCABC'),
+                labels.map(l => REGION_COLORS_MAP[l] || '#CCCABC'),
                 labels, 'Region'
             );
 
