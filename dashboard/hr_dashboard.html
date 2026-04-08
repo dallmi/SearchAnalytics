@@ -157,15 +157,6 @@
 
         .nav-content.active { display: block; }
 
-        /* DEBUG: remove after diagnosis */
-        .header { outline: 3px solid red !important; }
-        .nav-tabs { outline: 3px solid blue !important; }
-        #navTrends { outline: 3px solid green !important; }
-        #trendsLoading { outline: 3px solid orange !important; }
-        #trendsCharts { outline: 3px solid magenta !important; }
-        .charts-grid { outline: 2px dashed cyan !important; }
-        .chart-card { outline: 2px dashed yellow !important; }
-        #loadingState { outline: 3px solid purple !important; }
 
         .loading {
             display: flex;
@@ -662,7 +653,7 @@
                     <div class="spinner" style="margin:0 auto 0.5rem;"></div>
                     <div style="font-size:0.8rem;">Loading trends...</div>
                 </div>
-                <div id="trendsCharts">
+                <div id="trendsCharts" style="visibility:hidden; height:0; overflow:hidden;">
                 <div class="charts-grid">
                     <div class="chart-card full-width">
                         <div class="chart-title">Total Headcount &amp; FTE Over Time</div>
@@ -1156,6 +1147,9 @@
                 document.querySelectorAll('.nav-content').forEach(c => c.classList.remove('active'));
                 e.target.classList.add('active');
                 const navId = 'nav' + e.target.dataset.nav.charAt(0).toUpperCase() + e.target.dataset.nav.slice(1);
+                // Pre-collapse trend charts before tab becomes visible to prevent empty whitespace
+                const tc = document.getElementById('trendsCharts');
+                if (tc) tc.style.cssText = 'visibility:hidden; height:0; overflow:hidden;';
                 document.getElementById(navId).classList.add('active');
                 document.querySelector('.nav-tabs').scrollIntoView({ behavior: 'smooth' });
                 renderCurrentTab();
