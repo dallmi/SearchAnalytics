@@ -648,6 +648,11 @@
 
             <!-- Trends Tab -->
             <div class="nav-content" id="navTrends">
+                <div class="loading" id="trendsLoading">
+                    <div class="spinner"></div>
+                    <div>Loading trends...</div>
+                </div>
+                <div id="trendsContent" style="display:none;">
                 <div class="charts-grid">
                     <div class="chart-card full-width">
                         <div class="chart-title">Total Headcount &amp; FTE Over Time</div>
@@ -693,6 +698,7 @@
                             <canvas id="growthRateChart"></canvas>
                         </div>
                     </div>
+                </div>
                 </div>
             </div>
 
@@ -1739,6 +1745,10 @@
         //  TRENDS TAB
         // ══════════════════════════════════════
         async function renderTrendsTab() {
+            const loading = document.getElementById('trendsLoading');
+            const content = document.getElementById('trendsContent');
+            loading.style.display = 'flex';
+            content.style.display = 'none';
             await Promise.allSettled([
                 renderHcFteTrend(),
                 renderDivTrend(),
@@ -1746,6 +1756,8 @@
                 renderRankTrend(),
                 renderGrowthRate()
             ]);
+            loading.style.display = 'none';
+            content.style.display = 'block';
         }
 
         async function renderHcFteTrend() {
