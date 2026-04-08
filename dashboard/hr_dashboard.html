@@ -910,9 +910,14 @@
         let gcrsLevel = 0;
         let gcrsFilters = []; // [{level, value}]
 
-        // ── Color palettes ──
-        const DIVISION_GRAYS = ['#404040', '#B8B3A2', '#5A5D5C', '#CCCABC', '#7A7870', '#8E8D83']; // high-contrast alternating order
-        let divisionColorMap = {}; // stable division→gray mapping, built on first data load
+        // ── Color palettes (canonical — see entity-colors.md in html-dashboard skill) ──
+        const DIVISION_COLOR_MAP = {
+            'Investment Bank': '#404040', 'Global Wealth Management': '#B8B3A2',
+            'Asset Management': '#5A5D5C', 'Group Functions': '#CCCABC',
+            'Personal & Corporate Banking': '#7A7870'
+        };
+        const DIVISION_GRAYS_FALLBACK = ['#8E8D83', '#404040', '#B8B3A2', '#5A5D5C', '#CCCABC', '#7A7870'];
+        let divFallbackIdx = 0;
         const RANK_ORDER = ['Other', 'NA', 'EE', 'AO', 'AD', 'DI', 'ED', 'MD'];
         const RANK_COLORS = {
             'MD': '#404040', 'ED': '#CCCABC', 'DI': '#5A5D5C',
@@ -924,10 +929,10 @@
         const GRAY_PALETTE = ['#404040', '#5A5D5C', '#8E8D83', '#B8B3A2', '#CCCABC', '#7A7870', '#8E8D83', '#CCCABC', '#404040', '#7A7870'];
 
         function getDivisionColor(divName) {
-            if (divisionColorMap[divName]) return divisionColorMap[divName];
-            const idx = Object.keys(divisionColorMap).length;
-            divisionColorMap[divName] = DIVISION_GRAYS[idx % DIVISION_GRAYS.length];
-            return divisionColorMap[divName];
+            if (DIVISION_COLOR_MAP[divName]) return DIVISION_COLOR_MAP[divName];
+            const color = DIVISION_GRAYS_FALLBACK[divFallbackIdx % DIVISION_GRAYS_FALLBACK.length];
+            divFallbackIdx++;
+            return color;
         }
 
         // ── Utility functions ──
