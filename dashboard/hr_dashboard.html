@@ -912,11 +912,11 @@
         // ── Color palettes ──
         const DIVISION_GRAYS = ['#404040', '#B8B3A2', '#5A5D5C', '#CCCABC', '#7A7870', '#8E8D83']; // high-contrast alternating order
         let divisionColorMap = {}; // stable division→gray mapping, built on first data load
-        const RANK_ORDER = ['MD', 'ED', 'DI', 'AD', 'AO', 'EE', 'NA', 'Other'];
+        const RANK_ORDER = ['Other', 'NA', 'EE', 'AO', 'AD', 'DI', 'ED', 'MD'];
         const RANK_COLORS = {
-            'MD': '#404040', 'ED': '#5A5D5C', 'DI': '#00759E',
-            'AD': '#879420', 'AO': '#AF8626', 'EE': '#804C95',
-            'NA': '#CCCABC', 'Other': '#B8B3A2'
+            'MD': '#404040', 'ED': '#CCCABC', 'DI': '#5A5D5C',
+            'AD': '#B8B3A2', 'AO': '#7A7870', 'EE': '#8E8D83',
+            'NA': '#785E4A', 'Other': '#AD3E4A'
         };
         const REGION_COLORS = { 'SWITZERLAND': '#404040', 'EMEA': '#B8B3A2', 'AMERICAS': '#5A5D5C', 'APAC': '#7A7870', 'Unknown': '#CCCABC' };
         const COUNTRY_PALETTE = ['#879420', '#9F8865', '#469A6C', '#AD3E4A', '#8489BD', '#0C7EC6', '#654D16', '#804C95', '#45999C', '#4972AC'];
@@ -2038,7 +2038,7 @@
             });
 
             // Convert to percentages, keep absolute for tooltips
-            const datasets = RANK_ORDER.filter(rank => absMap[rank]).map(rank => ({
+            const datasets = RANK_ORDER.filter(rank => absMap[rank]).map((rank, idx) => ({
                 label: rank,
                 data: monthKeys.map(k => {
                     const abs = absMap[rank]?.[k] || 0;
@@ -2047,7 +2047,8 @@
                 }),
                 _absData: monthKeys.map(k => absMap[rank]?.[k] || 0),
                 backgroundColor: RANK_COLORS[rank],
-                borderWidth: 0
+                borderWidth: 0,
+                order: RANK_ORDER.length - idx
             }));
 
             destroyChart('rankTrend');
@@ -2059,9 +2060,10 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { position: 'top', labels: { font: { size: 10 }, boxWidth: 12 } },
+                        legend: { position: 'top', reverse: true, labels: { font: { size: 10 }, boxWidth: 12 } },
                         tooltip: {
                             mode: 'index',
+                            itemSort: (a, b) => b.datasetIndex - a.datasetIndex,
                             callbacks: {
                                 label: ctx => {
                                     const abs = ctx.dataset._absData[ctx.dataIndex];
